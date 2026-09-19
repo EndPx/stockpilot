@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc --noEmit && pnpm --filter @stockpilot/web build",
+    "dev": "pnpm --filter @stockpilot/web dev",
+    "start": "pnpm --filter @stockpilot/web start",
     "validate:mints": "tsx src/validate-mints.ts",
     "validate:execution": "tsx src/validate-execution.ts"
   },
