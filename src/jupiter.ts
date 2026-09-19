@@ -75,7 +75,11 @@ export async function getJupiterQuote(request: JupiterQuoteRequest): Promise<Jup
   const priceImpactPct = Number(quote.priceImpactPct);
   const slippageBps = quote.slippageBps;
 
-  if (!Number.isFinite(priceImpactPct) || !Number.isInteger(slippageBps)) {
+  if (
+    !Number.isFinite(priceImpactPct) ||
+    typeof slippageBps !== "number" ||
+    !Number.isInteger(slippageBps)
+  ) {
     throw new Error("Jupiter quote response contains invalid numeric fields.");
   }
 
