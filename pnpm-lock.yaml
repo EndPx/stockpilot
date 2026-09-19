@@ -11,6 +11,9 @@ importers:
       '@solana/kit':
         specifier: ^8.3.0
         version: 8.3.0(typescript@5.9.3)
+      '@stockpilot/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@stockpilot/integrations':
         specifier: workspace:*
         version: link:packages/integrations
@@ -49,6 +52,12 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+
+  packages/core:
+    dependencies:
+      '@stockpilot/integrations':
+        specifier: workspace:*
+        version: link:../integrations
 
   packages/integrations:
     dependencies:

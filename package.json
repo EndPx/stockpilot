@@ -17,6 +17,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@stockpilot/core": "workspace:*",
     "@stockpilot/integrations": "workspace:*",
     "@solana/kit": "^8.3.0"
   }
