@@ -1,0 +1,8 @@
+{
+  "name": "@stockpilot/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { "./prestocks": "./src/prestocks.ts" },
+  "dependencies": { "@solana/kit": "^8.3.0" }
+}

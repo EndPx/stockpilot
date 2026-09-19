@@ -7,6 +7,7 @@
     "build": "tsc --noEmit && pnpm --filter @stockpilot/web build",
     "dev": "pnpm --filter @stockpilot/web dev",
     "start": "pnpm --filter @stockpilot/web start",
+    "test": "tsx --test tests/*.test.ts",
     "validate:mints": "tsx src/validate-mints.ts",
     "validate:execution": "tsx src/validate-execution.ts"
   },
@@ -16,6 +17,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@stockpilot/integrations": "workspace:*",
     "@solana/kit": "^8.3.0"
   }
 }

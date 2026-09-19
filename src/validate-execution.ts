@@ -1,6 +1,6 @@
 import { SOLANA_MAINNET_USDC_DECIMALS, SOLANA_MAINNET_USDC_MINT } from "./constants.js";
 import { getJupiterQuote } from "./jupiter.js";
-import { fetchPreStocks } from "./prestocks.js";
+import { fetchPreStocks } from "@stockpilot/integrations/prestocks";
 import { getSolanaTokenDecimals, validateSolanaMint } from "./solana.js";
 
 function formatRawAmount(raw: string, decimals: number): string {

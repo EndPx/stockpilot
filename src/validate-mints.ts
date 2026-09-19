@@ -1,4 +1,4 @@
-import { fetchPreStocks } from "./prestocks.js";
+import { fetchPreStocks } from "@stockpilot/integrations/prestocks";
 import { validateSolanaMint } from "./solana.js";
 
 const assets = await fetchPreStocks();
