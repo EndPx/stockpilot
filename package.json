@@ -8,8 +8,8 @@
     "validate:execution": "tsx src/validate-execution.ts"
   },
   "devDependencies": {
+    "@types/node": "^26.6.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
 }
-
