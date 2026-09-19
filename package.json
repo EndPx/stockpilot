@@ -1,0 +1,15 @@
+{
+  "name": "stockpilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "validate:execution": "tsx src/validate-execution.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
+
