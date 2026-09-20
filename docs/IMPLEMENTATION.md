@@ -1,6 +1,6 @@
 # Implementation Checklist
 
-Last verified: 2026-09-20
+Last verified: 2026-09-21
 
 ## Product scope
 
@@ -79,13 +79,56 @@ On 2026-09-20:
 
 Live prices, quote output, route, and asset availability are observations rather than fixed application data.
 
-## Phase 3 — wallet connection in progress
+## Phase 3 — Solana wallet connection
 
-- [ ] Solana wallet connection.
-- [ ] Connected wallet UI state.
-- [ ] Wallet disconnect and reconnect.
+- [x] Discover compatible mainnet wallets through Wallet Standard.
+- [x] Connect from the navigation or minimal home page without gating Markets.
+- [x] Show a shortened address in controls and the full address, wallet name, and network in the wallet dialog.
+- [x] Persist the selected wallet account and attempt silent reconnect after reload.
+- [x] Disconnect without clearing unrelated application data.
+- [x] Handle pending, reconnecting, connecting, connected, disconnecting, no-wallet, and recoverable error states.
+- [x] Preserve usable layouts at 375 px mobile, 768 px tablet, and desktop widths.
 
 Wallet connection means frontend access to a Wallet Standard wallet. It is not authentication, does not prove ownership to the StockPilot backend, and does not create a user session.
+
+### Tooling choice
+
+The web application uses exact versions of the maintained Solana frontend stack:
+
+- `@solana/kit` 8.3.0 for the composable client.
+- `@solana/kit-plugin-wallet` 0.20.0 for Wallet Standard discovery, connection state, persistence, and reconnect.
+- `@solana/react` 8.3.0 for the client provider and reactive hooks.
+
+The wallet plugin is installed with `walletWithoutSigner`. This intentionally adds wallet state without assigning a client payer or identity. No legacy `@solana/web3.js` v1 or wallet-adapter packages were added. No wallet vendor is hardcoded; Phantom, Solflare, Backpack, and other compatible wallets appear when their installed provider advertises Solana mainnet and `standard:connect`.
+
+Phase 3 performs no RPC calls, balance reads, message signing, transaction signing, or transaction submission. Consequently there is no `NEXT_PUBLIC_SOLANA_RPC_URL` and no paid or private RPC credential to configure. The mainnet chain identifier is centralized in `apps/web/lib/solana/config.ts`.
+
+### Wallet architecture
+
+```text
+apps/web/
+  providers/solana-provider.tsx         stable application-wide Kit client
+  lib/solana/config.ts                  mainnet chain and persistence key
+  lib/solana/address.ts                 reusable address shortening
+  components/wallet/wallet-button.tsx   Wallet Standard UI and lifecycle actions
+  tests/wallet.test.ts                  extension-independent UI state coverage
+```
+
+The provider wraps the application shell, so public Markets and Asset Detail pages retain their server-rendered data path while wallet state is available to client controls. Server and first-client wallet rendering share a stable pending state to prevent hydration mismatches.
+
+### Final Phase 3 verification
+
+On 2026-09-21:
+
+- `pnpm build` passed with every application and API route compiled.
+- `pnpm test` passed all 14 existing service tests and 5 wallet UI tests.
+- Production browser checks had no console warnings or errors.
+- Wallet discovery, connection, full and shortened address display, connected Markets access, disconnect, reconnect, and reload recovery were checked with an isolated Wallet Standard mock; no real wallet keys or transactions were used.
+- The no-installed-wallet state, Escape dismissal with focus restoration, and disconnected Markets access were checked.
+- Live `/markets` returned 8 official PreStocks assets and live `/markets/SPACEX` metadata loaded while disconnected; Markets also retained all 8 assets while connected.
+- Desktop, 768 px tablet, and 375 px mobile layouts had no document-level horizontal overflow.
+
+The live Phase 1 execution regression is recorded again at final handoff because quote output and routes are time-sensitive.
 
 ## Future phases
 

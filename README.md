@@ -6,7 +6,7 @@ StockPilot is an agent-native investing experience built specifically for PreSto
 
 - Phase 1: live PreStocks mint discovery and USDC-to-PreStocks Jupiter quote validation complete.
 - Phase 2: shared asset architecture, Next.js application, live markets, and asset detail pages complete.
-- Phase 3: Solana wallet connection in progress; wallet authentication remains a later phase.
+- Phase 3: Wallet Standard connection, reconnect state, connected identity, and disconnect complete. Wallet authentication remains a later phase.
 
 The web application reads live provider data. Prices and the available asset registry can change between requests.
 
@@ -62,7 +62,10 @@ pnpm dev
 
 Open `http://localhost:3000`, then use **Explore Markets** or visit `/markets` directly.
 
+Use **Connect Wallet** to choose an installed Wallet Standard compatible Solana wallet. Compatible wallets such as Phantom, Solflare, and Backpack are discovered by capability rather than hardcoded by vendor.
+
 No environment variables are required for the default live PreStocks endpoint. `PRESTOCKS_API_URL` can override it for local testing.
+Phase 3 makes no RPC request, so it does not require or expose a browser RPC URL or credential.
 
 ## Verification
 
