@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav aria-label="Main navigation" className="mx-auto flex min-h-20 max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:gap-x-10 sm:px-8">
               <Link href="/" className="text-xl font-bold tracking-tight">StockPilot<span className="text-accent">.</span></Link>
               <Link href="/markets" className="flex min-h-11 items-center text-sm font-semibold text-muted hover:text-ink">Markets</Link>
-              <WalletButton />
+              <div className="ms-auto"><WalletButton /></div>
             </nav>
           </header>
           <main id="main" className="page">{children}</main>

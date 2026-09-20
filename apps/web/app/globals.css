@@ -23,7 +23,7 @@ button:disabled { cursor: not-allowed; }
   .button { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700; }
   .secondary-button { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50; }
   .page-title { @apply text-3xl font-semibold tracking-tight sm:text-4xl; }
-  .wallet-control { @apply ms-auto shrink-0; }
+  .wallet-control { @apply shrink-0; }
   .wallet-trigger { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold hover:bg-slate-50 disabled:text-muted disabled:opacity-80 sm:px-4; }
   .wallet-trigger-connected { @apply border-indigo-200 bg-indigo-50 text-indigo-950 hover:bg-indigo-100; }
   .wallet-dot { @apply size-2 shrink-0 rounded-full bg-slate-300; }
