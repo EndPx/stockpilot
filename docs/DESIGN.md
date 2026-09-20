@@ -1,9 +1,9 @@
 # StockPilot design foundation
 
 Purpose: help users compare current official PreStocks data, inspect one asset,
-and connect a Solana wallet. The live company table carries the page. Connecting
-a wallet establishes identity only; it does not expose balances, trading, or
-transaction signing.
+connect a Solana wallet, and prove ownership of that wallet. The live company
+table carries the page. Authentication establishes identity only; it does not
+expose balances, trading, or transaction signing.
 
 - Colors: background #F7F8FA, surface #FFFFFF, text #111318, secondary #6B7280,
   border #E7E9EE, restrained indigo #4F46E5 for links and actions.
@@ -24,13 +24,22 @@ transaction signing.
 - States: distinct loading, empty, no search results, unavailable, and not found.
   Token Price and Mark Price remain separate; missing data is an em dash. The
   wallet control distinguishes pending, disconnected, connecting, connected,
-  disconnecting, reconnecting, no-wallet, and recoverable error states.
+  disconnecting, reconnecting, no-wallet, and recoverable error states. A
+  connected wallet separately distinguishes signed out, signing in, signed in,
+  and recoverable authentication failure. The primary authentication action
+  keeps one stable position while its label and disabled state communicate
+  progress.
 - Wallet selector: use a focused modal dialog with the wallet trigger carrying
   `aria-haspopup="dialog"` and `aria-expanded`. Escape and the close control
   dismiss it and return focus to the trigger. Installed Wallet Standard wallets
   appear by discovered name; no wallet vendor is hardcoded.
 - Motion: no decorative animation. Loading placeholders are static. Wallet state
   changes do not depend on motion and remain usable with reduced-motion settings.
+- Authentication: connection and authentication are never presented as the same
+  state. “Sign out” removes the StockPilot session without disconnecting the
+  wallet. “Disconnect” also removes the session. A restored session is shown as
+  authenticated only when its wallet address matches the currently connected
+  wallet.
 - Content: errors use calm, actionable language and do not expose raw wallet or
   extension internals. The empty state explains that a compatible Solana wallet
   must be installed before connecting.
@@ -44,3 +53,4 @@ References:
 
 - Layout mechanism: https://github.com/changeroa/StyleGallery/blob/main/patterns/in-line-grouping/split-nav.md
 - Dialog interaction mechanism: https://beui.dev/r/popover/raw
+- Async action-state mechanism: https://beui.dev/r/button/raw
