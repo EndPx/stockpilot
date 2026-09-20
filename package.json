@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && pnpm --filter @stockpilot/web build",
     "dev": "pnpm --filter @stockpilot/web dev",
     "start": "pnpm --filter @stockpilot/web start",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts && pnpm --filter @stockpilot/web test",
     "validate:mints": "tsx src/validate-mints.ts",
     "validate:execution": "tsx src/validate-execution.ts"
   },
