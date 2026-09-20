@@ -9,7 +9,7 @@ import {
   useWalletStatus,
   useWallets,
 } from "@solana/kit-plugin-wallet/react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { shortenAddress } from "@/lib/solana/address";
 import { SOLANA_NETWORK_LABEL } from "@/lib/solana/config";
 import { solanaClient } from "@/providers/solana-provider";
@@ -194,6 +194,7 @@ export function WalletControlView({
 }
 
 export function WalletButton() {
+  const [hydrated, setHydrated] = useState(false);
   const status = useWalletStatus(solanaClient);
   const wallets = useWallets(solanaClient);
   const connected = useConnectedWallet(solanaClient);
@@ -202,13 +203,15 @@ export function WalletButton() {
   const disconnectAction = useDisconnect(solanaClient);
   const options = wallets.map((wallet, index) => ({ id: `${wallet.name}-${index}`, name: wallet.name }));
 
+  useEffect(() => setHydrated(true), []);
+
   return (
     <WalletControlView
-      status={status}
-      address={connected?.account.address}
-      reconnectingAddress={reconnectingAccount?.address}
-      walletName={connected?.wallet.name}
-      wallets={options}
+      status={hydrated ? status : "pending"}
+      address={hydrated ? connected?.account.address : undefined}
+      reconnectingAddress={hydrated ? reconnectingAccount?.address : undefined}
+      walletName={hydrated ? connected?.wallet.name : undefined}
+      wallets={hydrated ? options : []}
       onConnect={async (walletId) => {
         const index = options.findIndex((option) => option.id === walletId);
         if (index < 0) throw new Error("Wallet is no longer available");
