@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { WalletButton } from "@/components/wallet/wallet-button";
 import { SolanaProvider } from "@/providers/solana-provider";
 import "./globals.css";
 
@@ -15,9 +16,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SolanaProvider>
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4">Skip to content</a>
           <header className="border-b border-line bg-white">
-            <nav aria-label="Main navigation" className="mx-auto flex h-20 max-w-6xl items-center gap-10 px-5 sm:px-8">
+            <nav aria-label="Main navigation" className="mx-auto flex min-h-20 max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:gap-x-10 sm:px-8">
               <Link href="/" className="text-xl font-bold tracking-tight">StockPilot<span className="text-accent">.</span></Link>
               <Link href="/markets" className="flex min-h-11 items-center text-sm font-semibold text-muted hover:text-ink">Markets</Link>
+              <WalletButton />
             </nav>
           </header>
           <main id="main" className="page">{children}</main>
