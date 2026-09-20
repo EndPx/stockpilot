@@ -1,14 +1,36 @@
 # StockPilot
 
-StockPilot is a minimal web foundation for browsing tokenized pre-IPO assets from PreStocks. Its Solana execution path is independently validated against Jupiter, while trade execution remains intentionally outside the Phase 2 web application.
+StockPilot is an agent-native investing experience built specifically for PreStocks on Solana. It makes PreStocks a native investing capability for the AI agents users already use.
 
 ## Current status
 
 - Phase 1: live PreStocks mint discovery and USDC-to-PreStocks Jupiter quote validation complete.
 - Phase 2: shared asset architecture, Next.js application, live markets, and asset detail pages complete.
-- Phase 3: wallet connection and wallet authentication not started.
+- Phase 3: Solana wallet connection in progress; wallet authentication remains a later phase.
 
 The web application reads live provider data. Prices and the available asset registry can change between requests.
+
+## Product boundary
+
+The investable universe is limited to official assets returned by PreStocks. StockPilot does not create wrapped or synthetic versions of those assets and does not expose arbitrary SPL-token trading.
+
+The first future investment path is intentionally narrow:
+
+```text
+User investment intent
+    ↓
+USDC funding
+    ↓
+StockPilot resolves an official PreStocks asset and mint
+    ↓
+Jupiter supplies execution infrastructure
+    ↓
+Solana wallet approval
+```
+
+Users will not need to already own a PreStocks token. A later phase may also support SOL as a funding asset, but every investment output will remain an official PreStocks asset.
+
+Jupiter is infrastructure behind an investment-specific experience; StockPilot is not a generic DEX or generic Jupiter interface. Tessera, Pyth, Meteora DBC, Clawpump, non-PreStocks pre-IPO tokens, and custom StockPilot-wrapped assets are outside the product scope. Meteora may still appear as a venue chosen inside a Jupiter route.
 
 ## Architecture
 
@@ -51,6 +73,8 @@ pnpm validate:execution
 ```
 
 The execution validator makes live mainnet-facing requests and obtains a quote; it does not sign or submit a transaction.
+
+Wallet connection only makes a browser wallet available to the frontend. It is not StockPilot authentication and does not create a user session or prove wallet ownership to the backend.
 
 ## Application routes
 

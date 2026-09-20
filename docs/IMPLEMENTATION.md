@@ -2,6 +2,24 @@
 
 Last verified: 2026-09-20
 
+## Product scope
+
+StockPilot is an agent-native investing experience for official PreStocks assets on Solana.
+
+```text
+Funding asset (USDC first; SOL may follow)
+    ↓
+StockPilot investment intent using a PreStocks symbol
+    ↓
+verified official mint from the PreStocks Asset Service
+    ↓
+Jupiter execution infrastructure
+    ↓
+Solana wallet approval
+```
+
+The user does not need to already own a PreStocks token. Jupiter remains internal execution infrastructure rather than a generic swap surface, and an agent must never select an arbitrary output mint. Arbitrary SPL-token trading, non-PreStocks pre-IPO assets, Tessera, Pyth, Meteora DBC, Clawpump, and StockPilot-created wrappers are out of scope. A Jupiter route may still use Meteora as an execution venue.
+
 ## Phase 1 — execution validation
 
 - [x] Fetch and normalize live PreStocks assets.
@@ -61,9 +79,22 @@ On 2026-09-20:
 
 Live prices, quote output, route, and asset availability are observations rather than fixed application data.
 
-## Phase 3 — not started
+## Phase 3 — wallet connection in progress
 
 - [ ] Solana wallet connection.
-- [ ] Wallet authentication.
+- [ ] Connected wallet UI state.
+- [ ] Wallet disconnect and reconnect.
+
+Wallet connection means frontend access to a Wallet Standard wallet. It is not authentication, does not prove ownership to the StockPilot backend, and does not create a user session.
+
+## Future phases
+
+- [ ] Phase 4: wallet authentication and ownership verification.
+- [ ] Phase 5: portfolio discovery.
+- [ ] Phase 6: USDC to official PreStocks investment execution.
+- [ ] Phase 7: pending action and approval system.
+- [ ] Phase 8: agent credentials and policy engine.
+- [ ] Phase 9: StockPilot MCP.
+- [ ] Phase 10: bounded recurring investment.
 
 Trade execution, database storage, MCP tools, agents, and automations remain out of scope until explicitly scheduled.
