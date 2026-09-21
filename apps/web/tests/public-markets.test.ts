@@ -5,7 +5,7 @@ import { createAssetsGet } from "../app/api/assets/route";
 test("the Markets asset API remains public without an authentication cookie", async () => {
   const seen: string[] = [];
   const get = createAssetsGet(async (query) => {
-    seen.push(query);
+    seen.push(query ?? "");
     return {
       assets: [],
       total: 0,
