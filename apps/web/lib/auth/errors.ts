@@ -8,7 +8,7 @@ const DEFAULT_MESSAGES: Record<AuthErrorCode, string> = {
   AUTH_DOMAIN_MISMATCH: "The sign-in request belongs to a different site.",
   AUTH_REPLAY_DETECTED: "This sign-in request was already used. Request a new one.",
   AUTH_REQUEST_INVALID: "The authentication request is not valid.",
-  AUTH_SESSION_INVALID: "The authentication session is not valid.",
+  SESSION_INVALID: "The authentication session is not valid.",
 };
 
 export class AuthError extends Error {

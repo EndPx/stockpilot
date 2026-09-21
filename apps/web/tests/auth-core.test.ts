@@ -53,7 +53,7 @@ test("round trips a wallet-bound 24-hour session and rejects expiry", async () =
   assert.deepEqual(await decodeAuthSession(token, secret, now + 1), session);
   await assert.rejects(
     () => decodeAuthSession(token, secret, now + AUTH_SESSION_TTL_MS),
-    (error: unknown) => error instanceof AuthError && error.code === "AUTH_SESSION_INVALID",
+    (error: unknown) => error instanceof AuthError && error.code === "SESSION_INVALID",
   );
 });
 

@@ -9,12 +9,12 @@ function encodeBase64Url(bytes: Uint8Array): string {
 
 function decodeBase64Url(value: string): Uint8Array {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   const decoded = new Uint8Array(Buffer.from(value, "base64url"));
   if (encodeBase64Url(decoded) !== value) {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
   return decoded;
 }
@@ -50,7 +50,7 @@ export async function createSignedToken(payload: unknown, secret: string): Promi
 export async function readSignedToken(token: string, secret: string): Promise<unknown> {
   const parts = token.split(".");
   if (parts.length !== 3 || parts[0] !== TOKEN_VERSION || !parts[1] || !parts[2]) {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   const authenticatedValue = `${parts[0]}.${parts[1]}`;
@@ -58,12 +58,12 @@ export async function readSignedToken(token: string, secret: string): Promise<un
   const expectedSignature = await hmac(authenticatedValue, secret);
 
   if (!equalBytes(actualSignature, expectedSignature)) {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   try {
     return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
   } catch {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 }

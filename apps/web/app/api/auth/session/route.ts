@@ -18,7 +18,7 @@ export async function GET(request: Request): Promise<Response> {
     const headers = new Headers();
     clearSessionCookie(headers, config);
     return authErrorResponse(
-      error instanceof AuthError ? error : new AuthError("AUTH_SESSION_INVALID", 401),
+      error instanceof AuthError ? error : new AuthError("SESSION_INVALID", 401),
       headers,
     );
   }

@@ -6,7 +6,7 @@ export const AUTH_ERROR_CODES = [
   "AUTH_DOMAIN_MISMATCH",
   "AUTH_REPLAY_DETECTED",
   "AUTH_REQUEST_INVALID",
-  "AUTH_SESSION_INVALID",
+  "SESSION_INVALID",
 ] as const;
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];

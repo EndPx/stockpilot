@@ -37,17 +37,17 @@ export async function decodeAuthSession(
   try {
     value = await readSignedToken(token, secret);
   } catch {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   if (!isAuthSessionToken(value) || value.expiresAt <= now) {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   try {
     address(value.walletAddress);
   } catch {
-    throw new AuthError("AUTH_SESSION_INVALID", 401);
+    throw new AuthError("SESSION_INVALID", 401);
   }
 
   return value;

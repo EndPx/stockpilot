@@ -193,3 +193,13 @@ test("rejects cross-origin authentication mutations", async () => {
   assert.equal(response.status, 403);
   assert.equal(await errorCode(response), "AUTH_REQUEST_INVALID");
 });
+
+test("rejects and clears a tampered session cookie", async () => {
+  const response = await sessionGet(request("/api/auth/session", {
+    headers: { cookie: "stockpilot-session=v1.tampered.invalid" },
+  }));
+
+  assert.equal(response.status, 401);
+  assert.equal(await errorCode(response), "SESSION_INVALID");
+  assert.match(cookieValues(response).join("\n"), /stockpilot-session=; Max-Age=0/);
+});
