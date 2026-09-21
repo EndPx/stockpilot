@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./assets": "./src/assets.ts",
+    "./investments": "./src/investments.ts",
     "./portfolio": "./src/portfolio.ts",
     "./solana": "./src/solana.ts"
   },
