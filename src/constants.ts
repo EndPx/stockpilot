@@ -1,8 +1,4 @@
-/**
- * Circle native USDC on Solana mainnet.
- * Verified against Circle's supported-blockchains documentation on 2026-09-19.
- */
-export const SOLANA_MAINNET_USDC_MINT =
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
-export const SOLANA_MAINNET_USDC_DECIMALS = 6;
+export {
+  SOLANA_MAINNET_USDC_DECIMALS,
+  SOLANA_MAINNET_USDC_MINT,
+} from "@stockpilot/core/solana";

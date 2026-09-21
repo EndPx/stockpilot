@@ -1,10 +1,16 @@
 import { isAddress } from "@solana/kit";
+import {
+  SOLANA_MAINNET_RPC_URL as DEFAULT_SOLANA_MAINNET_RPC_URL,
+  SPL_TOKEN_PROGRAM_ADDRESS,
+  TOKEN_2022_PROGRAM_ADDRESS,
+} from "@stockpilot/core/solana";
 
-export const SOLANA_MAINNET_RPC_URL = "https://api.mainnet-beta.solana.com";
+export const SOLANA_MAINNET_RPC_URL =
+  process.env.SOLANA_RPC_URL ?? DEFAULT_SOLANA_MAINNET_RPC_URL;
 
 const TOKEN_PROGRAM_OWNERS = new Set([
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  SPL_TOKEN_PROGRAM_ADDRESS,
+  TOKEN_2022_PROGRAM_ADDRESS,
 ]);
 
 type AccountInfoResponse = {

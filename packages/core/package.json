@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { "./assets": "./src/assets.ts" },
+  "exports": {
+    "./assets": "./src/assets.ts",
+    "./solana": "./src/solana.ts"
+  },
   "dependencies": { "@stockpilot/integrations": "workspace:*" }
 }
