@@ -35,6 +35,9 @@ button:disabled { cursor: not-allowed; }
   .wallet-option { @apply flex min-h-12 w-full items-center gap-3 rounded-lg border border-line px-3 text-left text-sm font-semibold hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-60; }
   .wallet-option-mark { @apply flex size-8 items-center justify-center rounded-md bg-slate-100 text-xs text-muted; }
   .wallet-error { @apply mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800; }
+  .wallet-auth-panel { @apply mt-6 rounded-xl border border-line bg-slate-50 p-4; }
+  .auth-dot { @apply size-2.5 shrink-0 rounded-full bg-slate-300; }
+  .auth-dot-active { @apply bg-emerald-500; }
 }
 
 .wallet-dialog::backdrop { background: rgb(15 23 42 / 0.42); }

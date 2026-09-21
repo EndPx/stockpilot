@@ -12,6 +12,9 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { shortenAddress } from "@/lib/solana/address";
 import { SOLANA_NETWORK_LABEL } from "@/lib/solana/config";
+import { authStatusForWallet, disconnectAfterSignOut } from "@/lib/auth/client-state";
+import type { AuthStatus } from "@/providers/auth-provider";
+import { useAuth } from "@/providers/auth-provider";
 import { solanaClient } from "@/providers/solana-provider";
 
 export type WalletOption = Readonly<{ id: string; name: string }>;
@@ -22,8 +25,13 @@ type WalletControlViewProps = Readonly<{
   status: WalletStatus;
   walletName?: string;
   wallets: readonly WalletOption[];
+  authErrorMessage?: string;
+  authStatus: AuthStatus;
+  authWalletAddress?: string;
   onConnect: (walletId: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
+  onSignIn: () => Promise<void>;
+  onSignOut: () => Promise<void>;
 }>;
 
 function isAbortError(error: unknown): boolean {
@@ -59,17 +67,27 @@ export function WalletControlView({
   status,
   walletName,
   wallets,
+  authErrorMessage,
+  authStatus,
+  authWalletAddress,
   onConnect,
   onDisconnect,
+  onSignIn,
+  onSignOut,
 }: WalletControlViewProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
-  const busy = status === "pending" || status === "reconnecting" || status === "connecting" || status === "disconnecting";
+  const walletBusy = status === "pending" || status === "reconnecting" || status === "connecting" || status === "disconnecting";
+  const authBusy = authStatus === "authenticating" || authStatus === "signingOut";
+  const busy = walletBusy || authBusy;
   const connected = Boolean(address);
   const visibleAddress = status === "reconnecting" ? reconnectingAddress : address;
+  const authenticated = authStatus === "authenticated" && authWalletAddress === address;
+  const sessionForWallet = authWalletAddress === address &&
+    (authStatus === "authenticated" || authStatus === "signingOut");
 
   function openDialog() {
     setErrorMessage(undefined);
@@ -101,8 +119,26 @@ export function WalletControlView({
     }
   }
 
+  async function signIn() {
+    setErrorMessage(undefined);
+    try {
+      await onSignIn();
+    } catch (error) {
+      if (isAbortError(error)) return;
+    }
+  }
+
+  async function signOut() {
+    setErrorMessage(undefined);
+    try {
+      await onSignOut();
+    } catch (error) {
+      if (isAbortError(error)) return;
+    }
+  }
+
   const accessibleLabel = connected && address
-    ? `Connected with ${walletName ?? "Solana wallet"}, address ${address}. Open wallet details.`
+    ? `Connected with ${walletName ?? "Solana wallet"}, address ${address}${authenticated ? ", signed in to StockPilot" : ""}. Open wallet details.`
     : status === "reconnecting"
       ? `Reconnecting Solana wallet${visibleAddress ? ` ${visibleAddress}` : ""}`
       : "Connect a Solana wallet";
@@ -152,9 +188,52 @@ export function WalletControlView({
                   <dd className="mt-1 font-medium">{SOLANA_NETWORK_LABEL}</dd>
                 </div>
               </dl>
-              <p className="mt-5 text-xs leading-5 text-muted">Connection makes your wallet available in this browser. It does not sign you in or authorize transactions.</p>
+              <section className="wallet-auth-panel" aria-label="StockPilot authentication">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">StockPilot session</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      {authenticated
+                        ? "Signed in"
+                        : authStatus === "loading"
+                          ? "Checking session…"
+                          : authStatus === "authenticating"
+                            ? "Waiting for signature…"
+                            : authStatus === "signingOut"
+                              ? "Signing out…"
+                              : "Not signed in"}
+                    </p>
+                  </div>
+                  <span aria-hidden="true" className={authenticated ? "auth-dot auth-dot-active" : "auth-dot"} />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted">
+                  {authenticated
+                    ? "This browser session is bound to the connected wallet."
+                    : "Sign a non-transactional message to prove you control this wallet."}
+                </p>
+                {authErrorMessage && <p role="alert" className="wallet-error">{authErrorMessage}</p>}
+                {sessionForWallet ? (
+                  <button type="button" className="secondary-button mt-4 w-full" disabled={busy} onClick={() => void signOut()}>
+                    {authStatus === "signingOut" ? "Signing out…" : "Sign out"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="button mt-4 w-full"
+                    disabled={busy || authStatus === "loading" || authStatus === "authenticated"}
+                    onClick={() => void signIn()}
+                  >
+                    {authStatus === "authenticating"
+                      ? "Waiting for signature…"
+                      : authStatus === "error"
+                        ? "Try signing in again"
+                        : "Sign in to StockPilot"}
+                  </button>
+                )}
+              </section>
+              <p className="mt-5 text-xs leading-5 text-muted">Signing in proves wallet ownership only. It does not authorize transactions or asset transfers.</p>
               {errorMessage && <p role="alert" className="wallet-error">{errorMessage}</p>}
-              <button type="button" className="secondary-button mt-6 w-full" disabled={busy} onClick={disconnect}>
+              <button type="button" className="secondary-button mt-5 w-full" disabled={busy} onClick={() => void disconnect()}>
                 {status === "disconnecting" ? "Disconnecting…" : "Disconnect"}
               </button>
             </>
@@ -201,23 +280,33 @@ export function WalletButton() {
   const reconnectingAccount = useReconnectingAccount(solanaClient);
   const connectAction = useConnect(solanaClient);
   const disconnectAction = useDisconnect(solanaClient);
+  const auth = useAuth();
   const options = wallets.map((wallet, index) => ({ id: `${wallet.name}-${index}`, name: wallet.name }));
+  const address = hydrated ? connected?.account.address : undefined;
+  const authStatus = authStatusForWallet(auth.status, auth.sessionWalletAddress, address);
 
   useEffect(() => setHydrated(true), []);
 
   return (
     <WalletControlView
       status={hydrated ? status : "pending"}
-      address={hydrated ? connected?.account.address : undefined}
+      address={address}
       reconnectingAddress={hydrated ? reconnectingAccount?.address : undefined}
       walletName={hydrated ? connected?.wallet.name : undefined}
       wallets={hydrated ? options : []}
+      authErrorMessage={auth.errorMessage}
+      authStatus={authStatus}
+      authWalletAddress={auth.sessionWalletAddress}
       onConnect={async (walletId) => {
         const index = options.findIndex((option) => option.id === walletId);
         if (index < 0) throw new Error("Wallet is no longer available");
         await connectAction.dispatchAsync(wallets[index]);
       }}
-      onDisconnect={() => disconnectAction.dispatchAsync()}
+      onDisconnect={async () => {
+        await disconnectAfterSignOut(auth.signOut, () => disconnectAction.dispatchAsync());
+      }}
+      onSignIn={auth.signIn}
+      onSignOut={auth.signOut}
     />
   );
 }
