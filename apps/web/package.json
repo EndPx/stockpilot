@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts && tsx --conditions=react-server --test tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts"
+    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts && tsx --conditions=react-server --test tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts",
+    "validate:portfolio-read": "tsx --conditions=react-server scripts/validate-portfolio-read.ts"
   },
   "dependencies": {
     "@solana/kit": "8.3.0",
