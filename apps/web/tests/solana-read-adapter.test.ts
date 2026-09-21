@@ -32,6 +32,16 @@ function parsedAccount(mint: string, amount: string, decimals: number) {
   };
 }
 
+function rpc(overrides: Partial<SolanaPortfolioRpc> = {}): SolanaPortfolioRpc {
+  return {
+    getBalance() { return { async send() { return { value: 420_000_000n }; } }; },
+    getTokenAccountsByOwner() { return { async send() { return { value: [] }; } }; },
+    getTokenSupply() { return { async send() { return { value: { decimals: 9 } }; } }; },
+    getBlockHeight() { return { async send() { return 123n; } }; },
+    ...overrides,
+  };
+}
+
 test("normalizes legacy and Token-2022 parsed accounts from raw amounts", () => {
   assert.deepEqual(normalizeTokenAccounts([
     parsedAccount(legacyMint, "200000000", 6),
@@ -66,7 +76,7 @@ test("normalizes native lamports with bigint-safe SOL formatting", () => {
 
 test("queries both token programs once and keeps their program identity", async () => {
   const filters: string[] = [];
-  const rpc: SolanaPortfolioRpc = {
+  const rpcClient = rpc({
     getBalance() {
       return { async send() { return { value: 420_000_000n }; } };
     },
@@ -78,8 +88,8 @@ test("queries both token programs once and keeps their program identity", async 
         : parsedAccount(token2022Mint, "1", 0);
       return { async send() { return { value: [account] }; } };
     },
-  };
-  const adapter = new SolanaRpcReadAdapter(rpc);
+  });
+  const adapter = new SolanaRpcReadAdapter(rpcClient);
   const [native, tokens] = await Promise.all([
     adapter.getNativeBalance(wallet),
     adapter.getTokenBalances(wallet),
@@ -99,15 +109,15 @@ test("malformed RPC data is an explicit read failure, never an empty balance", (
 });
 
 test("RPC rejection is wrapped without leaking its message", async () => {
-  const rpc: SolanaPortfolioRpc = {
+  const rpcClient = rpc({
     getBalance() {
       return { async send() { throw new Error("private endpoint secret"); } };
     },
     getTokenAccountsByOwner() {
       return { async send() { throw new Error("private endpoint secret"); } };
     },
-  };
-  const adapter = new SolanaRpcReadAdapter(rpc);
+  });
+  const adapter = new SolanaRpcReadAdapter(rpcClient);
   await assert.rejects(adapter.getNativeBalance(wallet), {
     name: "SolanaBalanceReadError",
     message: "Solana RPC balance read failed.",
@@ -116,4 +126,21 @@ test("RPC rejection is wrapped without leaking its message", async () => {
     name: "SolanaBalanceReadError",
     message: "Solana RPC balance read failed.",
   });
+});
+
+test("reads output mint decimals and current block height for investment validity", async () => {
+  const adapter = new SolanaRpcReadAdapter(rpc());
+  assert.equal(await adapter.getTokenDecimals(token2022Mint), 9);
+  assert.equal(await adapter.getCurrentBlockHeight(), 123n);
+});
+
+test("invalid investment RPC values fail closed", async () => {
+  const invalidDecimals = new SolanaRpcReadAdapter(rpc({
+    getTokenSupply() { return { async send() { return { value: { decimals: -1 } }; } }; },
+  }));
+  const invalidHeight = new SolanaRpcReadAdapter(rpc({
+    getBlockHeight() { return { async send() { return -1n; } }; },
+  }));
+  await assert.rejects(invalidDecimals.getTokenDecimals(token2022Mint), { name: "SolanaInvestmentReadError" });
+  await assert.rejects(invalidHeight.getCurrentBlockHeight(), { name: "SolanaInvestmentReadError" });
 });

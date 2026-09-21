@@ -26,12 +26,24 @@ export type SolanaPortfolioRpc = {
     filter: { programId: unknown },
     config: { commitment: "confirmed"; encoding: "jsonParsed" },
   ): RpcRequest<{ value: unknown }>;
+  getTokenSupply(
+    mint: unknown,
+    config: { commitment: "confirmed" },
+  ): RpcRequest<{ value: { decimals: number } }>;
+  getBlockHeight(config: { commitment: "confirmed" }): RpcRequest<bigint>;
 };
 
 export class SolanaBalanceReadError extends Error {
   constructor(options?: ErrorOptions) {
     super("Solana RPC balance read failed.", options);
     this.name = "SolanaBalanceReadError";
+  }
+}
+
+export class SolanaInvestmentReadError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Solana RPC investment read failed.", options);
+    this.name = "SolanaInvestmentReadError";
   }
 }
 
@@ -128,6 +140,33 @@ export class SolanaRpcReadAdapter implements SolanaReadAdapter {
     } catch (cause) {
       if (cause instanceof SolanaBalanceReadError) throw cause;
       throw new SolanaBalanceReadError({ cause });
+    }
+  }
+
+  async getTokenDecimals(mintAddress: string): Promise<number> {
+    try {
+      const response = await this.rpc
+        .getTokenSupply(address(mintAddress), { commitment: "confirmed" })
+        .send({ abortSignal: AbortSignal.timeout(10_000) });
+      const decimals = response.value.decimals;
+      if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+        throw new Error("Malformed token decimals.");
+      }
+      return decimals;
+    } catch (cause) {
+      throw new SolanaInvestmentReadError({ cause });
+    }
+  }
+
+  async getCurrentBlockHeight(): Promise<bigint> {
+    try {
+      const value = await this.rpc
+        .getBlockHeight({ commitment: "confirmed" })
+        .send({ abortSignal: AbortSignal.timeout(10_000) });
+      if (typeof value !== "bigint" || value < 0n) throw new Error("Malformed block height.");
+      return value;
+    } catch (cause) {
+      throw new SolanaInvestmentReadError({ cause });
     }
   }
 }
