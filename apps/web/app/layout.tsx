@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import { WalletButton } from "@/components/wallet/wallet-button";
 import { SolanaProvider } from "@/providers/solana-provider";
 import "./globals.css";
@@ -13,6 +14,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="font-sans antialiased">
+        {process.env.NODE_ENV === "development" && (
+          <>
+            <Script
+              src="https://unpkg.com/react-scan/dist/auto.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+            <Script
+              src="https://unpkg.com/react-grab/dist/index.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+          </>
+        )}
         <SolanaProvider>
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4">Skip to content</a>
           <header className="border-b border-line bg-white">
