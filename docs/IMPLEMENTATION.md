@@ -174,7 +174,7 @@ On 2026-09-21:
 ## Future phases
 
 - [x] Phase 4: wallet authentication and ownership verification.
-- [ ] Phase 5: portfolio discovery.
+- [ ] Phase 5: portfolio discovery (in progress).
 - [ ] Phase 6: USDC to official PreStocks investment execution.
 - [ ] Phase 7: pending action and approval system.
 - [ ] Phase 8: agent credentials and policy engine.
@@ -182,3 +182,36 @@ On 2026-09-21:
 - [ ] Phase 10: bounded recurring investment.
 
 Trade execution, database storage, MCP tools, agents, and automations remain out of scope until explicitly scheduled.
+
+## Phase 5 — read-only portfolio discovery
+
+Phase 5 adds a private read model without changing the Phase 4 authentication
+boundary. `GET /api/portfolio` validates the HttpOnly session and obtains the
+wallet address exclusively from its verified payload. Query parameters, headers,
+and request bodies cannot select or override the wallet being read.
+
+```text
+verified Phase 4 session
+    ↓ walletAddress
+PortfolioService
+    ├─ AssetService → official PreStocks mint allowlist and token prices
+    └─ SolanaReadAdapter
+         ├─ native SOL balance
+         ├─ legacy SPL Token owner accounts
+         └─ Token-2022 owner accounts
+```
+
+The adapter normalizes RPC data into raw string amounts, authoritative account
+decimals, display amounts, and a token-program label. The domain service merges
+accounts by mint with bigint arithmetic, extracts canonical mainnet USDC as
+Available to Invest, intersects remaining balances with the current official
+PreStocks mint set, and values those positions with PreStocks `tokenPrice` only.
+Missing prices stay `null`; provider and RPC failures remain errors rather than
+being converted into an empty portfolio.
+
+Wallet balances are read fresh and are not cached for minutes. Existing bounded
+AssetService metadata caching remains in place. The browser requests the private
+portfolio only after authentication and may refresh it on explicit retry. Native
+SOL is informational Network Balance and is neither converted to USD nor included
+in Available to Invest. This phase contains no Jupiter calls, transaction signing,
+database storage, P&L, or generic wallet-portfolio behavior.
