@@ -6,7 +6,9 @@ StockPilot is an agent-native investing experience built specifically for PreSto
 
 - Phase 1: live PreStocks mint discovery and USDC-to-PreStocks Jupiter quote validation complete.
 - Phase 2: shared asset architecture, Next.js application, live markets, and asset detail pages complete.
-- Phase 3: Wallet Standard connection, reconnect state, connected identity, and disconnect complete. Wallet authentication remains a later phase.
+- Phase 3: Wallet Standard connection, reconnect state, connected identity, and disconnect complete.
+- Phase 4: Sign In With Solana authentication and wallet-bound server sessions complete.
+- Phase 5: authenticated, read-only USDC, SOL, and official PreStocks portfolio discovery complete.
 
 The web application reads live provider data. Prices and the available asset registry can change between requests.
 
@@ -39,9 +41,9 @@ PreStocks API
     ↓
 packages/integrations  — fetches and normalizes the remote registry
     ↓
-packages/core          — canonical Asset model, search, lookup, and bounded cache
+packages/core          — canonical assets, bounded cache, and portfolio domain service
     ↓
-apps/web               — Next.js routes, API endpoints, Markets UI, Asset Detail UI
+apps/web               — Next.js UI, authenticated APIs, and Solana balance adapter
 
 src                    — Phase 1 Solana and Jupiter validation path
 ```
@@ -60,37 +62,54 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`, then use **Explore Markets** or visit `/markets` directly.
+Copy `.env.example` to `.env.local`, set a strong `SESSION_SECRET`, and keep
+`APP_URL` aligned with the origin you open. The default public Solana mainnet
+RPC works for development; set the server-only `SOLANA_RPC_URL` when using a
+dedicated endpoint. Never expose it as a `NEXT_PUBLIC_` variable.
+
+Open `http://localhost:3000`, then use **Explore Markets** or visit `/markets`
+directly. Markets remain public. Connect and sign in with a wallet before
+opening `/app` to load its private portfolio.
 
 Use **Connect Wallet** to choose an installed Wallet Standard compatible Solana wallet. Compatible wallets such as Phantom, Solflare, and Backpack are discovered by capability rather than hardcoded by vendor.
 
-No environment variables are required for the default live PreStocks endpoint. `PRESTOCKS_API_URL` can override it for local testing.
-Phase 3 makes no RPC request, so it does not require or expose a browser RPC URL or credential.
+`PRESTOCKS_API_URL` can override the live registry for local testing.
+`SESSION_SECRET` is required for authentication. Portfolio balance calls are
+made on the server and always derive the owner address from the verified
+session, never from a browser query or header.
 
 ## Verification
 
 ```bash
 pnpm build
 pnpm test
+pnpm validate:portfolio-read
 pnpm validate:execution
 ```
 
-The execution validator makes live mainnet-facing requests and obtains a quote; it does not sign or submit a transaction.
+The portfolio validator makes structural, read-only mainnet RPC calls against a
+well-known public address. The execution validator obtains a live Jupiter quote.
+Neither command signs or submits a transaction.
 
-Wallet connection only makes a browser wallet available to the frontend. It is not StockPilot authentication and does not create a user session or prove wallet ownership to the backend.
+Wallet connection alone does not prove ownership. Signing in creates a
+wallet-bound HttpOnly session; it does not grant transaction authority.
 
 ## Application routes
 
 - `/` — minimal StockPilot introduction
+- `/app` — authenticated read-only portfolio overview
 - `/markets` — searchable live PreStocks registry
 - `/markets/[symbol]` — live asset detail and verified Solana mint
 - `/api/assets?q=...` — validated asset list/search API
 - `/api/assets/[symbol]` — validated exact-symbol asset API
+- `/api/auth/*` — SIWS challenge, verification, session, and logout APIs
+- `/api/portfolio` — session-bound USDC, SOL, and official PreStocks balances
 
 ## Documentation
 
 - [Implementation status](docs/IMPLEMENTATION.md)
 - [Phase 1 execution validation](docs/EXECUTION_VALIDATION.md)
+- [Wallet authentication](docs/AUTHENTICATION.md)
 - [Design foundation](docs/DESIGN.md)
 
 PreStocks provide economic exposure to private companies and do not necessarily represent direct ownership, shareholder rights, or voting rights. Investing involves risk.

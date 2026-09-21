@@ -174,7 +174,7 @@ On 2026-09-21:
 ## Future phases
 
 - [x] Phase 4: wallet authentication and ownership verification.
-- [ ] Phase 5: portfolio discovery (in progress).
+- [x] Phase 5: read-only portfolio discovery and available-to-invest balance.
 - [ ] Phase 6: USDC to official PreStocks investment execution.
 - [ ] Phase 7: pending action and approval system.
 - [ ] Phase 8: agent credentials and policy engine.
@@ -215,3 +215,66 @@ portfolio only after authentication and may refresh it on explicit retry. Native
 SOL is informational Network Balance and is neither converted to USD nor included
 in Available to Invest. This phase contains no Jupiter calls, transaction signing,
 database storage, P&L, or generic wallet-portfolio behavior.
+
+### Delivered
+
+- [x] Derive the portfolio owner exclusively from the verified Phase 4 session.
+- [x] Read canonical mainnet USDC as Available to Invest at 1 USDC = $1.
+- [x] Read native SOL separately as informational Network Balance.
+- [x] Query both the legacy SPL Token Program and Token-2022 by owner.
+- [x] Decode raw integer amounts with RPC-provided decimals and bigint-safe arithmetic.
+- [x] Intersect wallet mints with the current official PreStocks allowlist.
+- [x] Exclude unrelated assets and omit zero-balance PreStocks positions.
+- [x] Estimate positions from PreStocks `tokenPrice` without Jupiter or an oracle.
+- [x] Preserve missing prices as `null` and failures as explicit unavailable states.
+- [x] Add authenticated `/api/portfolio` and an auth-aware `/app` overview.
+- [x] Keep Markets and its APIs public.
+- [x] Cover funded-empty, unfunded-empty, loading, expired-session, RPC, and provider states.
+
+### Architecture
+
+```text
+packages/core/src/portfolio.ts          portfolio model and aggregation service
+packages/core/src/solana.ts             shared canonical mainnet constants
+apps/web/lib/solana/read-adapter.ts     server-only Solana RPC normalization
+apps/web/lib/portfolio.ts               production service composition
+apps/web/app/api/portfolio/route.ts     session-bound private API
+apps/web/components/portfolio-overview.tsx
+                                        auth-aware read-only overview UI
+```
+
+### Final Phase 5 verification
+
+On 2026-09-21:
+
+- `pnpm test` passed 58 of 58 deterministic core, authentication, wallet,
+  adapter, API, and portfolio UI tests.
+- `pnpm build` compiled the application and all API routes.
+- `pnpm validate:portfolio-read` decoded native, legacy SPL, and Token-2022 RPC
+  responses from a well-known public address without a private key or transaction.
+- `pnpm validate:execution` loaded 8 official assets and preserved the live
+  1 USDC to SPACEX route through Meteora DLMM.
+- Browser acceptance covered authenticated portfolio fixtures, funded and empty
+  presentation, navigation, keyboard focus, public Markets, and 375 px, 768 px,
+  and 1280 px layouts without horizontal overflow or console warnings/errors.
+- React Doctor reported no findings in the changed Phase 5 portfolio component
+  after the final hardening pass.
+- No real browser wallet extension was available in the isolated environment.
+  `REAL WALLET PORTFOLIO ACCEPTANCE: BLOCKED BY ENVIRONMENT`.
+
+### Manual real-wallet acceptance
+
+1. Set `APP_URL` to the exact local or deployment origin.
+2. Set a secret `SESSION_SECRET` with at least 32 bytes of entropy.
+3. Set the server-only `SOLANA_RPC_URL` when the default public RPC is unsuitable.
+4. Run `pnpm dev` and install/open Phantom, Solflare, Backpack, or another compatible wallet.
+5. Connect the real wallet, sign in, and open `/app`.
+6. Compare Available to Invest with the wallet's canonical mainnet USDC balance.
+7. Compare Network Balance with its native SOL balance.
+8. If it owns a PreStocks token, compare the displayed quantity with a Solana explorer or wallet.
+9. Confirm unrelated tokens do not appear under Investments.
+10. Reload `/app` and confirm the authenticated portfolio loads again.
+
+Phase 5 remains deliberately read-only. The next smallest task is Phase 6:
+USDC to an official PreStocks asset through the existing website investment
+flow, with explicit wallet approval. It is not implemented here.
