@@ -130,9 +130,50 @@ On 2026-09-21:
 
 The live Phase 1 execution regression is recorded again at final handoff because quote output and routes are time-sensitive.
 
+## Phase 4 — wallet authentication and proof of ownership
+
+- [x] Issue a fresh five-minute, server-controlled SIWS challenge with a random nonce.
+- [x] Verify the signed wallet address, signature, domain, URI, nonce, statement, chain, issue time, expiry, and request identifier.
+- [x] Prefer Wallet Standard `solana:signIn` and support canonical SIWS `solana:signMessage` as a compatibility fallback.
+- [x] Create a wallet-bound, HMAC-signed, 24-hour session in an HttpOnly cookie.
+- [x] Restore authenticated state after reload only when the session wallet matches the connected wallet.
+- [x] Keep sign out separate from wallet disconnect, while ensuring disconnect also clears authentication.
+- [x] Clear a previous session when the connected wallet account changes.
+- [x] Keep Markets, Asset Detail, and asset APIs public.
+
+The Solana client still uses `walletWithoutSigner`. Authentication invokes only
+the connected wallet's Wallet Standard sign-in or message-signing feature; it
+does not install a global transaction signer or call a transaction API.
+
+Challenge and session state are stateless HMAC-SHA-256 tokens authenticated by
+`SESSION_SECRET`. The authoritative challenge is held in a short-lived HttpOnly
+cookie and consumed on every verification attempt. This avoids a process-local
+nonce registry, so application restarts and multiple instances with the same
+secret can verify the same state. Mutation routes require the configured
+`APP_URL` origin. See [AUTHENTICATION.md](AUTHENTICATION.md) for the protocol and
+cookie details.
+
+### Final Phase 4 verification
+
+On 2026-09-21:
+
+- `pnpm build` compiled all public and authentication routes.
+- `pnpm test` passed 14 core/service tests and 19 web/authentication tests.
+- Direct route tests used generated Ed25519 keypairs to cover valid proofs,
+  invalid signatures, tampered statements, wrong nonces, expired challenges,
+  replay, wrong domain, wrong wallet, cross-origin mutation, session restoration,
+  logout, and invalid session cookies.
+- Browser acceptance covered Wallet Standard SIWS and the `signMessage` fallback,
+  reload restoration, sign out, disconnect, account switching, public Markets and
+  Asset Detail, keyboard dismissal, and 375 px, 768 px, and 1280 px layouts with
+  no browser console warnings or errors.
+- A real Phantom, Solflare, or Backpack extension was not available in the
+  isolated browser environment. Real-wallet acceptance remains a repository-owner
+  check and is not represented as passed.
+
 ## Future phases
 
-- [ ] Phase 4: wallet authentication and ownership verification.
+- [x] Phase 4: wallet authentication and ownership verification.
 - [ ] Phase 5: portfolio discovery.
 - [ ] Phase 6: USDC to official PreStocks investment execution.
 - [ ] Phase 7: pending action and approval system.
