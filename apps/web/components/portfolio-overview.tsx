@@ -38,8 +38,8 @@ async function fetchPortfolio(signal: AbortSignal): Promise<Portfolio> {
     credentials: "same-origin",
     signal,
   });
-  const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
     const code = typeof body === "object" && body !== null && "error" in body
       ? (body as { error?: { code?: unknown } }).error?.code
       : undefined;
@@ -53,6 +53,7 @@ async function fetchPortfolio(signal: AbortSignal): Promise<Portfolio> {
     }
     throw new PortfolioLoadError("PORTFOLIO_UNAVAILABLE");
   }
+  const body: unknown = await response.json().catch(() => null);
   const portfolio = typeof body === "object" && body !== null && "portfolio" in body
     ? (body as { portfolio?: unknown }).portfolio
     : undefined;
@@ -179,7 +180,7 @@ export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
       </section>
       <p className="mt-5 text-xs leading-6 text-muted">
         Estimates use current PreStocks token prices and are not executable liquidation quotes.
-        Updated <time dateTime={portfolio.asOf}>{new Date(portfolio.asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</time>.
+        Updated <time dateTime={portfolio.asOf}>{new Date(portfolio.asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC</time>.
       </p>
     </>
   );
