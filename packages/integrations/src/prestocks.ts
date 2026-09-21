@@ -3,6 +3,13 @@ import { isAddress } from "@solana/kit";
 export const PRESTOCKS_API_URL =
   process.env.PRESTOCKS_API_URL ?? "https://prestocks.com/api/prestocks";
 
+export class PreStocksProviderError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("PreStocks provider request failed.", options);
+    this.name = "PreStocksProviderError";
+  }
+}
+
 export type Asset = {
   id: string;
   provider: "prestocks";
@@ -86,18 +93,23 @@ function normalizeAsset(value: unknown): Asset {
 
 /** Fetches and normalizes the live PreStocks registry. */
 export async function fetchPreStocks(): Promise<Asset[]> {
-  const response = await fetch(PRESTOCKS_API_URL, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-  });
+  try {
+    const response = await fetch(PRESTOCKS_API_URL, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
 
-  if (!response.ok) {
-    throw new Error(`PreStocks API request failed with HTTP ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(`PreStocks API request failed with HTTP ${response.status}.`);
+    }
+
+    const payload: unknown = await response.json();
+    return normalizePreStocks(payload);
+  } catch (cause) {
+    if (cause instanceof PreStocksProviderError) throw cause;
+    throw new PreStocksProviderError({ cause });
   }
-
-  const payload: unknown = await response.json();
-  return normalizePreStocks(payload);
 }
 
 export function normalizePreStocks(payload: unknown): Asset[] {

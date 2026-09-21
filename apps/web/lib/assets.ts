@@ -3,7 +3,7 @@ import { AssetService, findAssetBySymbol, searchAssets } from "@stockpilot/core/
 
 // Cache is per server process. Keep the same instance across development reloads.
 const globalAssets = globalThis as typeof globalThis & { stockpilotAssets?: AssetService };
-const assetService = globalAssets.stockpilotAssets ??= new AssetService();
+export const assetService = globalAssets.stockpilotAssets ??= new AssetService();
 
 export async function listAssets(query = "") {
   const { assets, ...meta } = await assetService.getSnapshot();

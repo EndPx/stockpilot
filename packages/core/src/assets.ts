@@ -1,6 +1,7 @@
 import { fetchPreStocks, type Asset } from "@stockpilot/integrations/prestocks";
 
 export type { Asset } from "@stockpilot/integrations/prestocks";
+export { PreStocksProviderError } from "@stockpilot/integrations/prestocks";
 
 export type AssetSnapshot = {
   assets: Asset[];

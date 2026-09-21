@@ -1,9 +1,9 @@
-import type { Asset, AssetSnapshot } from "./assets.js";
+import type { Asset, AssetSnapshot } from "@stockpilot/core/assets";
 import {
   SOLANA_MAINNET_USDC_DECIMALS,
   SOLANA_MAINNET_USDC_MINT,
   SOLANA_NATIVE_DECIMALS,
-} from "./solana.js";
+} from "@stockpilot/core/solana";
 
 export type TokenProgram = "spl-token" | "token-2022";
 
