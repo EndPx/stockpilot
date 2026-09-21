@@ -1,3 +1,5 @@
+import { isSignature } from "@solana/kit";
+
 const JUPITER_API_URL = "https://api.jup.ag";
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -177,7 +179,7 @@ export function normalizeJupiterExecution(payload: unknown): JupiterExecutionRes
   };
   if (
     result.status === "Success" &&
-    (!result.signature || result.totalInputAmount === null || result.totalOutputAmount === null)
+    (!result.signature || !isSignature(result.signature) || result.totalInputAmount === null || result.totalOutputAmount === null)
   ) {
     throw new JupiterExecutionError({ cause: new Error("Successful Jupiter execution is incomplete.") });
   }

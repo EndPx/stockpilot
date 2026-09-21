@@ -81,7 +81,7 @@ test("execute posts only signed transaction, request id, and bound block height"
     body = JSON.parse(String(init?.body));
     return Response.json({
       status: "Success",
-      signature: "signature",
+      signature: "1".repeat(64),
       totalInputAmount: "50000000",
       totalOutputAmount: "123",
     });
