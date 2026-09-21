@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./assets": "./src/assets.ts",
+    "./portfolio": "./src/portfolio.ts",
     "./solana": "./src/solana.ts"
   },
   "dependencies": { "@stockpilot/integrations": "workspace:*" }
