@@ -1,6 +1,6 @@
 # Implementation Checklist
 
-Last verified: 2026-09-21
+Last verified: 2026-09-22
 
 ## Product scope
 
@@ -181,7 +181,68 @@ On 2026-09-21:
 - [ ] Phase 9: StockPilot MCP.
 - [ ] Phase 10: bounded recurring investment.
 
-Trade execution, database storage, MCP tools, agents, and automations remain out of scope until explicitly scheduled.
+Database storage, MCP tools, agents, sell execution, and automations remain out of scope until explicitly scheduled.
+
+## Phase 6 — first USDC investment
+
+Phase 6 adds one explicit BUY path from canonical Solana mainnet USDC to an
+official PreStocks mint. The asset page supplies only an official symbol and the
+user's USDC amount. The server derives the authenticated wallet from the Phase 4
+session, resolves the current official mint from `AssetService`, verifies the
+fresh canonical USDC balance, and requests a Jupiter Swap API V2 Meta-Aggregator
+order without custom routing, slippage, payer, referral, or fee parameters.
+
+```text
+authenticated asset page
+    ↓ { symbol, amountUsd }
+POST /api/investments/prepare
+    ├─ session wallet + same-origin enforcement
+    ├─ AssetService → official output mint
+    ├─ PortfolioService → authoritative USDC balance
+    ├─ Solana RPC → output decimals
+    └─ Jupiter /swap/v2/order
+         ↓ transaction + requestId + short-lived bound authorization
+review dialog
+    ↓ Wallet Standard solana:signTransaction
+POST /api/investments/execute
+    ├─ session/token/wallet/expiry checks
+    ├─ exact transaction-message fingerprint check
+    ├─ authenticated wallet signature check
+    └─ Jupiter /swap/v2/execute
+         ↓ actual amounts + signature
+fresh GET /api/portfolio
+```
+
+The investment authorization is stateless and HMAC-SHA-256 authenticated with
+`SESSION_SECRET`. It binds the session wallet, symbol, canonical input and
+official output mints, raw input amount, Jupiter request identifier, transaction
+message fingerprint, order validity fields, output decimals, and a short expiry.
+Signing may populate more than one signature slot, as required by JupiterZ, but
+must not alter the serialized versioned transaction message. The authenticated
+wallet's signature slot must be present and signed before execution.
+
+The client uses the connected account's Wallet Standard
+`solana:signTransaction` capability locally. It never installs a global signer,
+never signs automatically, never retries signing or submission automatically,
+and never reports success before Jupiter execution succeeds. Success quantities
+come from Jupiter's `totalInputAmount` and `totalOutputAmount`; the subsequent
+portfolio refresh continues to read balances from Solana rather than deriving
+holdings from the transaction response.
+
+### Phase 6 delivery checklist
+
+- [ ] Parse positive USDC amounts exactly with at most six fractional digits.
+- [ ] Add a server-only Jupiter Swap API V2 order/execute adapter.
+- [ ] Resolve official output mints and canonical USDC only on the server.
+- [ ] Enforce fresh session-wallet USDC balance before order preparation.
+- [ ] Bind a short-lived investment authorization to the transaction message.
+- [ ] Reject changed messages, missing wallet signatures, wrong sessions, and expired orders.
+- [ ] Add authenticated, same-origin prepare and execute routes with strict bodies.
+- [ ] Add an asset-page amount, review, wallet approval, submission, and success flow.
+- [ ] Refresh the blockchain-backed portfolio after successful execution.
+- [ ] Add deterministic security, route, adapter, domain, and client-orchestration tests.
+- [ ] Add a safe order-only validator that never signs or executes.
+- [ ] Complete production build, regression tests, browser acceptance, and real-wallet status.
 
 ## Phase 5 — read-only portfolio discovery
 
