@@ -26,6 +26,11 @@
   budgets remain unmeasured; no independent visual-qa skill certification claimed.
 - No wallet connection, SIWS signature, transaction preparation, signing or send
   was performed in this QA pass. Browser viewport restored after checks.
+- Handoff found a development-only stale singleton: the long-running pre-migration
+  server returned old PreStocks records without canonical/execution fields, so the
+  new registry correctly rejected them. Restarting that known dev server loaded
+  the current normalizer; private discovery returned eight assets. Pulling this
+  domain migration requires a dev-server restart, not weaker identity checks.
 
 ## Architecture-correction revision — 2026-09-23
 

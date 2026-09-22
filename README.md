@@ -81,6 +81,9 @@ Open `http://localhost:3000`, then use **Open the app** or visit `/markets`
 directly. Markets remain public. Connect and sign in with a wallet before
 opening `/app` to load its private portfolio.
 
+Restart `pnpm dev` after pulling provider/domain changes: per-process provider
+singletons survive hot reload and can retain old normalizer implementations.
+
 Use **Connect Wallet** to choose an installed Wallet Standard compatible Solana wallet. Compatible wallets such as Phantom, Solflare, and Backpack are discovered by capability rather than hardcoded by vendor.
 
 `PRESTOCKS_API_URL` can override the live registry for local testing.
