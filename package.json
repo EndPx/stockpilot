@@ -10,6 +10,7 @@
     "test": "tsx --test tests/*.test.ts && pnpm --filter @stockpilot/web test",
     "validate:mints": "tsx src/validate-mints.ts",
     "validate:execution": "tsx src/validate-execution.ts",
+    "validate:investment-order": "tsx src/validate-investment-order.ts",
     "validate:portfolio-read": "pnpm --filter @stockpilot/web validate:portfolio-read"
   },
   "devDependencies": {

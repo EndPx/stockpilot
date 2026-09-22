@@ -175,7 +175,7 @@ On 2026-09-21:
 
 - [x] Phase 4: wallet authentication and ownership verification.
 - [x] Phase 5: read-only portfolio discovery and available-to-invest balance.
-- [ ] Phase 6: USDC to official PreStocks investment execution.
+- [x] Phase 6: USDC to official PreStocks investment execution.
 - [ ] Phase 7: pending action and approval system.
 - [ ] Phase 8: agent credentials and policy engine.
 - [ ] Phase 9: StockPilot MCP.
@@ -231,18 +231,62 @@ holdings from the transaction response.
 
 ### Phase 6 delivery checklist
 
-- [ ] Parse positive USDC amounts exactly with at most six fractional digits.
-- [ ] Add a server-only Jupiter Swap API V2 order/execute adapter.
-- [ ] Resolve official output mints and canonical USDC only on the server.
-- [ ] Enforce fresh session-wallet USDC balance before order preparation.
-- [ ] Bind a short-lived investment authorization to the transaction message.
-- [ ] Reject changed messages, missing wallet signatures, wrong sessions, and expired orders.
-- [ ] Add authenticated, same-origin prepare and execute routes with strict bodies.
-- [ ] Add an asset-page amount, review, wallet approval, submission, and success flow.
-- [ ] Refresh the blockchain-backed portfolio after successful execution.
-- [ ] Add deterministic security, route, adapter, domain, and client-orchestration tests.
-- [ ] Add a safe order-only validator that never signs or executes.
-- [ ] Complete production build, regression tests, browser acceptance, and real-wallet status.
+- [x] Parse positive USDC amounts exactly with at most six fractional digits.
+- [x] Add a server-only Jupiter Swap API V2 order/execute adapter.
+- [x] Resolve official output mints and canonical USDC only on the server.
+- [x] Enforce fresh session-wallet USDC balance before order preparation.
+- [x] Bind a short-lived investment authorization to the transaction message.
+- [x] Reject changed messages, missing wallet signatures, wrong sessions, and expired orders.
+- [x] Add authenticated, same-origin prepare and execute routes with strict bodies.
+- [x] Add an asset-page amount, review, wallet approval, submission, and success flow.
+- [x] Refresh the blockchain-backed portfolio after successful execution.
+- [x] Add deterministic security, route, adapter, domain, and client-orchestration tests.
+- [x] Add a safe order-only validator that never signs or executes.
+- [x] Complete production build, regression tests, browser acceptance, and real-wallet status.
+
+### Final Phase 6 verification
+
+On 2026-09-22:
+
+- `pnpm test` passed 91 deterministic core, API, security, wallet-orchestration,
+  and portfolio tests.
+- `pnpm build` completed the production TypeScript and Next.js build, including
+  both investment routes.
+- `pnpm validate:execution` read the live registry, verified the official SPACEX
+  mint, and found a non-executed 1 USDC route through Meteora DLMM.
+- `pnpm validate:portfolio-read` decoded a public mainnet wallet's native, legacy
+  SPL, and Token-2022 accounts without a key or transaction.
+- `pnpm validate:investment-order` is intentionally order-only. This environment
+  has no `JUPITER_API_KEY`, so it made no request and printed its explicit safe
+  blocked state; it can never sign or call Jupiter execute.
+- Browser acceptance confirmed public asset rendering, the disconnected investment
+  state, responsive 375 px / 768 px / 1280 px layouts without horizontal overflow,
+  and keyboard dismissal of the wallet dialog with focus restoration. The sole
+  console warning came from the development-only React Scan tooling reporting an
+  outdated `react-grab` helper, not from application code.
+
+`REAL MAINNET INVESTMENT ACCEPTANCE: BLOCKED BY ENVIRONMENT`
+
+No compatible wallet extension, authenticated wallet session, funded mainnet
+wallet, or server-side `JUPITER_API_KEY` was available here. No wallet signature
+or on-chain transaction was attempted.
+
+### Manual real-wallet acceptance
+
+1. Set the exact deployment origin as `APP_URL`, a strong `SESSION_SECRET`, and
+   the server-only `JUPITER_API_KEY`; configure `SOLANA_RPC_URL` if needed.
+2. Use a compatible wallet with a small canonical USDC balance and enough SOL for
+   network fees, then connect and complete StockPilot sign-in.
+3. Open an official asset page, enter a small USDC amount, and inspect every
+   value in the review dialog before choosing **Approve in Wallet**.
+4. Approve the transaction only in the wallet, wait for the explicit success
+   state, compare actual quantities with the wallet/Solscan, and verify the
+   refreshed portfolio.
+
+Phase 6 deliberately contains no sell flow, database persistence, agent,
+automation, MCP, or custom Jupiter fee/routing parameters. The authorization is
+short-lived and stateless; durable idempotency/replay records belong to a later
+explicit persistence phase.
 
 ## Phase 5 — read-only portfolio discovery
 

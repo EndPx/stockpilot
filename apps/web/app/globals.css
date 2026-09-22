@@ -38,9 +38,22 @@ button:disabled { cursor: not-allowed; }
   .wallet-auth-panel { @apply mt-6 rounded-xl border border-line bg-slate-50 p-4; }
   .auth-dot { @apply size-2.5 shrink-0 rounded-full bg-slate-300; }
   .auth-dot-active { @apply bg-emerald-500; }
+  .asset-investment-layout { @apply flex flex-wrap gap-8; }
+  .asset-investment-primary { flex-basis: 0; flex-grow: 999; min-inline-size: min(16rem, 100%); }
+  .investment-panel { @apply self-start p-6 sm:p-7; flex-basis: 18rem; flex-grow: 1; }
+  .investment-amount-field { @apply grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-line bg-white px-3 focus-within:border-indigo-300; }
+  .investment-amount-field input { @apply min-w-0 border-0 bg-transparent py-3 text-lg font-semibold tabular-nums outline-none; }
+  .investment-max { @apply min-h-9 rounded-md px-2 text-xs font-semibold text-accent hover:bg-indigo-50 disabled:text-muted; }
+  .investment-error { @apply mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm leading-6 text-red-800; }
+  .investment-dialog { @apply m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line bg-white p-0 text-ink shadow-2xl; }
+  .investment-review-list { @apply divide-y divide-line rounded-xl border border-line; }
+  .investment-review-list > div { @apply flex items-start justify-between gap-4 px-4 py-3 text-sm; }
+  .investment-review-list dt { @apply text-muted; }
+  .investment-review-list dd { @apply text-right font-semibold tabular-nums; }
 }
 
 .wallet-dialog::backdrop { background: rgb(15 23 42 / 0.42); }
+.investment-dialog::backdrop { background: rgb(15 23 42 / 0.48); backdrop-filter: blur(4px); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AssetLogo } from "@/components/asset-logo";
 import { CopyMint } from "@/components/copy-mint";
 import { DataStatus } from "@/components/data-status";
+import { InvestmentPanel } from "@/components/investment-panel";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
 import { formatUsd, formatValuation } from "@/lib/format";
@@ -42,22 +43,25 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
       </dl>
       <div className="mt-4"><DataStatus {...meta} /></div>
       <p className="mt-3 text-xs leading-6 text-muted">Token Price reflects the traded token. Mark Price is PreStocks’ reference value. These values are not executable trade quotes.</p>
-      <div className="mt-10 grid gap-10 lg:grid-cols-[1.25fr_1fr] lg:gap-12">
-        <section>
+      <div className="asset-investment-layout mt-10">
+        <div className="asset-investment-primary grid gap-8">
+          <section>
           <h2 className="text-xl font-semibold tracking-tight">About</h2>
           <p className="mt-4 max-w-prose whitespace-pre-line text-sm leading-7 text-muted">{asset.description ?? "No company description is available from PreStocks yet."}</p>
           {asset.externalUrl && <a href={asset.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">View on PreStocks<span className="sr-only"> (opens in a new tab)</span></a>}
-        </section>
-        <section className="surface self-start p-6">
-          <h2 className="text-lg font-semibold">Token Details</h2>
-          <dl className="mt-5 space-y-4 text-sm">
-            <div className="flex justify-between gap-4"><dt className="text-muted">Provider</dt><dd>PreStocks</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-muted">Network</dt><dd>Solana mainnet</dd></div>
-            <div className="border-t border-line pt-4"><dt className="text-muted">Mint</dt><dd className="mt-2 break-all font-mono text-xs leading-6" data-testid="asset-mint">{asset.mintAddress}</dd></div>
-          </dl>
-          <div className="mt-4"><CopyMint mint={asset.mintAddress} /></div>
-          <a href={`https://solscan.io/token/${asset.mintAddress}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">View on Solscan<span className="sr-only"> (opens in a new tab)</span></a>
-        </section>
+          </section>
+          <section className="surface self-start p-6">
+            <h2 className="text-lg font-semibold">Token Details</h2>
+            <dl className="mt-5 space-y-4 text-sm">
+              <div className="flex justify-between gap-4"><dt className="text-muted">Provider</dt><dd>PreStocks</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Network</dt><dd>Solana mainnet</dd></div>
+              <div className="border-t border-line pt-4"><dt className="text-muted">Mint</dt><dd className="mt-2 break-all font-mono text-xs leading-6" data-testid="asset-mint">{asset.mintAddress}</dd></div>
+            </dl>
+            <div className="mt-4"><CopyMint mint={asset.mintAddress} /></div>
+            <a href={`https://solscan.io/token/${asset.mintAddress}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">View on Solscan<span className="sr-only"> (opens in a new tab)</span></a>
+          </section>
+        </div>
+        <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
       </div>
       <p className="mt-10 max-w-3xl border-t border-line pt-6 text-xs leading-6 text-muted">PreStocks provide economic exposure to private companies and do not necessarily represent direct ownership, shareholder rights, or voting rights. Investing involves risk.</p>
     </>

@@ -28,6 +28,7 @@ type WalletControlViewProps = Readonly<{
   authErrorMessage?: string;
   authStatus: AuthStatus;
   authWalletAddress?: string;
+  disconnectedLabel?: string;
   onConnect: (walletId: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   onSignIn: () => Promise<void>;
@@ -44,7 +45,7 @@ export function walletErrorMessage(action: "connect" | "disconnect"): string {
     : "We couldn't disconnect your wallet. Try again.";
 }
 
-function triggerLabel(status: WalletStatus, address?: string): string {
+function triggerLabel(status: WalletStatus, address?: string, disconnectedLabel = "Connect Wallet"): string {
   switch (status) {
     case "pending":
       return "Checking wallet…";
@@ -57,7 +58,7 @@ function triggerLabel(status: WalletStatus, address?: string): string {
     case "connected":
       return address ? shortenAddress(address) : "Connected";
     default:
-      return "Connect Wallet";
+      return disconnectedLabel;
   }
 }
 
@@ -70,6 +71,7 @@ export function WalletControlView({
   authErrorMessage,
   authStatus,
   authWalletAddress,
+  disconnectedLabel,
   onConnect,
   onDisconnect,
   onSignIn,
@@ -157,7 +159,7 @@ export function WalletControlView({
         onClick={openDialog}
       >
         <span aria-hidden="true" className={connected ? "wallet-dot wallet-dot-connected" : "wallet-dot"} />
-        <span>{triggerLabel(status, visibleAddress)}</span>
+        <span>{triggerLabel(status, visibleAddress, disconnectedLabel)}</span>
       </button>
 
       <dialog
@@ -272,7 +274,7 @@ export function WalletControlView({
   );
 }
 
-export function WalletButton() {
+export function WalletButton({ disconnectedLabel }: { disconnectedLabel?: string } = {}) {
   const [hydrated, setHydrated] = useState(false);
   const status = useWalletStatus(solanaClient);
   const wallets = useWallets(solanaClient);
@@ -297,6 +299,7 @@ export function WalletButton() {
       authErrorMessage={auth.errorMessage}
       authStatus={authStatus}
       authWalletAddress={auth.sessionWalletAddress}
+      disconnectedLabel={disconnectedLabel}
       onConnect={async (walletId) => {
         const index = options.findIndex((option) => option.id === walletId);
         if (index < 0) throw new Error("Wallet is no longer available");
