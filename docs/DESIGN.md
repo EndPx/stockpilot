@@ -95,6 +95,30 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 5. Components and states
 
+Historical chart extension (2026-09-23): public xStocks and private PreStocks
+details share a quiet, source-backed token-price surface before the existing facts.
+Use a straight SVG close-price line, no curve smoothing, fill, glow or animation.
+Time is proportional on the horizontal axis; missing intervals break the line.
+Only completed candles appear. The 1D / 1W / 1M controls use the existing 44px
+button targets, cobalt selected state and BeUI controlled-selection mechanics;
+1M means 30 days. A native labeled range control supports keyboard and touch candle
+inspection; pointer inspection is an enhancement, not the only access mechanism.
+Show the selected close, UTC interval end, USD axis, actual-period change, fetched
+time and linked pool/source attribution. An expandable semantic close-price table
+provides the same data without requiring vision or pointer use.
+Keep 24px padding (18px on mobile), tabular figures, a 220px plot, and existing
+surface/ink/muted/line/cobalt tokens. Empty, loading, provider failure, partial/gapped
+history and omitted ambiguous candles are explicit, not fabricated flat lines.
+Charts describe a single DEX pool's token prices, never underlying stock prices,
+private-company valuations, execution quotes or trading eligibility. The PreStocks
+issuer's Token/Mark Price comparison stays separate. Fetch only on detail navigation,
+range selection or explicit retry; no background polling or external browser scripts.
+The heading is explicitly `DEX-reported price`, with a prominent 12px unit notice
+between controls and figures on the elevated-canvas surface. Provider units are
+not proven normalized for splits/multipliers and must not be equated to issuer
+quotes or wallet display amounts. Do not apply today's multiplier to historical
+candles or label the percentage as split-adjusted investment performance.
+
 Discovery extension (2026-09-23): retain the existing shell, colors and controls.
 Markets now uses a bounded server-rendered directory (30 rows), with All / Private
 Markets / Public Markets navigation, a labeled search form, result count and next /
@@ -183,6 +207,7 @@ in this revision; no 100-point quality certification is claimed. See UI-REDESIGN
 
 Required closeout: unit tests, production build, React Doctor, real-browser checks
 for landing/dashboard/markets/detail, keyboard focus, narrow/mid/desktop screenshots,
-and verification that dev tools do not leak into production. Known acceptable debt:
-StockPilot has no provider-backed historical series, so the asset detail uses a
-truthful Token Price versus Mark Price reference visualization instead of a chart.
+and verification that dev tools do not leak into production. Historical coverage is
+limited to matching, source-verified DEX pools; unsupported assets and provider rate
+limits remain honest empty/error states. Token/Mark Price reference comparisons are
+not substituted for historical data. Full Lighthouse medians remain unmeasured.

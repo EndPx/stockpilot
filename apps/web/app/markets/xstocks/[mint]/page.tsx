@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { isAddress } from "@solana/kit";
 import { AssetLogo } from "@/components/asset-logo";
 import { CopyMint } from "@/components/copy-mint";
+import { MarketChart } from "@/components/market-chart";
 import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { getPublicMarket } from "@/lib/markets";
 import { marketLabels } from "@/lib/market-inputs";
@@ -24,6 +25,7 @@ export default async function PublicMarketPage({ params }: { params: Promise<{ m
     <header className="asset-hero"><div className="asset-identity"><AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} large /><div><p className="eyebrow">{asset.symbol} / xStocks</p><h1>{asset.name}</h1></div></div><span className="catalog-status">Official issuer catalog</span></header>
     <div className="asset-layout">
       <div className="asset-primary">
+        <MarketChart provider="xstocks" mint={asset.mintAddress} symbol={asset.symbol} />
         <dl className="asset-stats"><div><dt>Classification</dt><dd>{marketLabels[asset.marketType]}</dd></div><div><dt>Underlying symbol</dt><dd>{asset.metadata?.underlyingSymbol ?? "Not specified"}</dd></div><div><dt>Network</dt><dd>Solana mainnet</dd></div><div><dt>Provider</dt><dd>xStocks</dd></div></dl>
         <section className="asset-about"><p className="eyebrow">About this product</p><h2>Public-market exposure</h2><p>{asset.description ?? "An official product from the xStocks issuer catalog."}</p><p>{asset.marketType === "PUBLIC_MARKET_PRODUCT" ? "The issuer catalog does not yet establish a more specific instrument classification for this product." : "Classification is based on issuer evidence. Tokenized exposure is not direct share ownership."}</p>{asset.metadata?.classificationSource && <a href={asset.metadata.classificationSource} target="_blank" rel="noopener noreferrer" className="text-link">Classification evidence <ArrowUpRightIcon /><span className="sr-only"> (opens in a new tab)</span></a>}</section>
         <section className="surface token-details"><div><p className="eyebrow">Canonical identity</p><h2>Token details</h2></div><dl><div><dt>Asset ID</dt><dd className="font-mono">{asset.id}</dd></div><div><dt>Solana mint</dt><dd className="font-mono" data-testid="asset-mint">{asset.mintAddress}</dd></div><div><dt>Underlying ISIN</dt><dd>{asset.metadata?.underlyingIsin ?? "Not specified"}</dd></div><div><dt>Product ISIN</dt><dd>{asset.metadata?.productIsin ?? "Not specified"}</dd></div></dl><div className="token-actions"><CopyMint mint={mint} /><a href={`https://solscan.io/token/${mint}`} target="_blank" rel="noopener noreferrer" className="secondary-button">View on Solscan <ArrowUpRightIcon /><span className="sr-only"> (opens in a new tab)</span></a></div></section>

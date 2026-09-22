@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./market-history": "./src/market-history.ts",
+    "./market-history-types": "./src/market-history-types.ts",
     "./provider-json": "./src/provider-json.ts",
     "./market-validation": "./src/market-validation.ts",
     "./xstocks": "./src/xstocks.ts",

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetLogo } from "@/components/asset-logo";
 import { CopyMint } from "@/components/copy-mint";
+import { MarketChart } from "@/components/market-chart";
 import { DataStatus } from "@/components/data-status";
 import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { InvestmentPanel } from "@/components/investment-panel";
@@ -42,6 +43,7 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
 
       <div className="asset-layout">
         <div className="asset-primary">
+          <MarketChart provider="prestocks" mint={asset.mintAddress} symbol={asset.symbol} />
           <section className="surface price-reference" aria-labelledby="reference-heading">
             <div className="surface-header">
               <div><p className="eyebrow">Price context</p><h2 id="reference-heading">Token versus reference</h2></div>
