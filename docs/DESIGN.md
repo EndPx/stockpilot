@@ -19,8 +19,8 @@
 ## 1. Product and visual direction
 
 StockPilot is an agent-native tokenized-stock product: cinematic before sign-in,
-then quiet, precise, and operational inside the product. The signature is a warm
-paper workspace with inset sidebar navigation and a vivid electric-blue
+then quiet, precise, and operational inside the product. The signature is a cool
+graphite workspace with inset sidebar navigation and a vivid electric-blue
 execution color. Financial data is dense but never theatrical.
 
 Primary journeys are: understand the product, browse official PreStocks, inspect
@@ -35,16 +35,26 @@ connection with StockPilot authentication.
 
 ## 2. Tokens
 
-- Canvas: warm paper `#f1f0ed`; elevated canvas `#f8f7f4`; surface `#ffffff`.
-- Ink: `#11110f`; supporting ink `#6f6a64`; faint ink `#96918b`.
-- Line: `#e4e1dc`; strong line `#d6d1ca`.
-- Action: electric blue `#5468ff`; hover `#4053eb`; pale action `#eef0ff`.
-- Success: `#168f5b`; warning: `#a15d10`; destructive: `#b93838`.
-- Dark rail: `#11110f`; rail text `#f5f4f0`; rail-muted `#9c9891`.
+- Canvas: orbital charcoal `#070a0e`; elevated canvas `#0e131b`; surface `#141b25`.
+- Ink: silver `#eef2f8`; supporting ink `#a6b1c2`; faint ink `#8a98ad`.
+- Line: `#293444`; strong line/control boundary `#61728a`.
+- Brand cobalt `#5468ff`; action fill `#4c60f0` (darker for white-label contrast);
+  hover `#4053eb`; pale action `#1c2947`.
+  Action text/focus: `#a5b0ff`, distinct from the darker white-text button fill.
+- Success: `#64dba2`; warning: `#f2ca80`; destructive: `#ffaba7`.
+  Success background `#102b25`; warning `#302617`; destructive `#331e25`.
+- Dark rail: `#0b1017`; hover surface/skeleton `#202d3e`; inverse ink `#101620`.
+- Background material: landing uses a restrained cobalt light (12% opacity)
+  beneath the hero and a charcoal fade into the editorial sections. Dashboard uses
+  solid charcoal, with opaque panels and a subtle silver inner rim. No starfield,
+  animated glow, repeated hero image, or gradients behind financial text.
+- Accent hover surface `#293b60`; logo fallback ink `#475569` on white issuer tiles.
+  White issuer tiles intentionally retain their original artwork contrast. Selection
+  uses `#cdd3ff` and inverse ink. Subdued labels are slate rather than cobalt in app.
 - Landing art canvas `#070a0e`; security surface `#111319`; hero accent `#a5b0ff`,
   supporting text `#c0c3ca`, stage/caption `#a8aeb8`, link `#e1e3e8`.
-- Market scope panels: private `#e9ecff` / ink `#24294a`; planned public `#eeede9`
-  / ink `#373733` / border `#d8d7d2` / secondary `#686861`.
+- Market scope panels: private `#18253f` fading to `#101823`, planned public
+  surface `#141b25`; both use silver ink and muted slate body copy.
 - Security text `#b9bdc7`, trust text `#bbbfc8`, mark `#aeb8ff`, checks `#8d9cff`.
 - Surface radii: 24px major, 16px nested, 10px controls, full pills only for
   compact statuses. Shadows remain low contrast and broad, never neon glows.
@@ -137,6 +147,11 @@ State clearly that PreStocks exposure may not represent direct equity, voting ri
 or shareholder rights and that investing involves risk.
 
 ## 9. Verification and debt
+
+2026-09-23 background revision: remove the warm-paper break between the orbital
+artwork and the rest of the product. Keep existing geometry, generated art, content,
+wallet lifecycle and execution behavior. Validate labels and controls on dark
+surfaces, including empty/loading/error states, not only the hero screenshot.
 
 2026-09-23: original generated hero shipped through Next Image with preload and
 responsive WebP optimization. The landing is statically rendered and no longer

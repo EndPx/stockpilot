@@ -97,3 +97,37 @@ No transaction was signed or submitted during this UI work.
   Browser head references the new favicon, PNG icon, Apple icon and manifest.
 - No wallet connection, signing or purchase was performed for this brand-only QA.
   No new Lighthouse/zoom/screen-reader certification is claimed.
+
+## System-wide charcoal/navy revision — 2026-09-23
+
+User direction: one dark system, expressive orbital/cobalt landing and calmer,
+execution-focused dashboard. Frontend skill guided shared tokens and state checks.
+
+- Replaced warm paper backgrounds with charcoal/navy, silver text and slightly
+  elevated opaque cards. Landing artwork fades into dark editorial sections;
+  the dashboard has no decorative glow or gradient behind balances.
+- Retained layouts, generated assets, content, wallet/auth behavior and execution
+  boundaries. Updated loading placeholders, dialogs, error/stale states, native
+  color-scheme and manifest background. Issuer logo tiles intentionally stay white.
+- Split cobalt text/focus from button fill. The previous white-on-#5468ff button
+  pair measured 4.37:1; darker #4c60f0 now meets 4.5:1. Two regression tests cover
+  normal-text token pairs and CTA/control-boundary contrast. This is not a full
+  rendered-page accessibility certification.
+- `pnpm test`: 106/106; final `pnpm build`: passed; diff whitespace check passed.
+  React Doctor: 71/100, same seven pre-existing warnings, zero errors. No unrelated
+  auth, effect, or transaction refactoring was performed to silence warnings.
+- Production browser matrix: landing, app, Markets and ANDURIL detail at
+  375/768/1280px (12 checks) show charcoal background, no horizontal overflow,
+  no broken brand image and no Next dev portal. Screenshots inspected in-session
+  for landing hero/editorial sections, dashboard, Markets, detail and wallet dialog.
+- Keyboard: Escape closes the wallet dialog and returns focus to its trigger.
+  Search no-results and Clear search recovery exercised in production. Wallet
+  signing, authenticated/funded portfolio and trade review were not exercised.
+- Design review: consistent visual identity and surface hierarchy; market data and
+  issuer restrictions remain legible without decorative competition. Existing
+  small market labels remain unchanged; full screen-reader and 200% zoom testing
+  is still outstanding. No Lighthouse median or react-scan budget measured here.
+- Referenced visual-qa/review-work skills are not installed; used available browser
+  screenshots, DOM checks, contrast tests and local diff review instead, without
+  claiming those unavailable independent review gates passed.
+- Temporary production server stopped; viewport reset; localhost:3000/app retained.

@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Human-approved tokenized-stock investing on Solana.",
     start_url: "/app",
     display: "browser",
-    background_color: "#f1f0ed",
+    background_color: "#070a0e",
     theme_color: "#5468ff",
     icons: [
       { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

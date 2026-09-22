@@ -207,7 +207,7 @@ function AuthPrompt({ connected, onSignIn, busy, errorMessage }: {
           </button>
         ) : <WalletButton />}
       </div>
-      {errorMessage && <p role="alert" className="mx-auto mt-5 max-w-md text-sm text-red-700">{errorMessage}</p>}
+      {errorMessage && <p role="alert" className="mx-auto mt-5 max-w-md text-sm text-danger">{errorMessage}</p>}
     </section>
   );
 }

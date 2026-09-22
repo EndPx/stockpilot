@@ -258,7 +258,7 @@ export function WalletControlView({
                   ))}
                 </div>
               ) : (
-                <div className="mt-6 rounded-lg border border-line bg-slate-50 p-4">
+                <div className="mt-6 rounded-lg border border-line bg-raised p-4">
                   <p className="text-sm font-medium">No compatible wallet found</p>
                   <p className="mt-1 text-sm leading-6 text-muted">Install a Wallet Standard compatible Solana wallet, then reload this page.</p>
                 </div>
