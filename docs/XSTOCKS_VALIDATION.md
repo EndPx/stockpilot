@@ -1,5 +1,7 @@
 # xStocks validation
 
+> Historical architecture-correction findings below. Superseded for **discovery** on 2026-09-23 by [product evidence](XSTOCKS_PRODUCT_EVIDENCE.md) and the [discovery closeout](TOKENIZED_MARKET_DISCOVERY_REPORT.md): the full issuer catalog is ingested, with evidence-backed private-exposure exclusions. Public execution remains disabled; the old production-discovery block no longer applies.
+
 Decision: **XSTOCKS CANONICAL REGISTRY BLOCKED** for production activation.
 
 Canonical **discovery is proven**, not missing. The blocker is completing a safely classified, extension-aware and eligibility-reviewed production registry. Do not confuse this decision label with an inability to find official mints. No production xStocks provider or public-stock trading/category UI is enabled by this change.

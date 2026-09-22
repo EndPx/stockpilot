@@ -1,6 +1,6 @@
 # StockPilot
 
-StockPilot is building an agent-native tokenized-stock investing experience on Solana. Official PreStocks power private markets; verified xStocks are the planned public-equity/ETF provider. Human wallet authorization remains the execution boundary.
+StockPilot is building an agent-native tokenized-stock investing experience on Solana. Official PreStocks power private markets; the official xStocks Solana catalog powers public-market discovery. Human wallet authorization remains the execution boundary.
 
 ## Current status
 
@@ -10,13 +10,14 @@ StockPilot is building an agent-native tokenized-stock investing experience on S
 - Phase 4: Sign In With Solana authentication and wallet-bound server sessions complete.
 - Phase 5: authenticated, read-only USDC, SOL, and official PreStocks portfolio discovery complete.
 - Human BUY implementation exists; real mainnet investment acceptance remains outstanding.
-- Architecture correction: client/credential/grant/approval boundaries documented, provider-aware registry foundation tested. Agent features and production xStocks integration are **not enabled**. Execution work is frozen pending the revised asset-universe gates.
+- Public discovery: paginated canonical xStocks ingestion, evidence-backed classification, bounded Markets search and read-only public detail are enabled. Known private-exposure products are excluded (currently VCXx). Agent features and xStocks investment execution are **not enabled**.
+- Lazy execution eligibility is read-only and fail-closed, with expiring technical results separate from discovery. No production xStocks product-review clearance is configured.
 
 The web application reads live provider data. Prices and the available asset registry can change between requests.
 
 ## Product boundary
 
-Today the operational investment universe is official PreStocks only. The domain supports `PRE_IPO + prestocks` and `PUBLIC_EQUITY + xstocks`, never arbitrary SPL tokens. **All pre-IPO assets must remain exclusively PreStocks.** Public equities are a separate category, not a competing pre-IPO integration.
+Today the operational investment universe is official PreStocks only. Discovery also supports `PUBLIC_EQUITY`, `ETF` and unclassified `PUBLIC_MARKET_PRODUCT` from xStocks, never arbitrary SPL tokens. **All pre-IPO/private-company exposure must remain exclusively PreStocks.** Canonicality, classification and execution eligibility are separate; a listed fund does not override that invariant.
 
 The current human-authorized investment path remains intentionally narrow:
 
@@ -94,11 +95,19 @@ pnpm build
 pnpm test
 pnpm validate:portfolio-read
 pnpm validate:execution
+pnpm validate:xstocks
 ```
 
 The portfolio validator makes structural, read-only mainnet RPC calls against a
 well-known public address. The execution validator obtains a live Jupiter quote.
 Neither command signs or submits a transaction.
+
+The xStocks validator ingests the full current catalog, reports exclusions, then
+sequentially inspects AAPLx, NVDAx and TSLAx using mint reads and GET quotes only.
+Scaled quantities preserve raw u64 strings; local decimal scale calculations are
+explicit estimates, not guarantees of Token-2022 binary-float equivalence. xStocks
+portfolio admission is postponed until same-context RPC display and price units
+are validated. The existing PreStocks portfolio path is unchanged.
 
 Wallet connection alone does not prove ownership. Signing in creates a
 wallet-bound HttpOnly session; it does not grant transaction authority.
@@ -107,8 +116,10 @@ wallet-bound HttpOnly session; it does not grant transaction authority.
 
 - `/` — StockPilot landing; current versus planned capabilities explicitly labeled
 - `/app` — authenticated read-only portfolio overview
-- `/markets` — searchable live PreStocks registry
+- `/markets` — bounded, searchable public/private directory; All / Private / Public filters
 - `/markets/[symbol]` — live asset detail and verified Solana mint
+- `/markets/xstocks/[mint]` — canonical public product detail, discovery only
+- `/api/markets` — public GET discovery with query/provider/marketType/group/limit/cursor filters
 - `/api/assets?q=...` — validated asset list/search API
 - `/api/assets/[symbol]` — validated exact-symbol asset API
 - `/api/auth/*` — SIWS challenge, verification, session, and logout APIs
@@ -116,6 +127,8 @@ wallet-bound HttpOnly session; it does not grant transaction authority.
 
 ## Documentation
 
+- [Tokenized market discovery closeout (25-point report)](docs/TOKENIZED_MARKET_DISCOVERY_REPORT.md)
+- [xStocks product and token evidence](docs/XSTOCKS_PRODUCT_EVIDENCE.md)
 - [Architecture correction closeout](docs/ARCHITECTURE_CORRECTION_REPORT.md)
 - [Product and agent control-plane architecture](docs/PRODUCT_ARCHITECTURE.md)
 - [PayBox read-only product research](docs/PAYBOX_PRODUCT_RESEARCH.md)

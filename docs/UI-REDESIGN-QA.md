@@ -1,5 +1,32 @@
 # StockPilot UI redesign QA
 
+## Public/private discovery revision — 2026-09-23
+
+- Production build browser checks: public directory at 375/768/1280px, bounded
+  30 rows, next page 31–60, deterministic NVIDIA search, empty-search recovery,
+  private SpaceX filtering and invalid-cursor recovery. No horizontal overflow
+  observed. Final source policy displays 1,025 public products; VCXx returns zero.
+- NVIDIA detail: canonical identity, full Public equity classification after
+  two-column stat layout fix, readable 375px/1280px screenshots, only Copy under
+  main; no public BUY/preparation action. Existing SPACEX PreStocks detail retains
+  prices and the disconnected investment entry without invoking it.
+- Landing at 375px retains fixed header with only home/Open the app and working
+  private/public catalog links. Signed-out `/app` remains a wallet/authentication
+  entry, not a catalog of zero-balance holdings.
+- Keyboard search-to-submit traversal has visible cobalt outline. Active market
+  group is represented with aria-current. Existing reduced-motion styling retained.
+- Cold full issuer pagination was approximately 50 seconds locally; loading shell
+  appears first, warm pagination/search uses bounded cached results. This is a
+  recorded latency limitation, not a fast-cold-load claim.
+- `pnpm test`: 132/132; production build passed. React Doctor 0.9.14: 72/100,
+  zero errors, eight warnings: seven existing and one Markets render-complexity
+  warning. No unrelated wallet/security refactor was made to silence them.
+- Frontend skill guided design-contract reuse and bounded server rendering.
+  Full 200% zoom/screen-reader review, Lighthouse medians and react-scan render
+  budgets remain unmeasured; no independent visual-qa skill certification claimed.
+- No wallet connection, SIWS signature, transaction preparation, signing or send
+  was performed in this QA pass. Browser viewport restored after checks.
+
 ## Architecture-correction revision — 2026-09-23
 
 - Original orbital hero artwork, local optimized image, static landing generation.

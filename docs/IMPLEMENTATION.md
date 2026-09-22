@@ -1,6 +1,25 @@
 # Implementation Checklist
 
-Last verified: 2026-09-22
+Last verified: 2026-09-23
+
+## Latest closeout — tokenized market discovery
+
+The historical phase checklists below are retained. Current scope and evidence are
+in the [25-point discovery report](TOKENIZED_MARKET_DISCOVERY_REPORT.md).
+
+- Full official xStocks Solana ingestion: 1,026 observed; 1,025 admitted after
+  the owner-confirmed VCXx/private-exposure exclusion. Eight PreStocks unchanged.
+- Canonical mint identity, evidence-based classification, bounded search/cursors,
+  public/private Markets and read-only public detail implemented.
+- Sequential AAPLx/NVDAx/TSLAx mint/extension/quote probes completed; lazy validator
+  fails closed and has bounded, expiring results. No public execution enabled.
+- Raw/scaled amount infrastructure is string/bigint-safe; local scaled calculations
+  are explicitly estimates. xStocks portfolio admission is postponed.
+- Final `pnpm test`: 132/132. `pnpm build`, `pnpm validate:portfolio-read`,
+  `pnpm validate:execution` and `pnpm validate:xstocks`: passed read-only checks.
+- No transaction prepared, signed or submitted. Wallet/SIWS/portfolio/investment
+  implementation preserved; real-wallet acceptance was not repeated.
+- Stop here. Do not automatically resume financial execution or agent features.
 
 ## Product scope
 

@@ -24,7 +24,7 @@ then quiet, precise, and operational inside the product. The signature is a cool
 graphite workspace with inset sidebar navigation and a vivid electric-blue
 execution color. Financial data is dense but never theatrical.
 
-Primary journeys are: understand the product, browse official PreStocks, inspect
+Primary journeys are: understand the product, browse official PreStocks and xStocks, inspect
 one asset, connect and authenticate a Solana wallet, review the real on-chain
 portfolio, and explicitly approve a BUY. Human authorization and source clarity
 remain more important than decorative polish.
@@ -54,7 +54,7 @@ connection with StockPilot authentication.
   uses `#cdd3ff` and inverse ink. Subdued labels are slate rather than cobalt in app.
 - Landing art canvas `#070a0e`; security surface `#111319`; hero accent `#a5b0ff`,
   supporting text `#c0c3ca`, stage/caption `#a8aeb8`, link `#e1e3e8`.
-- Market scope panels: private `#18253f` fading to `#101823`, planned public
+- Market scope panels: private `#18253f` fading to `#101823`, public discovery
   surface `#141b25`; both use silver ink and muted slate body copy.
 - Security text `#b9bdc7`, trust text `#bbbfc8`, mark `#aeb8ff`, checks `#8d9cff`.
 - Surface radii: 24px major, 16px nested, 10px controls, full pills only for
@@ -81,7 +81,8 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   No landing wallet control, Markets link or Portfolio link in the header.
   Display type is 52–96px desktop, 44–60px mobile; body copy remains legible over a
   dark image scrim. Decorative image has empty alt and responsive optimized output.
-  Two editorial market-scope panels distinguish live PreStocks from planned xStocks.
+  Two editorial market-scope panels distinguish PreStocks private markets from
+  live xStocks public discovery. Public execution remains unimplemented.
 - App desktop: fixed 248px navigation rail; the document owns vertical scrolling;
   content has a 1180px readable maximum and broad breathing room.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
