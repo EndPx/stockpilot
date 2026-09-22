@@ -7,6 +7,7 @@
     "./market-validation": "./src/market-validation.ts",
     "./xstocks": "./src/xstocks.ts",
     "./xstocks-classification": "./src/xstocks-classification.ts",
+    "./xstocks-discovery-policy": "./src/xstocks-discovery-policy.ts",
     "./asset-domain": "./src/asset-domain.ts",
     "./jupiter-v2": "./src/jupiter-v2.ts",
     "./prestocks": "./src/prestocks.ts"

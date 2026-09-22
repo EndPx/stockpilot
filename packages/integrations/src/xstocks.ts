@@ -1,6 +1,7 @@
 import { isAddress } from "@solana/kit";
 import type { InvestmentAsset, MarketType } from "./asset-domain.js";
 import { XSTOCKS_CLASSIFICATION_EVIDENCE } from "@stockpilot/integrations/xstocks-classification";
+import { discoveryExclusion } from "@stockpilot/integrations/xstocks-discovery-policy";
 
 export const XSTOCKS_API = "https://api.xstocks.fi/api/v2/public/assets";
 export const XSTOCKS_TERMS = "https://assets.backed.fi/legal-documentation";
@@ -60,7 +61,7 @@ export function normalizeXStock(value: unknown): InvestmentAsset {
 }
 
 /** Complete-or-fail snapshot, bounded to 3,000 records / 60 seconds. Never uses token search. */
-export async function fetchXStocks(fetcher: typeof fetch = fetch): Promise<InvestmentAsset[]> {
+export async function fetchXStocksCatalog(fetcher: typeof fetch = fetch) {
   const assets: InvestmentAsset[] = [];
   const issuerIds = new Set<string>();
   const mints = new Set<string>();
@@ -86,11 +87,19 @@ export async function fetchXStocks(fetcher: typeof fetch = fetch): Promise<Inves
       }
       if (!pagination.hasNextPage) {
         if (!assets.length) throw new Error("Empty issuer catalog.");
-        return assets;
+        const excluded = assets.flatMap((asset) => {
+          const policy = discoveryExclusion(asset);
+          return policy ? [{ assetId: asset.id, symbol: asset.symbol, reason: policy.reason, evidenceUrl: policy.evidenceUrl }] : [];
+        });
+        return { canonicalCount: assets.length, excluded, assets: assets.filter((asset) => !discoveryExclusion(asset)) };
       }
     }
     throw new Error("Issuer pagination exceeded safety bound.");
   } catch (cause) { throw new XStocksProviderError({ cause }); }
+}
+
+export async function fetchXStocks(fetcher: typeof fetch = fetch): Promise<InvestmentAsset[]> {
+  return (await fetchXStocksCatalog(fetcher)).assets;
 }
 
 export class XStocksService {

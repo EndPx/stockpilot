@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchXStocks, normalizeXStock, XStocksService } from "@stockpilot/integrations/xstocks";
+import { fetchXStocks, fetchXStocksCatalog, normalizeXStock, XStocksService } from "@stockpilot/integrations/xstocks";
 const mint = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
 const row = { id: "issuer-1", name: "Apple xStock", symbol: "AAPLx", deployments: [{ network: "Solana", address: mint }], underlying: { type: null } };
 const page = (nodes: unknown[], currentPage = 0, hasNextPage = false) => ({ nodes, page: { currentPage, hasNextPage } });
@@ -45,4 +45,12 @@ test("bounded cache shares refresh, clones records and cannot extend stale lifet
   assert.equal((await service.getSnapshot()).assets[0].metadata!.issuerId, "issuer-1");
   now = 300_001; fail = true; assert.equal((await service.getSnapshot()).stale, true);
   now = 1_800_000; await assert.rejects(service.getSnapshot());
+});
+
+test("issuer-verified private exposure is excluded without hiding the rest of the catalog", async () => {
+  const privateFund = { ...row, id: "3b5de927-b421-48ec-81b1-74c8eec4925f", symbol: "RENAMED", deployments: [{ network: "Solana", address: "Xs7UsqobM3EJgMeHwdAbmDBCZH1G5WTCjatpeYcCr8x" }] };
+  const catalog = await fetchXStocksCatalog(fetchPages([page([row, privateFund])]).fetcher);
+  assert.equal(catalog.canonicalCount, 2); assert.equal(catalog.assets.length, 1);
+  assert.equal(catalog.excluded[0].reason, "PRIVATE_EXPOSURE_REQUIRES_PRESTOCKS");
+  assert.equal(catalog.assets[0].id, `xstocks:${mint}`);
 });
