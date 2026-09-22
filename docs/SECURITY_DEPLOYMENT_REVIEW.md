@@ -16,9 +16,13 @@ flooding, oversized upstream data, unavailable storage and untrusted agent input
 
 The confirmed target is Hostinger VPS `76.13.179.205`, SSH alias
 `whisperdesk-vps`, with intended origin `https://stockpilot.endpx.cloud`.
-The subdomain A record was added through the user's Hostinger browser and public
-DNS resolves to the confirmed VPS. TLS and actual deployment remain separate
-checks, not conclusions from the local review.
+The subdomain A record was added through the user's Hostinger browser (TTL 14400)
+and public DNS resolves to the confirmed VPS. No other DNS record was changed.
+The live origin is **https://stockpilot.endpx.cloud**. Release `4ffe7e2` runs from
+`/opt/stockpilot/releases/4ffe7e2`, with `/opt/stockpilot/current` pointing to it.
+The app image is `stockpilot:release-4ffe7e2` with resolved image ID
+`sha256:0cb36bb217249b37456c1fffcb5ce89d169675ed0b4ec4767ca19035f6e61eac`.
+The earlier hardened image `stockpilot:release-11d9809` is retained for rollback.
 
 ## Implemented controls and regression evidence
 
@@ -105,9 +109,12 @@ must become enforced server behavior before any external agent can act:
 
 ## Validation record
 
-Local targeted regressions cover the controls above using in-process/fake stores
-and mocked providers. This report does not claim live Redis persistence/failover,
-real-wallet browser acceptance, public TLS or remote deployment tests.
+Local regressions cover the controls above using in-process/fake stores and mocked
+providers. Live smoke tests additionally exercised the actual HTTPS/Redis auth
+path and read-only Solana portfolio adapter using an ephemeral unfunded identity.
+This is not acceptance with the user's Phantom wallet, a funded-wallet test,
+mainnet investment acceptance, a disaster-restore test, or an external penetration
+test. No financial transaction was signed, prepared or broadcast.
 
 The recorded production dependency audit covered 174 dependencies and reported
 zero known advisories. That is a point-in-time advisory result, not a guarantee
@@ -115,6 +122,29 @@ against unknown vulnerabilities or application defects.
 
 - Final full test results: 167 passed (89 core/integrations, 38 auth/client/header,
   40 server/portfolio/investment tests), zero failed.
-- Final production build result: passed TypeScript and Next.js standalone build.
-- DNS, host isolation, live Redis and public/browser acceptance: to be recorded
-  by the deployment owner with actual outcomes and remaining limitations.
+- Final production build result: passed TypeScript and Next.js standalone builds
+  locally on Windows and inside the Linux production Docker build.
+- Public HTTP redirects to HTTPS; HTTPS landing returns 200. Let's Encrypt
+  certificate covers this hostname and expires 2026-12-21; Certbot timer is active
+  with a domain-scoped NGINX renewal hook. Combined `nginx -t` passed before reload.
+- Both StockPilot containers are healthy, non-root and read-only. App binds only
+  `127.0.0.1:3100`; Redis publishes no host port and its network is internal.
+  External checks could not reach ports 3100 or 6379. Runtime config is root-owned
+  mode 0600 inside mode-0700 `/etc/stockpilot`. No dotenv files were found in the
+  runtime image. Existing unrelated containers remained running.
+- Redis reports AOF enabled and successful last writes/rewrite status. Its volume
+  survived app-only replacement. Redis restart, failover and backup restoration
+  were not exercised, and monitoring/backup operations still need operator setup.
+- `node deploy/smoke-auth.mjs --portfolio`: all eleven checks passed on the final
+  release. Verified secure cookies, real SIWS proof validation, restored sessions,
+  empty wallet-bound on-chain portfolio, rejection of identical proof replay,
+  logout revocation, foreign-origin rejection and both disabled investment gates.
+- Additional live checks: unauthenticated portfolio returns 401; oversized API
+  request returns 413; HTML CSP nonce differs per response; framing/MIME/referrer/
+  HSTS headers are present; health reports auth enabled, investments disabled and
+  agent execution disabled. Rate-limit behavior is covered by local tests and
+  deployed configuration; a public stress/flood test was not performed.
+- Browser checks: landing, app sign-in entry, Markets (1,033 catalog products at
+  the time of inspection), PreStocks detail, disabled-execution notice and copy
+  interaction loaded successfully. No browser warning/error logs were observed.
+  Real Phantom sign-in and non-empty portfolio rendering remain user acceptance.

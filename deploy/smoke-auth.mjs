@@ -1,8 +1,11 @@
 // Run only after the operator confirms the live deployment:
 //   node deploy/smoke-auth.mjs
-// Uses ten HTTP requests (at most one cleanup request), an ephemeral in-memory
-// Ed25519 identity, and SIWS only. Never reads a real wallet, calls RPC, prepares
-// an order, or signs a transaction. Nothing sensitive is printed or persisted.
+//   node deploy/smoke-auth.mjs --portfolio
+// Default: ten HTTP requests, no RPC. --portfolio: eleven HTTP requests, including
+// one authenticated portfolio request that triggers read-only server RPC calls.
+// Either mode allows at most one extra cleanup request. Uses an ephemeral in-memory
+// Ed25519 identity and SIWS only; never reads a real wallet, prepares an order, or
+// signs a transaction. Nothing sensitive is printed or persisted.
 import { generateKeyPairSync, sign } from "node:crypto";
 import { createRequire } from "node:module";
 
@@ -12,7 +15,9 @@ const ORIGIN = "https://stockpilot.endpx.cloud";
 const STATEMENT = "Sign in to StockPilot. This proves wallet ownership and does not authorize transactions or asset transfers.";
 const TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 65_536;
-const MAX_REQUESTS = 11;
+const ARGS = process.argv.slice(2);
+const INCLUDE_PORTFOLIO = ARGS.includes("--portfolio");
+const MAX_REQUESTS = INCLUDE_PORTFOLIO ? 12 : 11;
 let requests = 0;
 
 function requireCheck(condition) {
@@ -88,6 +93,7 @@ function validateSignInInput(input, walletAddress) {
 }
 
 async function main() {
+  requireCheck(ARGS.length === 0 || ARGS.length === 1 && ARGS[0] === "--portfolio");
   const { getAddressDecoder } = requireWeb("@solana/kit");
   const { createSignInMessage } = requireWeb("@solana/wallet-standard-util");
   const health = await call("/api/health");
@@ -140,6 +146,17 @@ async function main() {
     requireCheck(restored.response.status === 200 && restored.data.authenticated === true && restored.data.walletAddress === walletAddress);
     pass("session_restored");
 
+    if (INCLUDE_PORTFOLIO) {
+      const result = await call("/api/portfolio", { cookie: sessionCookie });
+      const portfolio = result.data.portfolio;
+      const zeroAmount = (value) => typeof value === "string" && /^0(?:\.0+)?$/.test(value);
+      requireCheck(result.response.status === 200 && portfolio?.walletAddress === walletAddress);
+      requireCheck(Array.isArray(portfolio.positions) && portfolio.positions.length === 0 && portfolio.portfolioValueUsd === 0);
+      requireCheck(portfolio.funding?.usdc?.mintAddress === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+      requireCheck(zeroAmount(portfolio.funding.usdc.amount) && portfolio.funding.usdc.amountUsd === 0 && zeroAmount(portfolio.funding?.sol?.amount));
+      pass("ephemeral_wallet_empty_portfolio");
+    }
+
     const replay = await call("/api/auth/verify", { method: "POST", cookie: challengeCookie, body: proof });
     requireCheck(replay.response.status === 401 && replay.data.error?.code === "AUTH_REPLAY_DETECTED");
     pass("identical_proof_replay_denied");
@@ -161,5 +178,6 @@ async function main() {
 
 // Do not emit exception text: HTTP response data and authentication material
 // must stay private even when a check fails. Exit status and last PASS identify
-// an incomplete run; success always prints all ten named PASS checks.
+// an incomplete run; success prints ten named PASS checks, or eleven with
+// --portfolio. The optional check adds no financial preparation or execution.
 await main().catch(() => { process.exitCode = 1; });

@@ -49,6 +49,11 @@ Set `AUTH_ENABLED=false` if the initial release should offer discovery only.
 `INVESTMENTS_ENABLED` is hardcoded to `false` in Compose, and changing the env file
 cannot enable buys. Enabling trading is a separate release/security decision.
 
+When archiving a release on Windows, use `git -c core.autocrlf=false archive`.
+The repository also fixes Linux deployment asset line endings through
+`.gitattributes`. Transfer only the source archive, never the local working tree
+or its dotenv files.
+
 `.dockerignore` excludes dotenv files, key files, deployment files, and local
 dependencies from the build context. Runtime secrets are injected only when
 containers start. Docker administrators can still inspect container environment
@@ -124,8 +129,20 @@ After confirming the exact live origin, run `node deploy/smoke-auth.mjs` from a
 checkout with the workspace dependencies installed. It tests real HTTPS/Redis
 authentication, replay denial, revocation, cross-origin rejection and disabled
 investment endpoints using only a throwaway in-memory SIWS identity. It does not
-connect a real wallet or create a financial transaction. All ten named checks
-must print `PASS`; a failure exits nonzero without exposing authentication data.
+connect a real wallet or create a financial transaction. The default run makes ten
+HTTP requests, performs no RPC calls, and must print all ten named `PASS` checks.
+
+Optionally run `node deploy/smoke-auth.mjs --portfolio` to add one authenticated
+`GET /api/portfolio` after session restoration. This triggers read-only server RPC
+calls and verifies the generated wallet has zero SOL/USDC balances, zero portfolio
+value, and no holdings, with the response bound to that same wallet. This mode
+makes eleven HTTP requests and must print eleven named `PASS` checks. It never
+logs wallet addresses, keys, proofs, or cookies, and adds no financial preparation
+or execution. Both modes allow at most one additional logout request for cleanup
+on failure (eleven/twelve requests maximum), use a ten-second timeout per request,
+and reject responses over 64 KiB. A failure exits nonzero without exposing
+authentication data. Run the optional check only after confirming the live image
+and its read-only RPC configuration.
 
 ## Updates and rollback
 
