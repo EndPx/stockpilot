@@ -1,0 +1,6 @@
+# Linux deployment assets must remain executable/configurable from Windows archives.
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+deploy/*.sh text eol=lf
+deploy/*.conf text eol=lf
+deploy/*.yml text eol=lf
