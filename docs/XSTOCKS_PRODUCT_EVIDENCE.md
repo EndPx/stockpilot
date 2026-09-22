@@ -36,3 +36,15 @@ Keep current PreStocks portfolio admission and valuation unchanged. Public catal
 ## Baseline
 
 Starting commit: `55018a3`; local main matched origin/main and working tree was clean. `pnpm build`, `pnpm test`, `pnpm validate:portfolio-read`, and quote-only `pnpm validate:execution` passed before implementation. No transaction was prepared or executed.
+
+## Representative 1 — AAPLx
+
+Observed sequentially first, 2026-09-22T18:14Z (2026-09-23 Asia/Jakarta). The complete production ingestion returned **1,026** canonical Solana products. This is a changing count, not a constant or a tradability claim.
+
+- Official issuer ID `9e43a778-fdc8-44f1-87de-f2e7420bb7f7`; product ISIN `CH1436219187`; underlying Apple Inc., `AAPL`, ISIN `US0378331005`. [Issuer product evidence](https://assets.backed.fi/products/apple-xstock) explicitly identifies tokenized equity exposure via a tracker certificate, not direct share ownership.
+- Canonical Solana mint `XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp`; initialized; Token-2022 `TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`; 8 decimals.
+- `scaledUiAmountConfig`: stored multiplier `1.0026642075893797`; new multiplier `1.0032690125398187`, effective timestamp `1786149000` (already effective at observation). Do not blindly use the stored old multiplier.
+- `defaultAccountState=initialized`; `pausableConfig.paused=false`; `transferHook.programId=null`. Authorities can change these states. Permanent delegate, mint authority and freeze authority are present.
+- Other extensions: metadataPointer, tokenMetadata, confidentialTransferMint (autoApproveNewAccounts=false, no auditor). No transferFeeConfig was returned in this mint observation. Absence here says nothing about other catalog products.
+- Quote-only: canonical USDC `1000000` raw → AAPLx `291895` raw, Raydium CLMM. This is a time/amount-specific route, not a signed execution or a share quantity.
+- Issuer/product terms and geographic/sanctions/venue eligibility remain unreviewed for StockPilot. Discovery stays UNKNOWN; no execution authorization is granted.
