@@ -7,7 +7,8 @@
   generated artwork. Imagegen produced a metallic orbital navigation sculpture
   with charcoal negative space and cobalt core. A separately generated orbital-S
   logo replaces the earlier bar mark. Content order: hero, market scope,
-  human-control flow, wallet security.
+  human-control flow, footer. The standalone "Built on trust" section was removed
+  at the user's request; transaction safeguards remain unchanged.
   Planned capabilities must be labeled and must not produce fake controls/dead links.
 - 2026-09-22: reviewed the user's two mobile references. We take the dense market
   hierarchy, reachable bottom navigation, strong price typography, and persistent

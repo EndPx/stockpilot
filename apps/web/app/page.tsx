@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRightIcon, CheckIcon, ShieldIcon } from "@/components/icons";
+import { ArrowUpRightIcon } from "@/components/icons";
 import orbital from "@/public/images/stockpilot-orbital.png";
 
 export default function HomePage() {
@@ -55,16 +55,6 @@ export default function HomePage() {
           <li><span>02</span><div><strong>Review an exact request</strong><p>The asset, amount and transaction stay bound to your decision. A changed request needs a new approval.</p></div></li>
           <li><span>03</span><div><strong>Your wallet. Your signature.</strong><p>Human approval first. Wallet signing next. Confirmation and a traceable record close the loop.</p></div></li>
         </ol>
-      </section>
-
-      <section className="landing-security">
-        <div className="security-mark"><ShieldIcon /></div>
-        <div><p className="section-index">03 / Built on trust</p><h2>Access isn&apos;t authority.</h2></div>
-        <div>
-          <p className="security-copy">Connecting a wallet or signing in doesn&apos;t move funds. Each investment requires a separate transaction signature from your wallet.</p>
-          <div className="hero-trust"><span><CheckIcon /> No private-key access</span><span><CheckIcon /> No hidden execution</span></div>
-        </div>
-        <Link href="/app" className="text-link">Open the app <ArrowUpRightIcon /></Link>
       </section>
     </div>
   );
