@@ -1,0 +1,23 @@
+# Example site block for the EXISTING host reverse proxy. Replace this domain only
+# after DNS and the approved VPS are confirmed; preserve all other site blocks.
+# Caddy obtains/renews HTTPS certificates automatically for the configured domain.
+stockpilot.example.com {
+    encode zstd gzip
+    header Strict-Transport-Security "max-age=31536000"
+
+    @api path /api /api/*
+    request_body @api {
+        max_size 16KiB
+    }
+
+    reverse_proxy 127.0.0.1:3100 {
+        # Overwrite any client-supplied value. TRUST_PROXY relies on this contract.
+        header_up X-Real-IP {remote_host}
+        header_up -Forwarded
+        transport http {
+            dial_timeout 5s
+            # Cold, fully paginated issuer reads can take up to one minute.
+            response_header_timeout 90s
+        }
+    }
+}
