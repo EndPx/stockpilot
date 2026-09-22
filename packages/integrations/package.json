@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./xstocks": "./src/xstocks.ts",
     "./asset-domain": "./src/asset-domain.ts",
     "./jupiter-v2": "./src/jupiter-v2.ts",
     "./prestocks": "./src/prestocks.ts"

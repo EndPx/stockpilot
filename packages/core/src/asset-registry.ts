@@ -7,6 +7,7 @@ import {
   type MarketType,
 } from "@stockpilot/integrations/asset-domain";
 import { AssetService } from "./assets.js";
+import { XStocksService } from "@stockpilot/integrations/xstocks";
 
 export type { InvestmentAsset, MarketType, AssetProvider, AssetAvailability, ExecutionStatus } from "@stockpilot/integrations/asset-domain";
 
@@ -17,6 +18,10 @@ export type RegistryFilter = { query?: string; marketType?: MarketType; provider
 /** Server-owned adapter. The legacy execution path continues to use AssetService. */
 export function createPreStocksProvider(service = new AssetService()): AssetRegistryProvider {
   return { provider: "prestocks", marketType: "PRE_IPO", getSnapshot: () => service.getSnapshot() };
+}
+
+export function createXStocksProvider(service = new XStocksService()): AssetRegistryProvider {
+  return { provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT", getSnapshot: () => service.getSnapshot() };
 }
 
 export class InvestmentAssetRegistry {
