@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./execution-eligibility": "./src/execution-eligibility.ts",
     "./token-amounts": "./src/token-amounts.ts",
     "./asset-registry": "./src/asset-registry.ts",
     "./assets": "./src/assets.ts",

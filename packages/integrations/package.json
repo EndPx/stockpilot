@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./market-validation": "./src/market-validation.ts",
     "./xstocks": "./src/xstocks.ts",
     "./asset-domain": "./src/asset-domain.ts",
     "./jupiter-v2": "./src/jupiter-v2.ts",

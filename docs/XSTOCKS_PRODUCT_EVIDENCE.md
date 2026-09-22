@@ -92,3 +92,11 @@ All three sampled mints returned the same eight extension names, but different s
 | Unknown extensions | Never assume another asset's semantics | Unsupported until reviewed. |
 
 No wallet signing or transaction simulation occurred, so signing/execution compatibility is **not proven**. Current issuer terms restrict US persons and sanctions-related access; product/venue/jurisdiction review remains incomplete, not an exhaustive allowlist. No geolocation or eligibility bypass is implemented.
+
+## Lazy validation boundary
+
+`ExecutionEligibilityService.validateForExecution(assetId)` performs a fresh canonical snapshot lookup before consulting its bounded cache, then reads the selected mint, checks extension/amount behavior, reviews server-owned product evidence and requests a fixed 1-USDC diagnostic quote. Only the selected product is inspected. Results contain status, reason, findings, validatedAt and expiresAt. Up to 128 results, 8 in-flight validations, 30-second TTL, same-asset request coalescing, immutable outputs; expiry is also capped by upcoming scale activation and product-review expiry.
+
+No production product-review clearance is configured. Therefore the sampled products return UNAVAILABLE / PRODUCT_AND_TOKEN_REVIEW_REQUIRED even when quotes succeed. Known pause/freeze/halt restrictions return RESTRICTED; active hooks, fees and unknown extensions return UNSUPPORTED. Missing routes return UNAVAILABLE. Tests exercise EXECUTABLE only with synthetic complete server-owned evidence. It is a technical result, never user authorization or proof that any wallet/account can sign/transfer.
+
+The validator is a core service and a read-only CLI (`pnpm validate:xstocks`), not a public expensive endpoint, MCP tool or connection to investment prepare. Catalog pages do not trigger 1,026 mint/quote checks. Listing status remains UNKNOWN; expiring readiness is deliberately not persisted into issuer metadata. A future financial flow must revalidate near preparation, inspect the actual wallet accounts, apply user-specific restrictions/approvals and bind transaction authorization independently.
