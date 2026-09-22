@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { WalletButton } from "@/components/wallet/wallet-button";
+import { SiteShell } from "@/components/site-shell";
 import { SolanaProvider } from "@/providers/solana-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "StockPilot", template: "%s | StockPilot" },
-  description: "Explore tokenized pre-IPO companies available through PreStocks on Solana.",
+  description: "Your AI agent for tokenized stocks on Solana. Explore official PreStocks today, with human-approved agent controls and public equities in development.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,20 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="font-sans antialiased">
         <SolanaProvider>
-          <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4">Skip to content</a>
-          <header className="border-b border-line bg-white">
-            <nav aria-label="Main navigation" className="mx-auto flex min-h-20 max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:gap-x-10 sm:px-8">
-              <Link href="/" className="text-xl font-bold tracking-tight">StockPilot<span className="text-accent">.</span></Link>
-              <Link href="/app" className="flex min-h-11 items-center text-sm font-semibold text-muted hover:text-ink">Overview</Link>
-              <Link href="/markets" className="flex min-h-11 items-center text-sm font-semibold text-muted hover:text-ink">Markets</Link>
-              <div className="ms-auto"><WalletButton /></div>
-            </nav>
-          </header>
-          <main id="main" className="page">{children}</main>
-          <footer className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 px-5 pb-8 text-xs text-muted sm:px-8">
-            <span>Pre-IPO exposure provided by PreStocks.</span>
-            <span>Solana mainnet</span>
-          </footer>
+          <SiteShell>{children}</SiteShell>
         </SolanaProvider>
       </body>
     </html>

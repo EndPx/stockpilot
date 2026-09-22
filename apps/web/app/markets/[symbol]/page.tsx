@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AssetLogo } from "@/components/asset-logo";
 import { CopyMint } from "@/components/copy-mint";
 import { DataStatus } from "@/components/data-status";
+import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { InvestmentPanel } from "@/components/investment-panel";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
@@ -18,52 +19,67 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
   const { asset, meta } = await getAsset(symbol);
   if (!asset) notFound();
 
-  const stats = [
-    ["Token Price", formatUsd(asset.tokenPriceUsd)],
-    ["Mark Price", formatUsd(asset.markPriceUsd)],
-    ["Implied Valuation", formatValuation(asset.impliedValuationUsd)],
-    ["Mark Valuation", formatValuation(asset.markValuationUsd)],
-  ];
+  const maxPrice = Math.max(asset.tokenPriceUsd ?? 0, asset.markPriceUsd ?? 0);
+  const tokenWidth = maxPrice > 0 && asset.tokenPriceUsd !== null ? (asset.tokenPriceUsd / maxPrice) * 100 : 0;
+  const markWidth = maxPrice > 0 && asset.markPriceUsd !== null ? (asset.markPriceUsd / maxPrice) * 100 : 0;
 
   return (
-    <>
-      <Link href="/markets" className="mb-8 inline-flex min-h-11 items-center text-sm font-medium text-muted hover:text-accent">← Markets</Link>
-      <div className="mb-8 flex items-center gap-5">
-        <AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} large />
-        <div><p className="mb-2 text-sm font-medium text-muted">{asset.symbol}</p><h1 className="page-title">{asset.name}</h1></div>
-      </div>
-      <p className="mb-8 text-base leading-7 text-muted">Tokenized pre-IPO exposure provided by PreStocks.</p>
-      <dl className="surface grid grid-cols-2 overflow-hidden lg:grid-cols-4">
-        {stats.map(([label, value], index) => (
-          <div key={label} className={`min-w-0 p-5 sm:p-7 ${index % 2 ? "border-l border-line" : ""} ${index > 1 ? "border-t border-line lg:border-t-0 lg:border-l" : ""}`}>
-            <dt className="text-xs leading-5 text-muted sm:text-sm">{label}</dt>
-            <dd className="mt-3 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-4"><DataStatus {...meta} /></div>
-      <p className="mt-3 text-xs leading-6 text-muted">Token Price reflects the traded token. Mark Price is PreStocks’ reference value. These values are not executable trade quotes.</p>
-      <div className="asset-investment-layout mt-10">
-        <div className="asset-investment-primary grid gap-8">
-          <section>
-          <h2 className="text-xl font-semibold tracking-tight">About</h2>
-          <p className="mt-4 max-w-prose whitespace-pre-line text-sm leading-7 text-muted">{asset.description ?? "No company description is available from PreStocks yet."}</p>
-          {asset.externalUrl && <a href={asset.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">View on PreStocks<span className="sr-only"> (opens in a new tab)</span></a>}
+    <div className="asset-page">
+      <Link href="/markets" className="back-link"><ArrowLeftIcon /> Markets</Link>
+
+      <header className="asset-hero">
+        <div className="asset-identity">
+          <AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} large />
+          <div><p className="eyebrow">{asset.symbol}</p><h1>{asset.name}</h1></div>
+        </div>
+        <div className="asset-price-block">
+          <span>Token Price</span>
+          <strong>{formatUsd(asset.tokenPriceUsd)}</strong>
+          <small>Official PreStocks market data</small>
+        </div>
+      </header>
+
+      <div className="asset-layout">
+        <div className="asset-primary">
+          <section className="surface price-reference" aria-labelledby="reference-heading">
+            <div className="surface-header">
+              <div><p className="eyebrow">Price context</p><h2 id="reference-heading">Token versus reference</h2></div>
+              <DataStatus {...meta} />
+            </div>
+            <div className="price-bars" role="img" aria-label={`Token Price ${formatUsd(asset.tokenPriceUsd)}. Mark Price ${formatUsd(asset.markPriceUsd)}.`}>
+              <div className="price-bar-row"><span>Token Price</span><div><i style={{ width: `${tokenWidth}%` }} /></div><strong>{formatUsd(asset.tokenPriceUsd)}</strong></div>
+              <div className="price-bar-row price-bar-mark"><span>Mark Price</span><div><i style={{ width: `${markWidth}%` }} /></div><strong>{formatUsd(asset.markPriceUsd)}</strong></div>
+            </div>
+            <p className="reference-note">This is a current-value comparison, not historical performance or an executable quote.</p>
           </section>
-          <section className="surface self-start p-6">
-            <h2 className="text-lg font-semibold">Token Details</h2>
-            <dl className="mt-5 space-y-4 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-muted">Provider</dt><dd>PreStocks</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted">Network</dt><dd>Solana mainnet</dd></div>
-              <div className="border-t border-line pt-4"><dt className="text-muted">Mint</dt><dd className="mt-2 break-all font-mono text-xs leading-6" data-testid="asset-mint">{asset.mintAddress}</dd></div>
+
+          <dl className="asset-stats">
+            <div><dt>Implied Valuation</dt><dd>{formatValuation(asset.impliedValuationUsd)}</dd></div>
+            <div><dt>Mark Valuation</dt><dd>{formatValuation(asset.markValuationUsd)}</dd></div>
+            <div><dt>Network</dt><dd>Solana mainnet</dd></div>
+            <div><dt>Provider</dt><dd>PreStocks</dd></div>
+          </dl>
+
+          <section className="asset-about">
+            <p className="eyebrow">About</p>
+            <h2>Company overview</h2>
+            <p>{asset.description ?? "No company description is available from PreStocks yet."}</p>
+            {asset.externalUrl && <a href={asset.externalUrl} target="_blank" rel="noopener noreferrer" className="text-link">View on PreStocks <ArrowUpRightIcon /><span className="sr-only"> (opens in a new tab)</span></a>}
+          </section>
+
+          <section className="surface token-details">
+            <div><p className="eyebrow">On-chain identity</p><h2>Token details</h2></div>
+            <dl>
+              <div><dt>Mint address</dt><dd className="font-mono" data-testid="asset-mint">{asset.mintAddress}</dd></div>
             </dl>
-            <div className="mt-4"><CopyMint mint={asset.mintAddress} /></div>
-            <a href={`https://solscan.io/token/${asset.mintAddress}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">View on Solscan<span className="sr-only"> (opens in a new tab)</span></a>
+            <div className="token-actions"><CopyMint mint={asset.mintAddress} /><a href={`https://solscan.io/token/${asset.mintAddress}`} target="_blank" rel="noopener noreferrer" className="secondary-button">View on Solscan <ArrowUpRightIcon /><span className="sr-only"> (opens in a new tab)</span></a></div>
           </section>
         </div>
+
         <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
       </div>
-      <p className="mt-10 max-w-3xl border-t border-line pt-6 text-xs leading-6 text-muted">PreStocks provide economic exposure to private companies and do not necessarily represent direct ownership, shareholder rights, or voting rights. Investing involves risk.</p>
-    </>
+
+      <p className="risk-note">PreStocks provide economic exposure to private companies and do not necessarily represent direct ownership, shareholder rights, or voting rights. Investing involves risk.</p>
+    </div>
   );
 }

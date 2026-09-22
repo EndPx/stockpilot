@@ -139,11 +139,12 @@ export function WalletControlView({
     }
   }
 
+  const visibleLabel = triggerLabel(status, visibleAddress, disconnectedLabel);
   const accessibleLabel = connected && address
-    ? `Connected with ${walletName ?? "Solana wallet"}, address ${address}${authenticated ? ", signed in to StockPilot" : ""}. Open wallet details.`
+    ? `${visibleLabel}. Connected with ${walletName ?? "Solana wallet"}, address ${address}${authenticated ? ", signed in to StockPilot" : ""}. Open wallet details.`
     : status === "reconnecting"
-      ? `Reconnecting Solana wallet${visibleAddress ? ` ${visibleAddress}` : ""}`
-      : "Connect a Solana wallet";
+      ? `${visibleLabel}. Reconnecting Solana wallet${visibleAddress ? ` ${visibleAddress}` : ""}`
+      : `${visibleLabel} — opens the Solana wallet selector`;
 
   return (
     <div className="wallet-control">
@@ -159,16 +160,13 @@ export function WalletControlView({
         onClick={openDialog}
       >
         <span aria-hidden="true" className={connected ? "wallet-dot wallet-dot-connected" : "wallet-dot"} />
-        <span>{triggerLabel(status, visibleAddress, disconnectedLabel)}</span>
+        <span>{visibleLabel}</span>
       </button>
 
       <dialog
         ref={dialogRef}
         className="wallet-dialog"
         aria-labelledby={titleId}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) closeDialog();
-        }}
         onClose={() => {
           setDialogOpen(false);
           triggerRef.current?.focus();

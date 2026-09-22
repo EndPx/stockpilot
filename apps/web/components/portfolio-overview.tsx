@@ -69,18 +69,18 @@ class PortfolioLoadError extends Error {
 
 export function PortfolioLoading() {
   return (
-    <div role="status" aria-label="Loading portfolio" className="grid gap-8">
-      <div className="surface grid overflow-hidden sm:grid-cols-3">
+    <div role="status" aria-label="Loading portfolio" className="dashboard-stack">
+      <div className="surface portfolio-summary-grid">
         {["Portfolio Estimate", "Available to Invest", "Network Balance"].map((label) => (
-          <div key={label} className="border-b border-line p-6 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+          <div key={label} className="metric-block">
             <p className="text-sm font-medium text-muted">{label}</p>
-            <span className="mt-4 block h-9 w-36 rounded-md bg-slate-200" aria-hidden="true" />
+            <span className="skeleton-value" aria-hidden="true" />
           </div>
         ))}
       </div>
       <div className="surface p-6">
         <p className="text-sm font-medium text-muted">Investments</p>
-        <span className="mt-5 block h-16 rounded-lg bg-slate-100" aria-hidden="true" />
+        <span className="skeleton-row" aria-hidden="true" />
       </div>
       <span className="sr-only">Loading wallet balances and investments.</span>
     </div>
@@ -105,7 +105,7 @@ export function PortfolioErrorState({
         ? "We couldn't load your wallet balances."
         : "We couldn't load your portfolio.";
   return (
-    <section role="alert" className="surface px-6 py-12 text-center">
+    <section role="alert" className="surface empty-surface">
       <h2 className="text-xl font-semibold">{title}</h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">
         {expired
@@ -123,26 +123,26 @@ export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
   const hasAvailableUsdc = portfolio.funding.usdc.amountUsd > 0;
   return (
     <>
-      <div className="surface grid overflow-hidden sm:grid-cols-3">
-        <div className="border-b border-line p-6 sm:border-b-0 sm:border-r">
+      <div className="surface portfolio-summary-grid">
+        <div className="metric-block metric-block-primary">
           <p className="text-sm font-medium text-muted">Portfolio Estimate</p>
-          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{formatUsd(portfolio.portfolioValueUsd)}</p>
+          <p className="metric-value">{formatUsd(portfolio.portfolioValueUsd)}</p>
           <p className="mt-2 text-xs text-muted">Estimated from current PreStocks token prices</p>
         </div>
-        <div className="border-b border-line p-6 sm:border-b-0 sm:border-r">
+        <div className="metric-block">
           <p className="text-sm font-medium text-muted">Available to Invest</p>
-          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{formatUsd(portfolio.funding.usdc.amountUsd)}</p>
+          <p className="metric-value">{formatUsd(portfolio.funding.usdc.amountUsd)}</p>
           <p className="mt-2 text-xs text-muted">{portfolio.funding.usdc.amount} USDC</p>
         </div>
-        <div className="p-6">
+        <div className="metric-block">
           <p className="text-sm font-medium text-muted">Network Balance</p>
-          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{portfolio.funding.sol.amount} SOL</p>
+          <p className="metric-value metric-value-network"><span>{portfolio.funding.sol.amount}</span> <span>SOL</span></p>
           <p className="mt-2 text-xs text-muted">For Solana network activity</p>
         </div>
       </div>
 
-      <section className="surface mt-8 overflow-hidden" aria-labelledby="investments-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-5">
+      <section className="surface investment-list" aria-labelledby="investments-heading">
+        <div className="surface-header">
           <h2 id="investments-heading" className="text-lg font-semibold">Investments</h2>
           <Link href="/markets" className="text-sm font-semibold text-accent hover:underline">Explore Markets</Link>
         </div>
@@ -150,7 +150,7 @@ export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
           <ul className="divide-y divide-line">
             {portfolio.positions.map((position) => (
               <li key={position.mintAddress}>
-                <Link href={`/markets/${encodeURIComponent(position.symbol)}`} className="grid min-h-24 gap-4 px-6 py-5 hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <Link href={`/markets/${encodeURIComponent(position.symbol)}`} className="position-row">
                   <span className="flex min-w-0 items-center gap-3">
                     <AssetLogo imageUrl={position.imageUrl} symbol={position.symbol} />
                     <span className="min-w-0">
@@ -167,7 +167,7 @@ export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
             ))}
           </ul>
         ) : (
-          <div className="px-6 py-12 text-center">
+          <div className="empty-surface border-0">
             <h3 className="text-lg font-semibold">You don&apos;t own any PreStocks yet.</h3>
             <p className="mt-2 text-sm text-muted">
               {hasAvailableUsdc
@@ -193,7 +193,8 @@ function AuthPrompt({ connected, onSignIn, busy, errorMessage }: {
   errorMessage?: string;
 }) {
   return (
-    <section className="surface px-6 py-14 text-center sm:px-10">
+    <section className="surface auth-prompt">
+      <div className="auth-prompt-mark" aria-hidden="true">SP</div>
       <h2 className="text-2xl font-semibold tracking-tight">Your StockPilot portfolio</h2>
       <p className="mx-auto mt-4 max-w-md leading-7 text-muted">
         Connect and sign in with your Solana wallet to view your investments.
@@ -235,18 +236,16 @@ export function PortfolioOverview() {
   const signIn = useCallback(() => { void auth.signIn().catch(() => {}); }, [auth]);
 
   return (
-    <div className="grid gap-8">
-      <header>
-        <p className="text-sm font-semibold text-accent">Overview</p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="page-title">Portfolio</h1>
-            <p className="mt-3 text-sm text-muted">
-              {auth.sessionWalletAddress
-                ? `Wallet ${shortenAddress(auth.sessionWalletAddress)}`
-                : "Official PreStocks held by your authenticated wallet."}
-            </p>
-          </div>
+    <div className="dashboard-stack">
+      <header className="app-page-header">
+        <div>
+          <p className="eyebrow">Overview</p>
+          <h1 className="page-title mt-2">Your portfolio</h1>
+          <p className="mt-3 text-sm text-muted">
+            {auth.sessionWalletAddress
+              ? `Wallet ${shortenAddress(auth.sessionWalletAddress)}`
+              : "Official PreStocks held by your authenticated wallet."}
+          </p>
         </div>
       </header>
 
