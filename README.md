@@ -62,10 +62,12 @@ pnpm install
 pnpm dev
 ```
 
-Copy `.env.example` to `.env.local`, set a strong `SESSION_SECRET`, and keep
-`APP_URL` aligned with the origin you open. The default public Solana mainnet
-RPC works for development; set the server-only `SOLANA_RPC_URL` when using a
-dedicated endpoint. Never expose it as a `NEXT_PUBLIC_` variable.
+Copy `apps/web/.env.example` to `apps/web/.env.local`, set a strong
+`SESSION_SECRET`, and keep `APP_URL` aligned with the origin you open. Next.js
+loads the web runtime environment from `apps/web`; a root-only `.env.local` is
+not used by `pnpm dev`. The default public Solana mainnet RPC works for
+development; set the server-only `SOLANA_RPC_URL` when using a dedicated
+endpoint. Never expose it as a `NEXT_PUBLIC_` variable.
 
 Open `http://localhost:3000`, then use **Explore Markets** or visit `/markets`
 directly. Markets remain public. Connect and sign in with a wallet before

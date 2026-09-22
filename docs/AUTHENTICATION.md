@@ -51,6 +51,9 @@ reconnected.
 
 ## Configuration
 
+- For local development, copy `apps/web/.env.example` to
+  `apps/web/.env.local`. Next.js resolves these values from the web workspace,
+  not from the repository root.
 - `APP_URL`: canonical deployment origin, for example `http://localhost:3000`.
 - `SESSION_SECRET`: a deployment secret with at least 32 bytes of entropy. It
   must be identical across application instances and must not be committed.
