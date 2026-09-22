@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "StockPilot", template: "%s | StockPilot" },
-  description: "Your AI agent for tokenized stocks on Solana. Explore official PreStocks today, with human-approved agent controls and public equities in development.",
+  description: "Explore tokenized public and private markets on Solana through official PreStocks and xStocks catalogs. Discovery is live; agent controls are in development.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,4 @@
-import { formatRawTokenAmount } from "./portfolio.js";
+import { formatRawTokenAmount } from "@stockpilot/core/portfolio";
 
 export type ScaleConfig = { multiplier: string; newMultiplier: string; newMultiplierEffectiveTimestamp: string };
 export type TokenAmountSemantics = {

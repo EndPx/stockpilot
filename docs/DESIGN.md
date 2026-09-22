@@ -93,6 +93,21 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 5. Components and states
 
+Discovery extension (2026-09-23): retain the existing shell, colors and controls.
+Markets now uses a bounded server-rendered directory (30 rows), with All / Private
+Markets / Public Markets navigation, a labeled search form, result count and next /
+first-page links. Filter links reuse control radius, 44px targets, cobalt active
+surface and visible focus. Cursor resets when query/group changes. Loading, provider
+failure, invalid query/cursor, stale data and no-match states must remain explicit.
+Do not render a heavy 1,000-card grid or auto-fetch eligibility for catalog rows.
+Public details reuse the asset identity, stats, token-details and surface primitives,
+but have a read-only discovery panel instead of investment controls. Execution
+"Not checked" is neutral text, never a green readiness badge. Mobile must retain
+provider, symbol and status even when secondary classification columns collapse.
+Use 16/24px panel padding, 8/16px gaps, 14px row text and the existing surface tokens.
+Product copy distinguishes live public discovery from unimplemented public execution
+and future agents. Both market-scope panels may link to their live filtered catalogs.
+
 Brand identity: use the generated white orbital-S/navigation mark on its opaque
 cobalt tile, not the hero illustration or the former CSS bar mark. Shared BrandMark
 renders at 32px (8px corner radius) in navigation/footer and 56px (16px radius) in

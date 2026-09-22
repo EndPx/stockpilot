@@ -6,7 +6,7 @@ import {
   type MarketClassification,
   type MarketType,
 } from "@stockpilot/integrations/asset-domain";
-import { AssetService } from "./assets.js";
+import { AssetService } from "@stockpilot/core/assets";
 import { XStocksService } from "@stockpilot/integrations/xstocks";
 
 export type { InvestmentAsset, MarketType, AssetProvider, AssetAvailability, ExecutionStatus } from "@stockpilot/integrations/asset-domain";

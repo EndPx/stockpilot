@@ -1,8 +1,8 @@
 import type { InvestmentAsset, ExecutionStatus } from "@stockpilot/integrations/asset-domain";
 import { inspectMarketMint, quoteMarketMint, MarketQuoteError, type MintInspection, type ReadOnlyQuote } from "@stockpilot/integrations/market-validation";
-import { InvestmentAssetRegistry } from "./asset-registry.js";
-import { normalizeTokenAmount, parseRawU64, type ScaleConfig, type TokenAmountSemantics } from "./token-amounts.js";
-import { SOLANA_MAINNET_USDC_MINT, SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS } from "./solana.js";
+import { InvestmentAssetRegistry } from "@stockpilot/core/asset-registry";
+import { normalizeTokenAmount, parseRawU64, type ScaleConfig, type TokenAmountSemantics } from "@stockpilot/core/token-amounts";
+import { SOLANA_MAINNET_USDC_MINT, SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
 
 /** Server-owned evidence only; never accept this structure from a browser or agent. */
 export type ProductReview = {

@@ -1,6 +1,6 @@
 import { isAddress } from "@solana/kit";
 import type { InvestmentAsset, MarketType } from "./asset-domain.js";
-import { XSTOCKS_CLASSIFICATION_EVIDENCE } from "./xstocks-classification.js";
+import { XSTOCKS_CLASSIFICATION_EVIDENCE } from "@stockpilot/integrations/xstocks-classification";
 
 export const XSTOCKS_API = "https://api.xstocks.fi/api/v2/public/assets";
 export const XSTOCKS_TERMS = "https://assets.backed.fi/legal-documentation";

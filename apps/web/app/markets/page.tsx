@@ -1,101 +1,57 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AssetLogo } from "@/components/asset-logo";
-import { DataStatus } from "@/components/data-status";
+import { RegistryQueryError } from "@stockpilot/core/asset-registry";
+import { MarketDirectoryRow } from "@/components/market-directory-row";
 import { ArrowUpRightIcon, SearchIcon } from "@/components/icons";
-import { listAssets } from "@/lib/assets";
-import { InvalidAssetInput, parseAssetQuery } from "@/lib/asset-inputs";
-import { formatUsd, formatValuation } from "@/lib/format";
+import { listMarkets } from "@/lib/markets";
+import { marketHref, parseMarketInputs } from "@/lib/market-inputs";
 
-export const metadata: Metadata = { title: "Markets" };
+export const metadata: Metadata = { title: "Markets", description: "Discover canonical public and private market products on Solana. Discovery is not execution approval." };
 export const dynamic = "force-dynamic";
 
-export default async function MarketsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
-  let query: string;
+export default async function MarketsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  let filter; let page;
   try {
-    query = parseAssetQuery((await searchParams).q);
+    filter = parseMarketInputs(await searchParams);
+    // Browser pages are always bounded to 30, independently of the API's 100 maximum.
+    page = await listMarkets({ ...filter, limit: 30 });
   } catch (error) {
-    if (!(error instanceof InvalidAssetInput)) throw error;
-    return <section className="surface empty-surface"><p className="eyebrow">Search error</p><h1 className="page-title mt-2">Check your search</h1><p className="mt-4 text-muted">{error.message}</p><Link href="/markets" className="button mt-6">Back to Markets</Link></section>;
+    const invalid = error instanceof RegistryQueryError;
+    return <section className="surface empty-surface"><p className="eyebrow">{invalid ? "Search error" : "Catalog unavailable"}</p><h1 className="page-title mt-2">{invalid ? "Check your search" : "Markets need a moment"}</h1><p className="mt-4 text-muted">{invalid ? error.message : "We could not refresh the official catalog. Your wallet and holdings are unchanged."}</p><div className="token-actions mt-6"><Link href="/markets" className="button">Back to Markets</Link><Link href="/markets?group=private" className="secondary-button">Private Markets</Link></div></section>;
   }
-  const { assets, total, meta } = await listAssets(query);
-  const highlights = assets.slice(0, 3);
+  const { assets, total, catalogTotal, nextCursor, offset, sources, stale } = page;
+  const group = filter.group ?? "all";
+  return <div className="dashboard-stack">
+    <header className="app-page-header markets-header">
+      <div><p className="eyebrow">Tokenized public &amp; private markets</p><h1 className="page-title mt-2">Markets</h1><p className="page-description">Explore official issuer catalogs on Solana. Find a product, know its source, then review what comes next.</p></div>
+      <div className="market-count"><strong>{catalogTotal.toLocaleString("en-US")}</strong><span>catalog products</span></div>
+    </header>
 
-  return (
-    <div className="dashboard-stack">
-      <header className="app-page-header markets-header">
-        <div>
-          <p className="eyebrow">Official PreStocks</p>
-          <h1 className="page-title mt-2">Markets</h1>
-          <p className="page-description">Discover tokenized markets on Solana. Available today: official PreStocks for private-company exposure. Public equities are in development.</p>
-        </div>
-        <div className="market-count"><strong>{total}</strong><span>{total === 1 ? "company" : "companies"}</span></div>
-      </header>
+    <nav className="catalog-filters" aria-label="Market groups">
+      {([['all', 'All'], ['private', 'Private Markets'], ['public', 'Public Markets']] as const).map(([value, label]) => <Link key={value} href={marketHref({ query: filter.query, group: value })} aria-current={group === value ? "page" : undefined}>{label}</Link>)}
+    </nav>
 
-      {!query && highlights.length > 0 && (
-        <section aria-labelledby="market-pulse-heading">
-          <div className="section-heading-row">
-            <h2 id="market-pulse-heading">Market pulse</h2>
-            <span>Token Price</span>
-          </div>
-          <div className="market-reel">
-            {highlights.map((asset, index) => (
-              <Link key={asset.id} href={`/markets/${encodeURIComponent(asset.symbol)}`} className={index === 0 ? "pulse-card pulse-card-featured" : "pulse-card"}>
-                <span className="pulse-card-top"><AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} /><ArrowUpRightIcon /></span>
-                <span><strong>{asset.symbol}</strong><small>{asset.name}</small></span>
-                <b>{formatUsd(asset.tokenPriceUsd)}</b>
-                <span className="pulse-mark">Mark {formatUsd(asset.markPriceUsd)}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="market-directory" aria-labelledby="directory-heading">
-        <div className="directory-toolbar">
-          <div>
-            <p className="eyebrow">Directory</p>
-            <h2 id="directory-heading">All companies</h2>
-          </div>
-          <form action="/markets" method="get" role="search" className="market-search">
-            <SearchIcon />
-            <label htmlFor="company-search" className="sr-only">Find a company</label>
-            <input key={query} id="company-search" type="search" name="q" defaultValue={query} maxLength={100} placeholder="Search name or symbol" />
-            <button type="submit">Search</button>
-          </form>
-        </div>
-
-        {assets.length ? (
-          <div className="market-list">
-            <div className="market-list-head" aria-hidden="true">
-              <span>Company</span><span>Token Price</span><span>Mark Price</span><span>Valuation</span><span />
-            </div>
-            {assets.map((asset) => (
-              <Link key={asset.id} href={`/markets/${encodeURIComponent(asset.symbol)}`} className="market-row">
-                <span className="market-company">
-                  <AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} />
-                  <span><strong>{asset.name}</strong><small>{asset.symbol}</small></span>
-                </span>
-                <span className="market-cell"><small>Token Price</small><strong>{formatUsd(asset.tokenPriceUsd)}</strong></span>
-                <span className="market-cell market-cell-secondary"><small>Mark Price</small><strong>{formatUsd(asset.markPriceUsd)}</strong></span>
-                <span className="market-cell market-cell-secondary"><small>Valuation</small><strong>{formatValuation(asset.impliedValuationUsd)}</strong></span>
-                <ArrowUpRightIcon className="market-row-arrow" />
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-surface border-0">
-            <h3>{total === 0 ? "No PreStocks assets are available right now." : "No companies match your search."}</h3>
-            {total > 0 && <><p>Try a company name, symbol, or a shorter keyword.</p><Link href="/markets" className="secondary-button mt-5">Clear search</Link></>}
-          </div>
-        )}
-        <div className="directory-footer">
-          <DataStatus {...meta} />
-          {query && assets.length > 0 && <Link href="/markets" className="text-link">Clear search</Link>}
-        </div>
-      </section>
-
-      <p className="market-disclaimer">Token Price reflects the traded token. Mark Price is PreStocks&apos; reference value. Neither is an executable trade quote.</p>
-    </div>
-  );
+    <section className="market-directory" aria-labelledby="directory-heading">
+      <div className="directory-toolbar">
+        <div><p className="eyebrow">{group === "private" ? "PreStocks" : group === "public" ? "xStocks" : "Issuer-backed discovery"}</p><h2 id="directory-heading">{filter.query ? `${total.toLocaleString("en-US")} ${total === 1 ? "result" : "results"}` : "Explore the catalog"}</h2></div>
+        <form action="/markets" method="get" role="search" className="market-search">
+          <SearchIcon /><label htmlFor="market-search" className="sr-only">Search stocks, ETFs or private markets</label>
+          <input key={`${group}:${filter.query}`} id="market-search" type="search" name="q" defaultValue={filter.query} maxLength={100} placeholder="Name, symbol or underlying" />
+          <input type="hidden" name="group" value={group} />
+          {filter.provider && <input type="hidden" name="provider" value={filter.provider} />}
+          {filter.marketType && <input type="hidden" name="marketType" value={filter.marketType} />}
+          <button type="submit">Search</button>
+        </form>
+      </div>
+      {assets.length ? <div className="catalog-list">
+        <div className="market-list-head" aria-hidden="true"><span>Product / issuer</span><span>Classification</span><span>Token Price</span><span>Execution</span><span /></div>
+        {assets.map((asset) => <MarketDirectoryRow key={asset.id} asset={asset} />)}
+      </div> : <div className="empty-surface border-0"><h3>No products match your search.</h3><p>Try a name, symbol, or a shorter keyword.</p><Link href={marketHref({ group })} className="secondary-button mt-5">Clear search</Link></div>}
+      <div className="directory-footer catalog-pagination">
+        <span>{total ? `${offset + 1}–${offset + assets.length} of ${total.toLocaleString("en-US")}` : "0 results"}</span>
+        <nav aria-label="Catalog pagination">{offset > 0 && <Link className="secondary-button" href={marketHref(filter)}>First page</Link>}{nextCursor && <Link prefetch={false} className="secondary-button" href={marketHref(filter, nextCursor)}>Next page <ArrowUpRightIcon /></Link>}{filter.query && <Link className="text-link" href={marketHref({ group })}>Clear search</Link>}</nav>
+      </div>
+    </section>
+    <div className="catalog-source-note"><p>{stale ? "Showing a previously verified catalog; refresh is temporarily unavailable." : "Official catalog snapshots."} {sources.map((source) => `${source.provider === "prestocks" ? "PreStocks" : "xStocks"}: ${new Date(source.fetchedAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC`).join(" · ")}</p><p>Canonical does not mean executable. Public products include unclassified instruments; issuer terms and restrictions apply. Prices, where provided, are reference data—not trade quotes.</p></div>
+  </div>;
 }
