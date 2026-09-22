@@ -1,3 +1,5 @@
+import { isAddress } from "@solana/kit";
+
 /** Provider-independent normalized values. Provider adapters own provenance. */
 export type MarketType = "PRE_IPO" | "PUBLIC_EQUITY";
 export type AssetProvider = "prestocks" | "xstocks";
@@ -30,4 +32,11 @@ export type InvestmentAsset = MarketClassification & {
 export function isSupportedClassification(value: { marketType?: unknown; provider?: unknown }): value is MarketClassification {
   return (value.marketType === "PRE_IPO" && value.provider === "prestocks") ||
     (value.marketType === "PUBLIC_EQUITY" && value.provider === "xstocks");
+}
+
+export function assertAssetIdentity(asset: InvestmentAsset): void {
+  if (!isSupportedClassification(asset) || !isAddress(asset.mintAddress) ||
+      asset.id !== `${asset.provider}:${asset.mintAddress}`) {
+    throw new Error("Unsupported asset classification or canonical identity.");
+  }
 }
