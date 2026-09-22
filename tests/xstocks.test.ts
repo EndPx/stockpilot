@@ -24,6 +24,13 @@ test("classification uses explicit issuer type, not a ticker heuristic", () => {
   assert.equal(normalizeXStock({ ...row, underlying: { type: "Equity" } }).marketType, "PUBLIC_EQUITY");
   assert.throws(() => normalizeXStock({ ...row, underlying: { type: "PRE_IPO" } }));
 });
+test("representative classification binds mint, issuer identity and underlying, never ticker alone", () => {
+  const apple = { ...row, id: "9e43a778-fdc8-44f1-87de-f2e7420bb7f7", isin: "CH1436219187", underlying: { type: null, isin: "US0378331005" } };
+  assert.equal(normalizeXStock(apple).marketType, "PUBLIC_EQUITY");
+  assert.equal(normalizeXStock({ ...apple, underlying: { type: null, isin: "changed" } }).marketType, "PUBLIC_MARKET_PRODUCT");
+  assert.equal(normalizeXStock({ ...apple, deployments: [{ network: "Solana", address: "So11111111111111111111111111111111111111112" }] }).marketType, "PUBLIC_MARKET_PRODUCT");
+  assert.throws(() => normalizeXStock({ ...apple, underlying: { type: "ETF", isin: "US0378331005" } }));
+});
 test("rejects duplicate identity, malformed pagination, missing or ambiguous deployments", async () => {
   for (const payload of [page([row, row]), page([{ ...row, deployments: [] }]), page([{ ...row, deployments: [...row.deployments, ...row.deployments] }]), page([{ ...row, deployments: [{ network: "Solana", address: "fake" }] }]), page([row], 1), page([], 0, true), page([])]) {
     await assert.rejects(fetchXStocks(fetchPages([payload]).fetcher));

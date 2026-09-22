@@ -56,3 +56,39 @@ Observed sequentially first, 2026-09-22T18:14Z (2026-09-23 Asia/Jakarta). The co
 Important limitation: [Token-2022's implementation](https://github.com/solana-program/token-2022/blob/main/interface/src/extension/scaled_ui_amount/mod.rs) performs binary f64 conversions internally. An exact decimal calculation is **not** guaranteed bit-identical to RPC formatting near rounding boundaries or for large u64s. The utility labels its fallback `DECIMAL_SCALE_ESTIMATE`, not an authoritative balance; `RPC_SCALED` identifies the already-scaled RPC string. Neither path converts raw u64 to Number or is used for investment sizing/portfolio valuation. This is why public portfolio totals remain deferred.
 
 Reference: [Solana integration guidance](https://solana.com/docs/tokens/extensions/scaled-ui-amount/integration-guide). Multiplier updates/corporate actions require fresh context; displayed amounts cannot serve as permanent raw execution amounts.
+
+## Representatives 2 and 3 — sequential observations
+
+| Observation | NVDAx (18:15:31Z) | TSLAx (18:17:23Z) |
+| --- | --- | --- |
+| Date | 2026-09-22 UTC | 2026-09-22 UTC |
+| Issuer ID | 0997ed45-6a34-4f26-be92-28d8e0f9f28a | 96f43a87-976b-4076-ac84-394966c32a90 |
+| Product ISIN | CH1436219195 | CH1436219252 |
+| Underlying | NVIDIA Corporation, US67066G1040 | Tesla Inc., US88160R1014 |
+| Mint | Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh | XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB |
+| Program / decimals | Token-2022 / 8, initialized | Token-2022 / 8, initialized |
+| Stored multiplier | 1.0009180758490996 | 1 |
+| New multiplier | 1.001701196801074 | 1 |
+| Effective timestamp | 1789000200 (already effective) | 0 |
+| 1 USDC quote output, raw | 435716 | 263942 |
+| Route | Manifest | BinaryFi |
+
+[NVIDIA issuer evidence](https://assets.backed.fi/products/nvidia-xstock) and [Tesla issuer evidence](https://assets.backed.fi/products/tesla-xstock) establish public-equity underlying exposure through tracker certificates. The classification overlay binds canonical mint, issuer ID, product ISIN and underlying ISIN; it is not a three-product discovery whitelist. Other records remain generic unless the official API explicitly supplies Equity or ETF classification.
+
+All three sampled mints returned the same eight extension names, but different scale values. Their default account states were initialized, pause flags false, and hook program IDs null. All had permanent delegate, freeze, mint, pause and scale authorities. This does not prove compatibility for every possible wallet/account or for the rest of the catalog.
+
+## Extension implications
+
+| Extension / control | Read/display | Transfer, route and signing implications |
+| --- | --- | --- |
+| scaledUiAmountConfig | Preserve raw; effective-time scaled display; already-scaled RPC string preferred | Corporate actions change display, not raw units. Quotes use raw. Price units and wallet presentation need independent review. |
+| transferHook | Standard public balance still readable | Active program may require extra accounts or reject transfers. Null today can change under authority; unknown/active hooks fail closed. |
+| pausableConfig | Balance readable while paused | Pause blocks transfers. Require fresh state; no quote can override it. |
+| defaultAccountState / freeze authority | Does not change amount | Frozen default/account can block receipt/transfer. Individual user token-account state is a future prepare prerequisite. |
+| permanentDelegate | Does not change amount formatting | Issuer can transfer/burn under its authority. Disclose and review; do not imply user-exclusive control. |
+| metadataPointer / tokenMetadata | Display metadata only; not canonicality proof | Token name/symbol cannot override issuer mint identity. |
+| confidentialTransferMint | Public balances remain distinct from confidential balances | No confidential-account/decryption support. Its presence is not evidence that every transfer is confidential; execution compatibility still requires review. |
+| transferFeeConfig (not observed in samples) | Raw balance remains integer; withheld fees are separate | Net output/fee epochs require dedicated support; currently unsupported. |
+| Unknown extensions | Never assume another asset's semantics | Unsupported until reviewed. |
+
+No wallet signing or transaction simulation occurred, so signing/execution compatibility is **not proven**. Current issuer terms restrict US persons and sanctions-related access; product/venue/jurisdiction review remains incomplete, not an exhaustive allowlist. No geolocation or eligibility bypass is implemented.

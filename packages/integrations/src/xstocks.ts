@@ -1,5 +1,6 @@
 import { isAddress } from "@solana/kit";
 import type { InvestmentAsset, MarketType } from "./asset-domain.js";
+import { XSTOCKS_CLASSIFICATION_EVIDENCE } from "./xstocks-classification.js";
 
 export const XSTOCKS_API = "https://api.xstocks.fi/api/v2/public/assets";
 export const XSTOCKS_TERMS = "https://assets.backed.fi/legal-documentation";
@@ -36,7 +37,9 @@ export function normalizeXStock(value: unknown): InvestmentAsset {
   const underlying = row.underlying == null ? {} : record(row.underlying);
   const instrument = optionalText(underlying.type);
   if (instrument && /private|pre.?ipo/i.test(instrument)) throw new Error("Private exposure must use PreStocks.");
-  const marketType: MarketType = instrument === "Equity" ? "PUBLIC_EQUITY" : instrument === "ETF" ? "ETF" : "PUBLIC_MARKET_PRODUCT";
+  const evidence = XSTOCKS_CLASSIFICATION_EVIDENCE.find((entry) => entry.mint === mintAddress && entry.issuerId === issuerId && entry.productIsin === row.isin && entry.underlyingIsin === underlying.isin);
+  if (evidence && instrument && instrument !== "Equity") throw new Error("Conflicting issuer classification evidence.");
+  const marketType: MarketType = instrument === "Equity" || evidence ? "PUBLIC_EQUITY" : instrument === "ETF" ? "ETF" : "PUBLIC_MARKET_PRODUCT";
   if (row.isTradingHalted != null && typeof row.isTradingHalted !== "boolean") throw new Error("Invalid halt state.");
   const sourceUrl = `${XSTOCKS_API}/${encodeURIComponent(symbol)}`;
   return {
@@ -45,7 +48,7 @@ export function normalizeXStock(value: unknown): InvestmentAsset {
     description: row.description == null ? null : text(row.description, 10_000),
     imageUrl: imageUrl(row.logo), tokenPriceUsd: null,
     metadata: {
-      issuerId, sourceUrl, classificationSource: marketType === "PUBLIC_MARKET_PRODUCT" ? null : sourceUrl,
+      issuerId, sourceUrl, classificationSource: evidence?.source ?? (marketType === "PUBLIC_MARKET_PRODUCT" ? null : sourceUrl),
       underlyingSymbol: optionalText(underlying.symbol), underlyingIsin: optionalText(underlying.isin),
       productIsin: optionalText(row.isin), isTradingHalted: typeof row.isTradingHalted === "boolean" ? row.isTradingHalted : null,
     },
