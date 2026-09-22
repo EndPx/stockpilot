@@ -74,8 +74,9 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   contains original orbital artwork, not an artificial product screenshot. Desktop
   copy occupies the left 55%, artwork the right; on mobile artwork sits below copy.
   Header contains only the StockPilot home link and one `Open the app` action.
-  Header stays fixed to the viewport during document scrolling, with charcoal
-  at 88% opacity, 16px backdrop blur and the shared line border. Existing hero
+  Header stays fixed to the viewport during document scrolling and is fully
+  transparent: no background fill, backdrop blur, border or shadow. Only the
+  logo/wordmark and `Open the app` control remain visible. Existing hero
   padding reserves space; document anchor/focus scroll padding is 112px desktop
   and 96px mobile so destinations are not hidden behind the persistent header.
   No landing wallet control, Markets link or Portfolio link in the header.
