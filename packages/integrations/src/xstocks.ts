@@ -2,6 +2,7 @@ import { isAddress } from "@solana/kit";
 import type { InvestmentAsset, MarketType } from "./asset-domain.js";
 import { XSTOCKS_CLASSIFICATION_EVIDENCE } from "@stockpilot/integrations/xstocks-classification";
 import { discoveryExclusion } from "@stockpilot/integrations/xstocks-discovery-policy";
+import { readProviderJson } from "@stockpilot/integrations/provider-json";
 
 export const XSTOCKS_API = "https://api.xstocks.fi/api/v2/public/assets";
 export const XSTOCKS_TERMS = "https://assets.backed.fi/legal-documentation";
@@ -30,7 +31,7 @@ export function normalizeXStock(value: unknown): InvestmentAsset {
   const issuerId = text(row.id);
   const symbol = text(row.symbol, 100);
   const name = text(row.name);
-  if (!Array.isArray(row.deployments)) throw new Error("Missing deployments.");
+  if (!Array.isArray(row.deployments) || row.deployments.length > 100) throw new Error("Missing or oversized deployments.");
   const deployments = row.deployments.map(record).filter((entry) => entry.network === "Solana");
   if (deployments.length !== 1) throw new Error("Missing or ambiguous Solana deployment.");
   const mintAddress = text(deployments[0].address);
@@ -73,7 +74,7 @@ export async function fetchXStocksCatalog(fetcher: typeof fetch = fetch) {
         signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       });
       if (!response.ok) throw new Error("Issuer HTTP failure.");
-      const payload = record(await response.json());
+      const payload = record(await readProviderJson(response));
       const pagination = record(payload.page);
       if (!Array.isArray(payload.nodes) || payload.nodes.length > 100 || pagination.currentPage !== page ||
           typeof pagination.hasNextPage !== "boolean" || (pagination.hasNextPage && !payload.nodes.length)) {
@@ -105,16 +106,34 @@ export async function fetchXStocks(fetcher: typeof fetch = fetch): Promise<Inves
 export class XStocksService {
   private cache?: { assets: InvestmentAsset[]; fetchedAt: number };
   private pending?: Promise<void>;
+  private failure?: { error: unknown; retryAt: number };
   constructor(private readonly load = fetchXStocks, private readonly now = Date.now) {}
   async getSnapshot() {
-    let stale = false;
-    if (!this.cache || this.now() - this.cache.fetchedAt >= 300_000) {
-      this.pending ??= this.load().then((assets) => { this.cache = { assets: structuredClone(assets), fetchedAt: this.now() }; }).finally(() => { this.pending = undefined; });
-      try { await this.pending; } catch (error) {
-        if (!this.cache || this.now() - this.cache.fetchedAt >= 1_800_000) throw error;
-        stale = true;
-      }
+    if (this.cache && this.now() - this.cache.fetchedAt < 300_000) {
+      return this.snapshot(false);
     }
+    if (this.failure && this.now() < this.failure.retryAt) {
+      return this.fallback(this.failure.error);
+    }
+    this.pending ??= this.refresh().finally(() => { this.pending = undefined; });
+    try { await this.pending; } catch (error) { return this.fallback(error); }
+    return this.snapshot(false);
+  }
+  private snapshot(stale: boolean) {
     return { assets: structuredClone(this.cache!.assets), fetchedAt: new Date(this.cache!.fetchedAt).toISOString(), stale };
+  }
+  private fallback(error: unknown) {
+    if (!this.cache || this.now() - this.cache.fetchedAt >= 1_800_000) throw error;
+    return this.snapshot(true);
+  }
+  private async refresh(): Promise<void> {
+    try {
+      const assets = await this.load();
+      this.cache = { assets: structuredClone(assets), fetchedAt: this.now() };
+      this.failure = undefined;
+    } catch (error) {
+      this.failure = { error, retryAt: this.now() + 15_000 };
+      throw error;
+    }
   }
 }

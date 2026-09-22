@@ -18,6 +18,8 @@ export function jsonResponse(value: unknown, init: ResponseInit = {}): Response 
 
 export function authErrorResponse(error: unknown, headers?: Headers): Response {
   const authError = toAuthError(error);
+  headers ??= new Headers();
+  if (authError.retryAfterSeconds !== undefined) headers.set("Retry-After", String(authError.retryAfterSeconds));
   const body: AuthErrorResponse = {
     error: { code: authError.code, message: authError.message },
   };
@@ -25,18 +27,43 @@ export function authErrorResponse(error: unknown, headers?: Headers): Response {
 }
 
 export async function readJsonBody(request: Request, maxBytes = 16_384): Promise<unknown> {
+  const mediaType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  if (mediaType !== "application/json") {
+    await request.body?.cancel().catch(() => {});
+    throw new AuthError("AUTH_REQUEST_INVALID", 415);
+  }
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await request.body?.cancel().catch(() => {});
     throw new AuthError("AUTH_REQUEST_INVALID", 413, "The authentication request is too large.");
   }
 
-  const text = await request.text();
-  if (!text || new TextEncoder().encode(text).byteLength > maxBytes) {
-    throw new AuthError("AUTH_REQUEST_INVALID", text ? 413 : 400);
+  const reader = request.body?.getReader();
+  if (!reader) throw new AuthError("AUTH_REQUEST_INVALID", 400);
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new AuthError("AUTH_REQUEST_INVALID", 413, "The authentication request is too large.");
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  if (!length) throw new AuthError("AUTH_REQUEST_INVALID", 400);
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
   }
 
   try {
-    return JSON.parse(text);
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     throw new AuthError("AUTH_REQUEST_INVALID", 400);
   }

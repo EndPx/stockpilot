@@ -6,11 +6,13 @@ import { JupiterOrderNotExecutableError, type JupiterExecutionResult } from "@st
 import { createInvestmentExecutePost } from "../app/api/investments/execute/route";
 import { createInvestmentPreparePost } from "../app/api/investments/prepare/route";
 import { AUTH_SESSION_COOKIE } from "../lib/auth/config";
-import { createAuthSession, encodeAuthSession } from "../lib/auth/session";
+import { createAuthSession, encodeAuthSession, registerAuthSession } from "../lib/auth/session";
 import { InvestmentSecurityError, type InvestmentAuthorization } from "../lib/investments/authorization";
 
 process.env.APP_URL = "http://localhost:3000";
 process.env.SESSION_SECRET = "investment-route-test-secret-at-least-32-bytes";
+process.env.INVESTMENTS_ENABLED = "true";
+process.env.AUTH_ENABLED = "true";
 
 const wallet = "PreY4UP8myYbeugNjN5B9LzL6ybRc4XqYEPzYBscQwV";
 const otherWallet = "So11111111111111111111111111111111111111112";
@@ -76,10 +78,9 @@ async function request(path: string, body: unknown, options: { wallet?: string; 
     origin: options.origin ?? "http://localhost:3000",
   };
   if (options.authenticated !== false) {
-    const token = await encodeAuthSession(
-      createAuthSession(options.wallet ?? wallet),
-      process.env.SESSION_SECRET!,
-    );
+    const session = createAuthSession(options.wallet ?? wallet);
+    await registerAuthSession(session);
+    const token = await encodeAuthSession(session, process.env.SESSION_SECRET!);
     headers.cookie = `${AUTH_SESSION_COOKIE}=${token}`;
   }
   return new Request(`http://localhost:3000${path}`, {

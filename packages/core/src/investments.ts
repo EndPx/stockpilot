@@ -1,4 +1,5 @@
-import type { Asset } from "@stockpilot/core/assets";
+import { findAssetBySymbol, type Asset, type AssetSnapshot } from "@stockpilot/core/assets";
+import { assertAssetIdentity } from "@stockpilot/integrations/asset-domain";
 import type { Portfolio } from "@stockpilot/core/portfolio";
 import {
   SOLANA_MAINNET_USDC_DECIMALS,
@@ -9,6 +10,7 @@ import type { JupiterExecutionAdapter, JupiterOrder } from "@stockpilot/integrat
 const MAX_U64 = 18_446_744_073_709_551_615n;
 
 export type InvestmentErrorCode =
+  | "ASSET_CATALOG_STALE"
   | "INVALID_AMOUNT"
   | "INSUFFICIENT_USDC"
   | "ASSET_NOT_FOUND"
@@ -50,7 +52,7 @@ export function parseUsdcAmount(value: string): ParsedUsdcAmount {
 }
 
 type AssetReader = {
-  getAssetBySymbol(symbol: string): Promise<Asset | null>;
+  getSnapshot(): Promise<AssetSnapshot>;
 };
 
 type PortfolioReader = {
@@ -106,11 +108,17 @@ export class InvestmentService {
     amountUsd: string;
   }): Promise<PreparedInvestment> {
     const amount = parseUsdcAmount(input.amountUsd);
-    const asset = await this.assets.getAssetBySymbol(input.symbol);
+    const snapshot = await this.assets.getSnapshot();
+    const catalogAge = this.now() - Date.parse(snapshot.fetchedAt);
+    if (snapshot.stale || !Number.isFinite(catalogAge) || catalogAge < -5_000 || catalogAge >= 45_000) {
+      throw new InvestmentError("ASSET_CATALOG_STALE", "A fresh issuer catalog is required before preparing an investment.");
+    }
+    const asset = findAssetBySymbol(snapshot.assets, input.symbol);
     if (!asset) {
       throw new InvestmentError("ASSET_NOT_FOUND", "This PreStocks asset was not found.");
     }
-    if (asset.provider !== "prestocks") {
+    assertAssetIdentity(asset);
+    if (asset.provider !== "prestocks" || asset.marketType !== "PRE_IPO") {
       throw new InvestmentError("ASSET_NOT_ALLOWED", "Only official PreStocks assets can be purchased.");
     }
 

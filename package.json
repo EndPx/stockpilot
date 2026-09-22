@@ -2,6 +2,7 @@
   "name": "stockpilot",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.21.0",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && pnpm --filter @stockpilot/web build",

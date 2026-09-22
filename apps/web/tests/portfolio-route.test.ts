@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Portfolio } from "@stockpilot/core/portfolio";
 import { PreStocksProviderError } from "@stockpilot/core/assets";
-import { AUTH_SESSION_COOKIE } from "../lib/auth/config";
-import { createAuthSession, encodeAuthSession } from "../lib/auth/session";
+import { AUTH_SESSION_COOKIE, getAuthRuntimeConfig } from "../lib/auth/config";
+import { AuthError } from "../lib/auth/errors";
+import { createAuthSession, encodeAuthSession, registerAuthSession } from "../lib/auth/session";
 import { SolanaBalanceReadError } from "../lib/solana/read-adapter";
 import { createPortfolioGet } from "../app/api/portfolio/route";
+import { MemoryAuthSecurityStore } from "../lib/auth/store";
+import { readInvestmentSessionWallet } from "../lib/investments/session";
 
 process.env.APP_URL = "http://localhost:3000";
 process.env.SESSION_SECRET = "portfolio-route-test-secret-at-least-32-bytes";
@@ -31,7 +34,9 @@ function portfolio(wallet = walletAddress): Portfolio {
 }
 
 async function authenticatedRequest(path = "/api/portfolio", headers: HeadersInit = {}) {
-  const token = await encodeAuthSession(createAuthSession(walletAddress), process.env.SESSION_SECRET!);
+  const session = createAuthSession(walletAddress);
+  await registerAuthSession(session);
+  const token = await encodeAuthSession(session, process.env.SESSION_SECRET!);
   return new Request(`http://localhost:3000${path}`, {
     headers: { ...headers, cookie: `${AUTH_SESSION_COOKIE}=${token}` },
   });
@@ -109,4 +114,58 @@ test("unexpected portfolio failures do not become an empty success", async () =>
   } finally {
     console.error = originalError;
   }
+});
+
+test("revoked copied cookies cannot read portfolio or authenticate investments", async () => {
+  const config = getAuthRuntimeConfig();
+  const store = new MemoryAuthSecurityStore();
+  const session = createAuthSession(walletAddress);
+  await registerAuthSession(session, config, store);
+  const token = await encodeAuthSession(session, config.sessionSecret);
+  const request = new Request("http://localhost:3000/api/portfolio", { headers: { cookie: `${AUTH_SESSION_COOKIE}=${token}` } });
+  let reads = 0;
+  const get = createPortfolioGet(async () => { reads++; return portfolio(); }, store);
+  assert.equal((await get(request)).status, 200);
+  assert.equal(await readInvestmentSessionWallet(request, config, store), walletAddress);
+  await store.revokeSession(session.sessionId);
+  const denied = await get(request);
+  assert.equal(denied.status, 401);
+  assert.equal(await errorCode(denied), "UNAUTHENTICATED");
+  await assert.rejects(readInvestmentSessionWallet(request, config, store), /Sign in with your wallet/);
+  assert.equal(reads, 1);
+});
+
+test("portfolio wallet limits survive creation of a new session and prevent RPC work", async () => {
+  const config = getAuthRuntimeConfig();
+  const store = new MemoryAuthSecurityStore();
+  let reads = 0;
+  const get = createPortfolioGet(async () => { reads++; return portfolio(); }, store);
+  async function signedRequest() {
+    const session = createAuthSession(walletAddress);
+    await registerAuthSession(session, config, store);
+    const token = await encodeAuthSession(session, config.sessionSecret);
+    return new Request("http://localhost:3000/api/portfolio", { headers: { cookie: `${AUTH_SESSION_COOKIE}=${token}` } });
+  }
+  const first = await signedRequest();
+  for (let index = 0; index < 60; index++) assert.equal((await get(first)).status, 200);
+  const response = await get(await signedRequest());
+  assert.equal(response.status, 429);
+  assert.equal(await errorCode(response), "AUTH_RATE_LIMITED");
+  assert.ok(Number(response.headers.get("retry-after")) > 0);
+  assert.equal(reads, 60);
+});
+
+test("security-store failure preserves unavailable status and never invokes RPC", async () => {
+  const config = getAuthRuntimeConfig();
+  const store = new MemoryAuthSecurityStore();
+  const session = createAuthSession(walletAddress);
+  await registerAuthSession(session, config, store);
+  const token = await encodeAuthSession(session, config.sessionSecret);
+  const request = new Request("http://localhost:3000/api/portfolio", { headers: { cookie: `${AUTH_SESSION_COOKIE}=${token}` } });
+  store.readSession = async () => { throw new AuthError("AUTH_UNAVAILABLE", 503); };
+  const get = createPortfolioGet(async () => { assert.fail("RPC must not run without the security store"); }, store);
+  const response = await get(request);
+  assert.equal(response.status, 503);
+  assert.equal(await errorCode(response), "AUTH_UNAVAILABLE");
+  await assert.rejects(readInvestmentSessionWallet(request, config, store), (error) => error instanceof AuthError && error.status === 503);
 });

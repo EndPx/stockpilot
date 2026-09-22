@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchXStocks, fetchXStocksCatalog, normalizeXStock, XStocksService } from "@stockpilot/integrations/xstocks";
+import { fetchXStocks, fetchXStocksCatalog, normalizeXStock, XStocksProviderError, XStocksService } from "@stockpilot/integrations/xstocks";
+import { MAX_PROVIDER_JSON_BYTES } from "../packages/integrations/src/provider-json.js";
 const mint = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
 const row = { id: "issuer-1", name: "Apple xStock", symbol: "AAPLx", deployments: [{ network: "Solana", address: mint }], underlying: { type: null } };
 const page = (nodes: unknown[], currentPage = 0, hasNextPage = false) => ({ nodes, page: { currentPage, hasNextPage } });
@@ -53,4 +54,64 @@ test("issuer-verified private exposure is excluded without hiding the rest of th
   assert.equal(catalog.canonicalCount, 2); assert.equal(catalog.assets.length, 1);
   assert.equal(catalog.excluded[0].reason, "PRIVATE_EXPOSURE_REQUIRES_PRESTOCKS");
   assert.equal(catalog.assets[0].id, `xstocks:${mint}`);
+});
+
+test("rejects oversized issuer metadata and deployment collections", () => {
+  for (const candidate of [
+    { ...row, description: "x".repeat(10_001) },
+    { ...row, name: "x".repeat(501) },
+    { ...row, symbol: "x".repeat(101) },
+    { ...row, underlying: { symbol: "x".repeat(501) } },
+    { ...row, deployments: Array.from({ length: 101 }, () => row.deployments[0]) },
+  ]) assert.throws(() => normalizeXStock(candidate));
+});
+
+test("issuer catalog bounds response bytes before JSON parsing", async () => {
+  await assert.rejects(fetchXStocks(async () => new Response(" ".repeat(MAX_PROVIDER_JSON_BYTES + 1))),
+    (error: unknown) => error instanceof XStocksProviderError && error.cause instanceof Error && /byte limit/.test(error.cause.message));
+});
+
+test("cold issuer failures share a cooldown and retry after fifteen seconds", async () => {
+  let now = 0;
+  let calls = 0;
+  const failure = new Error("Issuer down");
+  const service = new XStocksService(async () => {
+    calls++;
+    if (calls === 1) throw failure;
+    return [normalizeXStock(row)];
+  }, () => now);
+  await assert.rejects(service.getSnapshot(), (error) => error === failure);
+  now = 14_999;
+  await assert.rejects(service.getSnapshot(), (error) => error === failure);
+  assert.equal(calls, 1);
+  now = 15_000;
+  assert.equal((await service.getSnapshot()).stale, false);
+  assert.equal(calls, 2);
+});
+
+test("issuer stale cooldown preserves fetchedAt and cannot extend stale availability", async () => {
+  let now = 0;
+  let calls = 0;
+  const service = new XStocksService(async () => {
+    calls++;
+    if (calls > 1) throw new Error("Issuer down");
+    return [normalizeXStock(row)];
+  }, () => now);
+  const first = await service.getSnapshot();
+  now = 1_799_999;
+  const stale = await service.getSnapshot();
+  assert.equal(stale.stale, true);
+  assert.equal(stale.fetchedAt, first.fetchedAt);
+  stale.assets[0].name = "Changed";
+  const cached = await service.getSnapshot();
+  assert.equal(cached.assets[0].name, row.name);
+  assert.equal(cached.fetchedAt, first.fetchedAt);
+  assert.equal(cached.stale, true);
+  assert.equal(calls, 2);
+  now = 1_800_000;
+  await assert.rejects(service.getSnapshot(), /Issuer down/);
+  assert.equal(calls, 2);
+  now = 1_814_999;
+  await assert.rejects(service.getSnapshot(), /Issuer down/);
+  assert.equal(calls, 3);
 });

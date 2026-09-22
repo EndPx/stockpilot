@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   address,
+  getAddressEncoder,
   getTransactionDecoder,
   getTransactionVersionDecoder,
 } from "@solana/kit";
@@ -92,8 +93,13 @@ export async function assertSignedInvestmentTransaction(
   } catch {
     throw new InvestmentSecurityError("WALLET_MISMATCH", "The connected wallet does not match this investment.");
   }
-  if (!transaction.signatures[address(wallet)]) {
+  const signature = transaction.signatures[address(wallet)];
+  if (!signature) {
     throw new InvestmentSecurityError("WALLET_MISMATCH", "The authenticated wallet did not sign this investment.");
+  }
+  const key = await crypto.subtle.importKey("raw", Uint8Array.from(getAddressEncoder().encode(address(wallet))), { name: "Ed25519" }, false, ["verify"]);
+  if (!await crypto.subtle.verify("Ed25519", key, Uint8Array.from(signature), Uint8Array.from(transaction.messageBytes))) {
+    throw new InvestmentSecurityError("WALLET_MISMATCH", "The authenticated wallet signature is not valid.");
   }
 }
 

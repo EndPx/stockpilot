@@ -6,6 +6,7 @@ import { CopyMint } from "@/components/copy-mint";
 import { DataStatus } from "@/components/data-status";
 import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { InvestmentPanel } from "@/components/investment-panel";
+import { investmentsEnabled } from "@/lib/investments/config";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
 import { formatUsd, formatValuation } from "@/lib/format";
@@ -76,7 +77,9 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
           </section>
         </div>
 
-        <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
+        {investmentsEnabled() ? <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} /> : (
+          <aside className="surface p-6"><p className="eyebrow">Read-only release</p><h2 className="mt-3">Investments are not enabled</h2><p className="mt-4 text-muted">Explore official market data and verified wallet holdings. This deployment cannot prepare or submit investment transactions.</p></aside>
+        )}
       </div>
 
       <p className="risk-note">PreStocks provide economic exposure to private companies and do not necessarily represent direct ownership, shareholder rights, or voting rights. Investing involves risk.</p>

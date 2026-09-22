@@ -51,7 +51,7 @@ function isAuthChallengeToken(value: unknown): value is AuthChallengeToken {
   const input = token.input as Partial<AuthSignInInput> | undefined;
 
   return token.kind === "challenge" &&
-    typeof token.expiresAt === "number" &&
+    typeof token.expiresAt === "number" && Number.isFinite(token.expiresAt) &&
     !!input &&
     typeof input.domain === "string" &&
     typeof input.address === "string" &&
@@ -59,10 +59,10 @@ function isAuthChallengeToken(value: unknown): value is AuthChallengeToken {
     typeof input.uri === "string" &&
     input.version === "1" &&
     input.chainId === "solana:mainnet" &&
-    typeof input.nonce === "string" &&
+    typeof input.nonce === "string" && /^[0-9a-f]{32}$/.test(input.nonce) &&
     typeof input.issuedAt === "string" &&
     typeof input.expirationTime === "string" &&
-    typeof input.requestId === "string";
+    typeof input.requestId === "string" && /^[0-9a-f-]{36}$/.test(input.requestId);
 }
 
 export async function encodeAuthChallenge(
@@ -85,6 +85,10 @@ export async function decodeAuthChallenge(
   }
 
   if (!isAuthChallengeToken(value)) {
+    throw new AuthError("AUTH_CHALLENGE_INVALID", 401);
+  }
+  const issuedAt = Date.parse(value.input.issuedAt);
+  if (!Number.isFinite(issuedAt) || issuedAt > now || value.expiresAt - issuedAt !== AUTH_CHALLENGE_TTL_MS || Date.parse(value.input.expirationTime) !== value.expiresAt) {
     throw new AuthError("AUTH_CHALLENGE_INVALID", 401);
   }
   if (value.expiresAt <= now || Date.parse(value.input.expirationTime) <= now) {

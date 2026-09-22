@@ -14,11 +14,13 @@ import { InvestmentSecurityError } from "./authorization";
 import type { InvestmentApiErrorBody, InvestmentApiErrorCode } from "./types";
 
 const MESSAGES: Record<InvestmentApiErrorCode, string> = {
+  INVESTMENTS_DISABLED: "Investments are disabled for this deployment. No transaction was prepared or submitted.",
   UNAUTHENTICATED: "Sign in with your wallet to invest.",
   INVALID_REQUEST: "The investment request is not valid.",
   WALLET_MISMATCH: "The connected wallet does not match your authenticated session.",
   ASSET_NOT_FOUND: "This PreStocks asset was not found.",
   ASSET_NOT_ALLOWED: "Only official PreStocks assets can be purchased.",
+  ASSET_CATALOG_STALE: "A fresh issuer catalog is required before preparing an investment.",
   INVALID_AMOUNT: "Enter a valid USDC amount with no more than six decimal places.",
   INSUFFICIENT_USDC: "Your wallet does not have enough USDC for this investment.",
   JUPITER_ORDER_FAILED: "We couldn't prepare this investment with Jupiter. Please try again.",
@@ -46,7 +48,7 @@ export class InvestmentApiError extends Error {
 function normalize(error: unknown): InvestmentApiError {
   if (error instanceof InvestmentApiError) return error;
   if (error instanceof InvestmentError) {
-    const status = error.code === "ASSET_NOT_FOUND" ? 404 : error.code === "INSUFFICIENT_USDC" ? 409 : 400;
+    const status = error.code === "ASSET_CATALOG_STALE" ? 503 : error.code === "ASSET_NOT_FOUND" ? 404 : error.code === "INSUFFICIENT_USDC" ? 409 : 400;
     return new InvestmentApiError(error.code, status, error.message);
   }
   if (error instanceof InvestmentSecurityError) {
@@ -60,6 +62,7 @@ function normalize(error: unknown): InvestmentApiError {
   if (error instanceof JupiterOrderError) return new InvestmentApiError("JUPITER_ORDER_FAILED", 502);
   if (error instanceof JupiterExecutionError) return new InvestmentApiError("JUPITER_EXECUTION_FAILED", 502);
   if (error instanceof AuthError) {
+    if (error.status === 503) return new InvestmentApiError("PROVIDER_UNAVAILABLE", 503);
     return new InvestmentApiError(error.status === 401 ? "UNAUTHENTICATED" : "INVALID_REQUEST", error.status);
   }
   if (

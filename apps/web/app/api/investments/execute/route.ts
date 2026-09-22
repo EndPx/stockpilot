@@ -11,6 +11,7 @@ import {
   type InvestmentAuthorization,
 } from "@/lib/investments/authorization";
 import { InvestmentApiError, investmentErrorResponse } from "@/lib/investments/errors";
+import { assertInvestmentsEnabled } from "@/lib/investments/config";
 import { parseExecuteRequest } from "@/lib/investments/request";
 import { executeInvestment, getInvestmentBlockHeight } from "@/lib/investments/service";
 import { readInvestmentSessionWallet } from "@/lib/investments/session";
@@ -68,6 +69,7 @@ export function createInvestmentExecutePost(dependencies: Partial<Dependencies> 
   const deps = { ...defaults, ...dependencies };
   return async function POST(request: Request): Promise<Response> {
     try {
+      assertInvestmentsEnabled();
       const config = getAuthRuntimeConfig();
       assertSameOrigin(request, config.appUrl);
       const walletAddress = await readInvestmentSessionWallet(request, config);

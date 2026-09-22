@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { generateKeyPairSync, sign } from "node:crypto";
 import {
   AccountRole,
   address,
@@ -7,6 +8,7 @@ import {
   compileTransaction,
   createTransactionMessage,
   getTransactionEncoder,
+  getAddressDecoder,
   pipe,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -23,14 +25,16 @@ import {
   readInvestmentAuthorization,
 } from "../lib/investments/authorization";
 
-const wallet = "PreY4UP8myYbeugNjN5B9LzL6ybRc4XqYEPzYBscQwV";
+// Ephemeral offline fixture, never a funded wallet or a broadcast transaction.
+const walletKeys = generateKeyPairSync("ed25519");
+const wallet = getAddressDecoder().decode(walletKeys.publicKey.export({ format: "der", type: "spki" }).subarray(-32));
 const extraSigner = "So11111111111111111111111111111111111111112";
 const outputMint = "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh";
 const inputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const secret = "investment-authorization-test-secret-32-bytes";
 const now = 1_700_000_000_000;
 
-function transaction(options: { walletSigned?: boolean; differentMessage?: boolean } = {}): string {
+function transaction(options: { walletSigned?: boolean; differentMessage?: boolean; forgedSignature?: boolean } = {}): string {
   const message = pipe(
     createTransactionMessage({ version: 0 }),
     (value) => setTransactionMessageFeePayer(address(wallet), value),
@@ -50,7 +54,7 @@ function transaction(options: { walletSigned?: boolean; differentMessage?: boole
     ...compiled,
     signatures: {
       ...compiled.signatures,
-      [wallet]: options.walletSigned ? signatureBytes(new Uint8Array(64).fill(1)) : null,
+      [wallet]: options.forgedSignature ? signatureBytes(new Uint8Array(64).fill(1)) : options.walletSigned ? signatureBytes(sign(null, Uint8Array.from(compiled.messageBytes), walletKeys.privateKey)) : null,
     },
   };
   return Buffer.from(getTransactionEncoder().encode(signed)).toString("base64");
@@ -139,6 +143,13 @@ test("rejects missing wallet signature and changed transaction messages", async 
   await assert.rejects(
     assertSignedInvestmentTransaction(transaction({ walletSigned: true, differentMessage: true }), wallet, fingerprint),
     (error) => error instanceof InvestmentSecurityError && error.code === "TRANSACTION_MISMATCH",
+  );
+});
+
+test("rejects a nonempty fabricated wallet signature before execution", async () => {
+  await assert.rejects(
+    assertSignedInvestmentTransaction(transaction({ forgedSignature: true }), wallet, await fingerprintTransactionMessage(transaction())),
+    (error) => error instanceof InvestmentSecurityError && error.code === "WALLET_MISMATCH",
   );
 });
 

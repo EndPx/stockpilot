@@ -1,8 +1,9 @@
 import { address } from "@solana/kit";
-import { AUTH_SESSION_TTL_MS } from "./config";
+import { AUTH_SESSION_TTL_MS, getAuthRuntimeConfig, type AuthRuntimeConfig } from "./config";
 import { AuthError } from "./errors";
 import { createSignedToken, readSignedToken } from "./tokens";
 import type { AuthSession, AuthSessionToken } from "./types";
+import { getAuthSecurityStore, type AuthSecurityStore } from "./store";
 
 export function createAuthSession(walletAddress: string, now = Date.now()): AuthSessionToken {
   return {
@@ -19,9 +20,9 @@ function isAuthSessionToken(value: unknown): value is AuthSessionToken {
   const token = value as Partial<AuthSessionToken>;
   return token.kind === "session" &&
     typeof token.walletAddress === "string" &&
-    typeof token.sessionId === "string" &&
-    typeof token.issuedAt === "number" &&
-    typeof token.expiresAt === "number";
+    typeof token.sessionId === "string" && /^[0-9a-f-]{36}$/.test(token.sessionId) &&
+    typeof token.issuedAt === "number" && Number.isFinite(token.issuedAt) &&
+    typeof token.expiresAt === "number" && Number.isFinite(token.expiresAt);
 }
 
 export async function encodeAuthSession(session: AuthSessionToken, secret: string): Promise<string> {
@@ -40,7 +41,7 @@ export async function decodeAuthSession(
     throw new AuthError("SESSION_INVALID", 401);
   }
 
-  if (!isAuthSessionToken(value) || value.expiresAt <= now) {
+  if (!isAuthSessionToken(value) || value.expiresAt <= now || value.issuedAt > now || value.expiresAt - value.issuedAt !== AUTH_SESSION_TTL_MS) {
     throw new AuthError("SESSION_INVALID", 401);
   }
 
@@ -51,6 +52,28 @@ export async function decodeAuthSession(
   }
 
   return value;
+}
+
+export async function registerAuthSession(
+  session: AuthSessionToken,
+  config: AuthRuntimeConfig = getAuthRuntimeConfig(),
+  store: AuthSecurityStore = getAuthSecurityStore(config),
+): Promise<void> {
+  await store.registerSession(session.sessionId, { walletAddress: session.walletAddress, expiresAt: session.expiresAt });
+}
+
+/** Every authenticated request must use this check, not signature-only decoding. */
+export async function readActiveAuthSession(
+  token: string,
+  config: AuthRuntimeConfig,
+  store: AuthSecurityStore = getAuthSecurityStore(config),
+): Promise<AuthSessionToken> {
+  const session = await decodeAuthSession(token, config.sessionSecret);
+  const registered = await store.readSession(session.sessionId);
+  if (!registered || registered.walletAddress !== session.walletAddress || registered.expiresAt !== session.expiresAt || registered.expiresAt <= Date.now()) {
+    throw new AuthError("SESSION_INVALID", 401);
+  }
+  return session;
 }
 
 export function toPublicSession(session: AuthSessionToken): AuthSession {

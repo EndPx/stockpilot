@@ -59,7 +59,7 @@ function order(overrides: Partial<JupiterOrder> = {}): JupiterOrder {
   };
 }
 
-function service(options: { asset?: Asset | null; usdc?: string } = {}) {
+function service(options: { asset?: Asset | null; assets?: Asset[]; usdc?: string; stale?: boolean; catalogAge?: number } = {}) {
   const orders: unknown[] = [];
   const jupiter: JupiterExecutionAdapter = {
     async createOrder(input) {
@@ -71,7 +71,7 @@ function service(options: { asset?: Asset | null; usdc?: string } = {}) {
   return {
     orders,
     value: new InvestmentService(
-      { async getAssetBySymbol() { return options.asset === undefined ? asset : options.asset; } },
+      { async getSnapshot() { return { assets: options.assets ?? (options.asset === null ? [] : [options.asset ?? asset]), fetchedAt: new Date(1_700_000_000_000 - (options.catalogAge ?? 0)).toISOString(), stale: options.stale ?? false }; } },
       { async getPortfolio() { return portfolio(options.usdc); } },
       { async getTokenDecimals() { return 9; } },
       jupiter,
@@ -131,4 +131,19 @@ test("a zero balance is reported as insufficient rather than malformed", async (
     value.prepare({ walletAddress: wallet, symbol: "SPACEX", amountUsd: "0.000001" }),
     (error) => error instanceof InvestmentError && error.code === "INSUFFICIENT_USDC",
   );
+});
+
+test("stale, expired and future issuer snapshots fail before any order", async () => {
+  for (const options of [{ stale: true }, { catalogAge: 45_000 }, { catalogAge: -10_000 }]) {
+    const { value, orders } = service(options);
+    await assert.rejects(value.prepare({ walletAddress: wallet, symbol: "SPACEX", amountUsd: "1" }), (error) => error instanceof InvestmentError && error.code === "ASSET_CATALOG_STALE");
+    assert.equal(orders.length, 0);
+  }
+});
+
+test("ambiguous provider symbols cannot select a mint for investment", async () => {
+  const otherMint = "So11111111111111111111111111111111111111112";
+  const { value, orders } = service({ assets: [asset, { ...asset, mintAddress: otherMint, id: `prestocks:${otherMint}` }] });
+  await assert.rejects(value.prepare({ walletAddress: wallet, symbol: "SPACEX", amountUsd: "1" }), /[Aa]mbiguous/);
+  assert.equal(orders.length, 0);
 });

@@ -7,6 +7,7 @@ import {
   INVESTMENT_TOKEN_TTL_MS,
 } from "@/lib/investments/authorization";
 import { investmentErrorResponse } from "@/lib/investments/errors";
+import { assertInvestmentsEnabled } from "@/lib/investments/config";
 import { parsePrepareRequest } from "@/lib/investments/request";
 import { prepareInvestment } from "@/lib/investments/service";
 import { readInvestmentSessionWallet } from "@/lib/investments/session";
@@ -50,6 +51,7 @@ export function createInvestmentPreparePost(dependencies: Partial<Dependencies> 
   const deps = { ...defaults, ...dependencies };
   return async function POST(request: Request): Promise<Response> {
     try {
+      assertInvestmentsEnabled();
       const config = getAuthRuntimeConfig();
       assertSameOrigin(request, config.appUrl);
       const walletAddress = await readInvestmentSessionWallet(request, config);

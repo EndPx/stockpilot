@@ -67,10 +67,52 @@ test("stale fallback is marked and expires five minutes after last success", asy
   now = 300_000;
   await assert.rejects(service.getSnapshot(), /Provider down/);
   fails = false;
+  now = 314_999;
   assert.equal((await service.getSnapshot()).stale, false);
 });
 
 test("a cold provider failure is an error, not an empty registry", async () => {
   const service = new AssetService(async () => { throw new Error("Malformed response"); });
   await assert.rejects(service.listAssets(), /Malformed response/);
+});
+
+test("cold failures share a cooldown and retry after fifteen seconds", async () => {
+  let now = 0;
+  let calls = 0;
+  const failure = new Error("Provider down");
+  const service = new AssetService(async () => {
+    calls++;
+    if (calls === 1) throw failure;
+    return assets;
+  }, () => now);
+  await assert.rejects(service.getSnapshot(), (error) => error === failure);
+  now = 14_999;
+  await assert.rejects(service.getSnapshot(), (error) => error === failure);
+  assert.equal(calls, 1);
+  now = 15_000;
+  assert.equal((await service.getSnapshot()).stale, false);
+  assert.equal(calls, 2);
+});
+
+test("stale failure cooldown preserves fetchedAt and never extends maximum stale age", async () => {
+  let now = 0;
+  let calls = 0;
+  const service = new AssetService(async () => {
+    calls++;
+    if (calls > 1) throw new Error("Provider down");
+    return assets;
+  }, () => now);
+  const first = await service.getSnapshot();
+  now = 299_999;
+  const stale = await service.getSnapshot();
+  assert.equal(stale.stale, true);
+  assert.equal(stale.fetchedAt, first.fetchedAt);
+  assert.equal((await service.getSnapshot()).fetchedAt, first.fetchedAt);
+  assert.equal(calls, 2);
+  now = 300_000;
+  await assert.rejects(service.getSnapshot(), /Provider down/);
+  assert.equal(calls, 2);
+  now = 314_999;
+  await assert.rejects(service.getSnapshot(), /Provider down/);
+  assert.equal(calls, 3);
 });

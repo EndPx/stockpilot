@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./provider-json": "./src/provider-json.ts",
     "./market-validation": "./src/market-validation.ts",
     "./xstocks": "./src/xstocks.ts",
     "./xstocks-classification": "./src/xstocks-classification.ts",

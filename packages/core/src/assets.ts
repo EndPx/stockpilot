@@ -11,10 +11,12 @@ export type AssetSnapshot = {
 
 const FRESH_MS = 45_000;
 const MAX_STALE_AGE_MS = 5 * 60_000;
+const FAILURE_COOLDOWN_MS = 15_000;
 
 export class AssetService {
   private cache: { assets: Asset[]; fetchedAt: number } | undefined;
   private pending: Promise<AssetSnapshot> | undefined;
+  private failure: { error: unknown; retryAt: number } | undefined;
 
   constructor(
     private readonly load: () => Promise<Asset[]> = fetchPreStocks,
@@ -25,6 +27,9 @@ export class AssetService {
   async getSnapshot(): Promise<AssetSnapshot> {
     if (this.cache && this.now() - this.cache.fetchedAt < FRESH_MS) {
       return this.snapshot(false);
+    }
+    if (this.failure && this.now() < this.failure.retryAt) {
+      return this.fallback(this.failure.error);
     }
     if (!this.pending) {
       this.pending = this.refresh().finally(() => { this.pending = undefined; });
@@ -42,13 +47,19 @@ export class AssetService {
     try {
       const assets = await this.load();
       this.cache = { assets, fetchedAt: this.now() };
+      this.failure = undefined;
       return this.snapshot(false);
     } catch (error) {
-      if (this.cache && this.now() - this.cache.fetchedAt < MAX_STALE_AGE_MS) {
-        return this.snapshot(true);
-      }
-      throw error;
+      this.failure = { error, retryAt: this.now() + FAILURE_COOLDOWN_MS };
+      return this.fallback(error);
     }
+  }
+
+  private fallback(error: unknown): AssetSnapshot {
+    if (this.cache && this.now() - this.cache.fetchedAt < MAX_STALE_AGE_MS) {
+      return this.snapshot(true);
+    }
+    throw error;
   }
 
   async listAssets(query?: string): Promise<Asset[]> {

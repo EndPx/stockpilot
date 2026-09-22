@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts && tsx --conditions=react-server --test tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/investment-*.test.ts",
+    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/security-headers.test.ts && tsx --conditions=react-server --test tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/investment-*.test.ts",
     "validate:portfolio-read": "tsx --conditions=react-server scripts/validate-portfolio-read.ts",
     "doctor": "npx react-doctor@latest"
   },
@@ -20,6 +20,7 @@
     "next": "16.3.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "redis": "^6.2.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

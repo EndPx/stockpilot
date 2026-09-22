@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { SiteShell } from "@/components/site-shell";
 import { SolanaProvider } from "@/providers/solana-provider";
 import "./globals.css";
@@ -8,7 +9,9 @@ export const metadata: Metadata = {
   description: "Explore tokenized public and private markets on Solana through official PreStocks and xStocks catalogs. Discovery is live; agent controls are in development.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Every HTML response must render with its request-specific CSP nonce.
+  await connection();
   return (
     <html lang="en">
       <body className="font-sans antialiased">
