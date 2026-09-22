@@ -12,6 +12,7 @@ const publicAsset: InvestmentAsset = {
   mintAddress: "So11111111111111111111111111111111111111112",
   marketType: "PUBLIC_EQUITY", provider: "xstocks", name: "Public fixture", symbol: "SAME",
   description: null, imageUrl: null, tokenPriceUsd: null,
+  metadata: { issuerId: "fixture", sourceUrl: "https://example.com/issuer", classificationSource: "https://example.com/equity", underlyingSymbol: "SAME", underlyingIsin: null, productIsin: null, isTradingHalted: false },
   availability: { status: "AVAILABLE", reason: null, issuerTermsUrl: "https://example.com/terms", restrictedJurisdictions: ["US"], restrictionsComplete: true, reviewedAt: "2026-09-23T00:00:00Z" },
 };
 function publicProvider(assets: InvestmentAsset[] = [publicAsset], stale = false): AssetRegistryProvider {
@@ -42,6 +43,9 @@ test("registry rejects forbidden pairs, mismatched IDs, invalid mints and adapte
   for (const asset of [
     { ...publicAsset, marketType: "PRE_IPO" },
     { ...publicAsset, provider: "unknown" },
+    { ...publicAsset, marketType: "ETF", metadata: undefined },
+    { ...publicAsset, canonical: false },
+    { ...publicAsset, executionStatus: "EXECUTABLE" },
     { ...publicAsset, id: "xstocks:SAME" },
     { ...publicAsset, id: "xstocks:invalid", mintAddress: "invalid" },
     privateAssets[0],

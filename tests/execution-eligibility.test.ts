@@ -7,7 +7,7 @@ import { normalizeMintInspection, quoteMarketMint, MarketQuoteError, type MintIn
 import { SOLANA_MAINNET_USDC_MINT, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
 
 const mintAddress = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
-const asset = normalizeXStock({ id: "9e43a778-fdc8-44f1-87de-f2e7420bb7f7", name: "Apple", symbol: "AAPLx", isin: "CH1436219187", underlying: { isin: "US0378331005" }, deployments: [{ network: "Solana", address: mintAddress }] });
+const asset = normalizeXStock({ id: "9e43a778-fdc8-44f1-87de-f2e7420bb7f7", name: "Apple", symbol: "AAPLx", isTradingHalted: false, isin: "CH1436219187", underlying: { isin: "US0378331005" }, deployments: [{ network: "Solana", address: mintAddress }] });
 const mint: MintInspection = { mint: mintAddress, program: TOKEN_2022_PROGRAM_ADDRESS, decimals: 8, supplyRaw: "100000000", mintAuthority: null, freezeAuthority: null, extensions: [] };
 const quote = { inputMint: SOLANA_MAINNET_USDC_MINT, outputMint: mintAddress, inputRaw: "1000000", outputRaw: "291895", venues: ["Fixture"] };
 const review: ProductReview = { assetId: asset.id, mint: mintAddress, evidenceUrl: "https://example.com/review", expiresAt: "2027-01-01T00:00:00Z", restrictionsComplete: true, restricted: false, tokenCompatibilityReviewed: true };
@@ -78,4 +78,17 @@ test("Jupiter integration performs GET quote only and verifies canonical pair/ra
   };
   assert.equal((await quoteMarketMint(mintAddress, fetcher)).outputRaw, "10");
   outputMint = SOLANA_MAINNET_USDC_MINT; await assert.rejects(quoteMarketMint(mintAddress, fetcher));
+});
+
+test("issuer outage or unavailable/unknown state cannot be overridden by a positive review", async () => {
+  const provider = { provider: "xstocks" as const, marketType: "PUBLIC_MARKET_PRODUCT" as const, getSnapshot: async () => { throw new Error("upstream details"); } };
+  assert.equal((await new ExecutionEligibilityService(new InvestmentAssetRegistry([provider])).validateForExecution(asset.id)).reason, "REGISTRY_UNAVAILABLE");
+  for (const unknownHalt of [false, true]) {
+    const row = structuredClone(asset);
+    if (unknownHalt) row.metadata!.isTradingHalted = null; else row.availability!.status = "UNAVAILABLE";
+    const registry = new InvestmentAssetRegistry([{ ...provider, getSnapshot: async () => ({ assets: [row], fetchedAt: new Date().toISOString(), stale: false }) }]);
+    let quotes = 0;
+    const service = new ExecutionEligibilityService(registry, { inspect: async () => mint, quote: async () => { quotes++; return quote; }, review: () => review });
+    assert.equal((await service.validateForExecution(asset.id)).status, "UNAVAILABLE"); assert.equal(quotes, 0);
+  }
 });

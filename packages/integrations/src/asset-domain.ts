@@ -52,4 +52,7 @@ export function assertAssetIdentity(asset: InvestmentAsset): void {
       asset.id !== `${asset.provider}:${asset.mintAddress}`) {
     throw new Error("Unsupported asset classification or canonical identity.");
   }
+  if (asset.provider === "xstocks" && asset.marketType !== "PUBLIC_MARKET_PRODUCT" && !asset.metadata?.classificationSource) {
+    throw new Error("Public instrument classification requires issuer evidence.");
+  }
 }

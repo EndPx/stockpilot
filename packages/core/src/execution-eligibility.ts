@@ -35,9 +35,10 @@ export class ExecutionEligibilityService {
   }
 
   async validateForExecution(assetId: string): Promise<EligibilityResult> {
-    const snapshot = await this.registry.getSnapshot();
-    const asset = snapshot.assets.find(({ id }) => id === assetId);
     const deny = (reason: string) => { this.cache.delete(assetId); return this.result(assetId, "UNAVAILABLE", reason); };
+    let snapshot;
+    try { snapshot = await this.registry.getSnapshot(); } catch { return deny("REGISTRY_UNAVAILABLE"); }
+    const asset = snapshot.assets.find(({ id }) => id === assetId);
     if (!asset) return deny("UNREGISTERED_ASSET");
     if (asset.provider !== "xstocks") return deny("PRESTOCKS_EXECUTION_PATH_UNCHANGED");
     const source = snapshot.sources.find(({ provider }) => provider === asset.provider);
@@ -79,6 +80,8 @@ export class ExecutionEligibilityService {
     const hook = states.get("transferHook");
     if (pause && typeof pause.paused !== "boolean" || defaultState && !["initialized", "frozen"].includes(String(defaultState.accountState)) || hook && !(hook.programId === null || typeof hook.programId === "string")) return stop("UNSUPPORTED", "MALFORMED_EXTENSION_STATE");
     if (pause?.paused === true || defaultState?.accountState === "frozen" || asset.metadata?.isTradingHalted === true || asset.availability?.status === "RESTRICTED") return stop("RESTRICTED", "ISSUER_OR_TOKEN_RESTRICTION");
+    if (asset.availability?.status === "UNAVAILABLE") return stop("UNAVAILABLE", "ISSUER_UNAVAILABLE");
+    if (asset.metadata?.isTradingHalted !== false) return stop("UNAVAILABLE", "ISSUER_HALT_STATUS_UNKNOWN");
     if (hook && hook.programId !== null) return stop("UNSUPPORTED", "ACTIVE_TRANSFER_HOOK");
     let scale: ScaleConfig | null = null;
     try {
