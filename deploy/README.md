@@ -120,6 +120,13 @@ Confirm unauthenticated API requests fail as expected, trading stays disabled,
 and the host's 3100 and 6379 ports are inaccessible from outside. These checks do
 not require a buy, a wallet transaction signature, or a Jupiter key.
 
+After confirming the exact live origin, run `node deploy/smoke-auth.mjs` from a
+checkout with the workspace dependencies installed. It tests real HTTPS/Redis
+authentication, replay denial, revocation, cross-origin rejection and disabled
+investment endpoints using only a throwaway in-memory SIWS identity. It does not
+connect a real wallet or create a financial transaction. All ten named checks
+must print `PASS`; a failure exits nonzero without exposing authentication data.
+
 ## Updates and rollback
 
 Use a new release tag for every build and retain the previous working image. The
