@@ -8,7 +8,7 @@ import {
 } from "@stockpilot/integrations/asset-domain";
 import { AssetService } from "./assets.js";
 
-export type { InvestmentAsset, MarketType, AssetProvider, AssetAvailability } from "@stockpilot/integrations/asset-domain";
+export type { InvestmentAsset, MarketType, AssetProvider, AssetAvailability, ExecutionStatus } from "@stockpilot/integrations/asset-domain";
 
 export type ProviderSnapshot = { assets: InvestmentAsset[]; fetchedAt: string; stale: boolean };
 export type AssetRegistryProvider = MarketClassification & { getSnapshot(): Promise<ProviderSnapshot> };
@@ -39,7 +39,7 @@ export class InvestmentAssetRegistry {
       if (!Number.isFinite(Date.parse(snapshot.fetchedAt))) throw new Error("Invalid provider freshness metadata.");
       for (const asset of snapshot.assets) {
         assertAssetIdentity(asset);
-        if (asset.provider !== adapter.provider || asset.marketType !== adapter.marketType) {
+        if (asset.provider !== adapter.provider) {
           throw new Error("Asset does not belong to its registered provider.");
         }
       }

@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
+test("public ETF and generic discovery classifications do not permit private xStocks", () => {
+  assert.equal(isSupportedClassification({ marketType: "ETF", provider: "xstocks" }), true);
+  assert.equal(isSupportedClassification({ marketType: "PUBLIC_MARKET_PRODUCT", provider: "xstocks" }), true);
+  assert.equal(isSupportedClassification({ marketType: "PRE_IPO", provider: "xstocks" }), false);
+});
 import { isSupportedClassification } from "@stockpilot/integrations/asset-domain";
 
 test("PRE_IPO + PRESTOCKS is allowed", () => {

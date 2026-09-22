@@ -77,6 +77,8 @@ function normalizeAsset(value: unknown): Asset {
   }
 
   return {
+    canonical: true,
+    executionStatus: "UNKNOWN",
     id: `prestocks:${mintAddress}`,
     provider: "prestocks",
     marketType: "PRE_IPO",

@@ -7,6 +7,7 @@ import { normalizePreStocks } from "@stockpilot/integrations/prestocks";
 const privateAssets = normalizePreStocks([{ name: "Private company", symbol: "SAME", contract_address: "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh" }]);
 // Synthetic provider fixture, never a production allowlist or proof of issuer provenance.
 const publicAsset: InvestmentAsset = {
+  canonical: true, executionStatus: "UNKNOWN",
   id: "xstocks:So11111111111111111111111111111111111111112",
   mintAddress: "So11111111111111111111111111111111111111112",
   marketType: "PUBLIC_EQUITY", provider: "xstocks", name: "Public fixture", symbol: "SAME",
