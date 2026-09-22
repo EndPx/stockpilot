@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { BrandMark } from "./brand-mark";
 import { MarketsIcon, OverviewIcon, ShieldIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
 
@@ -14,7 +15,7 @@ const navigation = [
 function Brand({ inverse = false }: { inverse?: boolean }) {
   return (
     <Link href="/" className={inverse ? "brand brand-inverse" : "brand"} aria-label="StockPilot home">
-      <span className="brand-mark" aria-hidden="true"><span /></span>
+      <BrandMark />
       <span>StockPilot</span>
     </Link>
   );

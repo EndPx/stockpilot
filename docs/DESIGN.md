@@ -5,8 +5,9 @@
 - 2026-09-23 revision: PayBox is a quality benchmark and control-plane research
   source, not a visual design to copy. StockPilot uses original text, geometry and
   generated artwork. Imagegen produced a metallic orbital navigation sculpture
-  with charcoal negative space and cobalt core. The vector logo remains crisp at
-  icon sizes. Content order: hero, market scope, human-control flow, wallet security.
+  with charcoal negative space and cobalt core. A separately generated orbital-S
+  logo replaces the earlier bar mark. Content order: hero, market scope,
+  human-control flow, wallet security.
   Planned capabilities must be labeled and must not produce fake controls/dead links.
 - 2026-09-22: reviewed the user's two mobile references. We take the dense market
   hierarchy, reachable bottom navigation, strong price typography, and persistent
@@ -76,6 +77,14 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   panel is sticky on wide screens and returns to document flow on narrow screens.
 
 ## 5. Components and states
+
+Brand identity: use the generated white orbital-S/navigation mark on its opaque
+cobalt tile, not the hero illustration or the former CSS bar mark. Shared BrandMark
+renders at 32px (8px corner radius) in navigation/footer and 56px (16px radius) in
+authentication. Keep the StockPilot wordmark as accessible HTML text. Export icons
+directly from the preserved master: ICO 16/32/48, PNG 48, Apple 180, app 192/512.
+Do not stretch, rotate, recolor, or add detail to the mark. The favicon silhouette
+must remain recognizable at 16px; the arrow is secondary at that size.
 
 Controls have at least 44px targets, visible blue focus rings, specific labels, and
 `aria-current` on active navigation. Buttons define default, hover, focus, active,

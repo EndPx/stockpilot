@@ -77,3 +77,23 @@ No transaction was signed or submitted during this UI work.
 - The temporary production QA server was stopped. The existing development server
   remains available, and the user's browser returns to localhost:3000/app with
   its normal viewport restored.
+
+## Generated brand identity follow-up — 2026-09-23
+
+- Generated a separate orbital-S logo with imagegen, preserving the selected master
+  and prompt provenance. Shared BrandMark replaces both CSS bars and the auth `SP`
+  placeholder; the old SVG favicon is replaced, recoverable in Git history.
+- Exported ICO 16/32/48, browser PNG 48, Apple 180 and manifest icons 192/512.
+  The initial ICO export exposed Next's RGBA-only PNG decoder requirement; fixed
+  with an explicit alpha channel and covered by a regression assertion.
+- `pnpm test`: 104/104 passed. Asset tests rerun after the RGBA correction: 2/2.
+  `pnpm build`: passed after correction. `git diff --check`: passed.
+- React Doctor: 71/100, seven existing warnings, zero errors. No warning in the new
+  BrandMark or manifest. Authentication/investment behavior was not refactored.
+- Browser: landing and signed-out app inspected at desktop and 375px; landing
+  additionally checked at 768px. Mark loads at 32px/56px, remains recognizable,
+  and no document overflow observed. Temporary viewport override reset.
+- All seven icon/manifest/mark URLs return HTTP 200 with expected content types.
+  Browser head references the new favicon, PNG icon, Apple icon and manifest.
+- No wallet connection, signing or purchase was performed for this brand-only QA.
+  No new Lighthouse/zoom/screen-reader certification is claimed.

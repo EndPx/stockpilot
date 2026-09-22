@@ -47,10 +47,7 @@ svg { display: block; }
 
 .brand { display: inline-flex; min-height: 44px; align-items: center; gap: 10px; font-size: 18px; font-weight: 760; letter-spacing: -.03em; }
 .brand-inverse { color: #fff; }
-.brand-mark { position: relative; display: grid; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent); transform: rotate(-7deg); }
-.brand-mark::before, .brand-mark span { content: ""; position: absolute; width: 5px; border-radius: 99px; background: #fff; transform: rotate(7deg); }
-.brand-mark::before { height: 10px; left: 7px; bottom: 5px; }
-.brand-mark span { height: 16px; right: 7px; bottom: 5px; }
+.brand-mark { display: block; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; }
 .nav-icon { width: 20px; height: 20px; flex: 0 0 auto; }
 
 /* Landing */
@@ -167,7 +164,7 @@ svg { display: block; }
 .metric-value { margin: 14px 0 0; font-size: clamp(1.8rem, 3vw, 2.7rem); font-weight: 630; line-height: 1; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
 .investment-list { margin-top: 2px; }.position-row { display: grid; min-height: 94px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 18px 24px; transition: background .18s ease; }.position-row:hover { background: var(--canvas-raised); }
 .auth-prompt { position: relative; display: grid; justify-items: center; padding: clamp(48px, 8vw, 90px) 24px; text-align: center; background: radial-gradient(circle at 50% 0, var(--accent-pale), transparent 48%), #fff; }
-.auth-prompt-mark { display: grid; width: 56px; height: 56px; place-items: center; margin-bottom: 22px; border-radius: 18px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 800; letter-spacing: -.04em; transform: rotate(-5deg); }
+.auth-prompt-mark { width: 56px; height: 56px; margin-bottom: 22px; border-radius: 16px; }
 
 /* Markets */
 .market-count { display: grid; min-width: 112px; border-left: 1px solid var(--line-strong); padding-left: 26px; }.market-count strong { font-size: 36px; line-height: 1; letter-spacing: -.05em; }.market-count span { margin-top: 7px; color: var(--muted); font-size: 12px; }

@@ -9,6 +9,7 @@ import { shortenAddress } from "@/lib/solana/address";
 import { useAuth } from "@/providers/auth-provider";
 import { solanaClient } from "@/providers/solana-provider";
 import { AssetLogo } from "./asset-logo";
+import { BrandMark } from "./brand-mark";
 import { WalletButton } from "./wallet/wallet-button";
 
 type PortfolioErrorCode =
@@ -194,7 +195,7 @@ function AuthPrompt({ connected, onSignIn, busy, errorMessage }: {
 }) {
   return (
     <section className="surface auth-prompt">
-      <div className="auth-prompt-mark" aria-hidden="true">SP</div>
+      <BrandMark large />
       <h2 className="text-2xl font-semibold tracking-tight">Your StockPilot portfolio</h2>
       <p className="mx-auto mt-4 max-w-md leading-7 text-muted">
         Connect and sign in with your Solana wallet to view your investments.
