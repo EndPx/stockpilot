@@ -11,6 +11,7 @@ const mint = "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh";
 const asset: Asset = {
   id: `prestocks:${mint}`,
   provider: "prestocks",
+  marketType: "PRE_IPO",
   name: "SpaceX PreStocks",
   symbol: "SPACEX",
   description: null,

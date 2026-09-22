@@ -1,4 +1,5 @@
 import { isAddress } from "@solana/kit";
+import type { InvestmentAsset } from "./asset-domain.js";
 
 export const PRESTOCKS_API_URL =
   process.env.PRESTOCKS_API_URL ?? "https://prestocks.com/api/prestocks";
@@ -10,9 +11,10 @@ export class PreStocksProviderError extends Error {
   }
 }
 
-export type Asset = {
+export type Asset = InvestmentAsset & {
   id: string;
   provider: "prestocks";
+  marketType: "PRE_IPO";
   name: string;
   symbol: string;
   description: string | null;
@@ -77,6 +79,7 @@ function normalizeAsset(value: unknown): Asset {
   return {
     id: `prestocks:${mintAddress}`,
     provider: "prestocks",
+    marketType: "PRE_IPO",
     name,
     symbol,
     description: optionalString(asset.description),

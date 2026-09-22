@@ -17,6 +17,7 @@ const assets: Asset[] = [
   {
     id: `prestocks:${spacexMint}`,
     provider: "prestocks",
+    marketType: "PRE_IPO",
     name: "SpaceX PreStocks",
     symbol: "SPACEX",
     description: null,
@@ -32,6 +33,7 @@ const assets: Asset[] = [
   {
     id: `prestocks:${openaiMint}`,
     provider: "prestocks",
+    marketType: "PRE_IPO",
     name: "OpenAI PreStocks",
     symbol: "OPENAI",
     description: null,

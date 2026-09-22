@@ -13,6 +13,7 @@ test("normalizes provider identity and keeps token and mark values distinct", ()
   const [asset] = normalizePreStocks([row]);
   assert.equal(asset.id, `prestocks:${row.contract_address}`);
   assert.equal(asset.provider, "prestocks");
+  assert.equal(asset.marketType, "PRE_IPO");
   assert.equal(asset.mintAddress, row.contract_address);
   assert.equal(asset.tokenPriceUsd, row.tokenPrice);
   assert.equal(asset.markPriceUsd, row.markPrice);
