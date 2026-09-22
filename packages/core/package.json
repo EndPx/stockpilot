@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./token-amounts": "./src/token-amounts.ts",
     "./asset-registry": "./src/asset-registry.ts",
     "./assets": "./src/assets.ts",
     "./investments": "./src/investments.ts",

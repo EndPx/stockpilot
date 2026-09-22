@@ -48,3 +48,11 @@ Observed sequentially first, 2026-09-22T18:14Z (2026-09-23 Asia/Jakarta). The co
 - Other extensions: metadataPointer, tokenMetadata, confidentialTransferMint (autoApproveNewAccounts=false, no auditor). No transferFeeConfig was returned in this mint observation. Absence here says nothing about other catalog products.
 - Quote-only: canonical USDC `1000000` raw → AAPLx `291895` raw, Raydium CLMM. This is a time/amount-specific route, not a signed execution or a share quantity.
 - Issuer/product terms and geographic/sanctions/venue eligibility remain unreviewed for StockPilot. Discovery stays UNKNOWN; no execution authorization is granted.
+
+## Amount contract
+
+`token-amounts.ts` preserves raw u64 strings, formats base amounts using bigint, selects the new multiplier at/after its effective timestamp, and computes an exact decimal-rational scaled estimate truncated to mint decimals. It accepts a same-context RPC `uiAmountString` as the preferred display value and never scales that value again.
+
+Important limitation: [Token-2022's implementation](https://github.com/solana-program/token-2022/blob/main/interface/src/extension/scaled_ui_amount/mod.rs) performs binary f64 conversions internally. An exact decimal calculation is **not** guaranteed bit-identical to RPC formatting near rounding boundaries or for large u64s. The utility labels its fallback `DECIMAL_SCALE_ESTIMATE`, not an authoritative balance; `RPC_SCALED` identifies the already-scaled RPC string. Neither path converts raw u64 to Number or is used for investment sizing/portfolio valuation. This is why public portfolio totals remain deferred.
+
+Reference: [Solana integration guidance](https://solana.com/docs/tokens/extensions/scaled-ui-amount/integration-guide). Multiplier updates/corporate actions require fresh context; displayed amounts cannot serve as permanent raw execution amounts.
