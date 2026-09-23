@@ -68,7 +68,7 @@ export async function fetchXStocksCatalog(fetcher: typeof fetch = fetch) {
   const mints = new Set<string>();
   const signal = AbortSignal.timeout(60_000);
   try {
-    for (let page = 0; page < 30; page++) {
+    async function readPage(page: number) {
       const response = await fetcher(`${XSTOCKS_API}?network=Solana&pageSize=100&page=${page}`, {
         headers: { Accept: "application/json" }, cache: "no-store", redirect: "error",
         signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
@@ -80,22 +80,38 @@ export async function fetchXStocksCatalog(fetcher: typeof fetch = fetch) {
           typeof pagination.hasNextPage !== "boolean" || (pagination.hasNextPage && !payload.nodes.length)) {
         throw new Error("Malformed issuer pagination.");
       }
-      for (const row of payload.nodes) {
+      return { nodes: payload.nodes, hasNextPage: pagination.hasNextPage };
+    }
+    function acceptPage(nodes: unknown[]) {
+      for (const row of nodes) {
         const asset = normalizeXStock(row);
         const issuerId = asset.metadata!.issuerId;
         if (issuerIds.has(issuerId) || mints.has(asset.mintAddress)) throw new Error("Duplicate issuer ID or canonical mint.");
         issuerIds.add(issuerId); mints.add(asset.mintAddress); assets.push(asset);
       }
-      if (!pagination.hasNextPage) {
-        if (!assets.length) throw new Error("Empty issuer catalog.");
-        const excluded = assets.flatMap((asset) => {
-          const policy = discoveryExclusion(asset);
-          return policy ? [{ assetId: asset.id, symbol: asset.symbol, reason: policy.reason, evidenceUrl: policy.evidenceUrl }] : [];
-        });
-        return { canonicalCount: assets.length, excluded, assets: assets.filter((asset) => !discoveryExclusion(asset)) };
+    }
+    const first = await readPage(0);
+    acceptPage(first.nodes);
+    let hasNext = first.hasNextPage;
+    // The issuer caps a page at 100. Fetch at most three subsequent pages at a
+    // time; any lookahead after a terminal page is ignored, never admitted.
+    for (let start = 1; hasNext && start < 30; start += 3) {
+      const indexes = Array.from({ length: Math.min(3, 30 - start) }, (_, index) => start + index);
+      const batch = await Promise.allSettled(indexes.map(readPage));
+      for (const result of batch) {
+        if (!hasNext) break;
+        if (result.status === "rejected") throw result.reason;
+        acceptPage(result.value.nodes);
+        hasNext = result.value.hasNextPage;
       }
     }
-    throw new Error("Issuer pagination exceeded safety bound.");
+    if (hasNext) throw new Error("Issuer pagination exceeded safety bound.");
+    if (!assets.length) throw new Error("Empty issuer catalog.");
+    const excluded = assets.flatMap((asset) => {
+      const policy = discoveryExclusion(asset);
+      return policy ? [{ assetId: asset.id, symbol: asset.symbol, reason: policy.reason, evidenceUrl: policy.evidenceUrl }] : [];
+    });
+    return { canonicalCount: assets.length, excluded, assets: assets.filter((asset) => !discoveryExclusion(asset)) };
   } catch (cause) { throw new XStocksProviderError({ cause }); }
 }
 
@@ -109,13 +125,20 @@ export class XStocksService {
   private failure?: { error: unknown; retryAt: number };
   constructor(private readonly load = fetchXStocks, private readonly now = Date.now) {}
   async getSnapshot() {
-    if (this.cache && this.now() - this.cache.fetchedAt < 300_000) {
+    const age = this.cache ? this.now() - this.cache.fetchedAt : Number.POSITIVE_INFINITY;
+    if (this.cache && age < 300_000) {
       return this.snapshot(false);
     }
     if (this.failure && this.now() < this.failure.retryAt) {
       return this.fallback(this.failure.error);
     }
     this.pending ??= this.refresh().finally(() => { this.pending = undefined; });
+    if (this.cache && age < 1_800_000) {
+      // Discovery can use a bounded verified snapshot while a slow paginated
+      // issuer refresh runs. The stale flag keeps it out of eligibility checks.
+      void this.pending.catch(() => {});
+      return this.snapshot(true);
+    }
     try { await this.pending; } catch (error) { return this.fallback(error); }
     return this.snapshot(false);
   }

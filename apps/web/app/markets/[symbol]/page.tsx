@@ -27,7 +27,7 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
 
   return (
     <div className="asset-page">
-      <Link href="/markets" className="back-link"><ArrowLeftIcon /> Markets</Link>
+      <Link href="/markets?group=private" className="back-link"><ArrowLeftIcon /> Private Markets</Link>
 
       <header className="asset-hero">
         <div className="asset-identity">

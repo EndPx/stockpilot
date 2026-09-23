@@ -20,6 +20,26 @@ test("full issuer pagination admits generic canonical products, never ready-to-t
   assert.equal(assets[0].canonical, true); assert.equal(assets[0].executionStatus, "UNKNOWN");
   assert.equal(normalizeXStock({ ...row, symbol: "RENAMED" }).id, assets[0].id);
 });
+test("bounded issuer lookahead reduces cold loading without admitting pages after the terminal page", async () => {
+  const urls: string[] = [];
+  let release!: (response: Response) => void;
+  const held = new Promise<Response>((resolve) => { release = resolve; });
+  const second = { ...row, id: "issuer-2", deployments: [{ network: "Solana", address: "So11111111111111111111111111111111111111112" }] };
+  const third = { ...row, id: "issuer-3", deployments: [{ network: "Solana", address: "11111111111111111111111111111111" }] };
+  const fetcher: typeof fetch = async (url) => {
+    const current = Number(new URL(String(url)).searchParams.get("page"));
+    urls.push(String(url));
+    if (current === 0) return Response.json(page([row], 0, true));
+    if (current === 1) return held;
+    if (current === 2) return Response.json(page([third], 2, false));
+    throw new Error("Speculative page outside the catalog");
+  };
+  const loading = fetchXStocks(fetcher);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(urls.map((url) => Number(new URL(url).searchParams.get("page"))), [0, 1, 2, 3]);
+  release(Response.json(page([second], 1, true)));
+  assert.equal((await loading).length, 3);
+});
 test("classification uses explicit issuer type, not a ticker heuristic", () => {
   assert.equal(normalizeXStock({ ...row, underlying: { type: "ETF" } }).marketType, "ETF");
   assert.equal(normalizeXStock({ ...row, underlying: { type: "Equity" } }).marketType, "PUBLIC_EQUITY");
@@ -46,6 +66,27 @@ test("bounded cache shares refresh, clones records and cannot extend stale lifet
   assert.equal((await service.getSnapshot()).assets[0].metadata!.issuerId, "issuer-1");
   now = 300_001; fail = true; assert.equal((await service.getSnapshot()).stale, true);
   now = 1_800_000; await assert.rejects(service.getSnapshot());
+});
+
+test("public catalog serves a bounded cached snapshot while paginated refresh is pending", async () => {
+  let now = 0;
+  let calls = 0;
+  let finish!: (assets: ReturnType<typeof normalizeXStock>[]) => void;
+  const refresh = new Promise<ReturnType<typeof normalizeXStock>[]>((resolve) => { finish = resolve; });
+  const service = new XStocksService(async () => ++calls === 1 ? [normalizeXStock(row)] : refresh, () => now);
+  const first = await service.getSnapshot();
+  now = 300_001;
+  const stale = await service.getSnapshot();
+  assert.equal(stale.stale, true);
+  assert.equal(stale.fetchedAt, first.fetchedAt);
+  assert.equal(calls, 2);
+  assert.equal((await service.getSnapshot()).stale, true);
+  assert.equal(calls, 2);
+  finish([normalizeXStock({ ...row, name: "Refreshed Apple xStock" })]);
+  await new Promise((resolve) => setImmediate(resolve));
+  const fresh = await service.getSnapshot();
+  assert.equal(fresh.stale, false);
+  assert.equal(fresh.assets[0].name, "Refreshed Apple xStock");
 });
 
 test("issuer-verified private exposure is excluded without hiding the rest of the catalog", async () => {

@@ -87,7 +87,9 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 - App desktop: fixed 248px navigation rail; the document owns vertical scrolling;
   content has a 1180px readable maximum and broad breathing room.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
-  scrolling and receives safe bottom padding; no nested page scrollers.
+  scrolling and receives safe bottom padding; no nested page scrollers. Bottom
+  navigation has Overview, Private Markets, and Public Markets as three equal
+  44px-or-taller targets; the desktop rail exposes the same destinations.
 - Markets: page-grid/list on desktop, compact market rows on mobile, with an
   optional horizontal reel for source-backed highlights.
 - Asset: supporting-pane layout. Market facts and About are primary; the investment
@@ -120,10 +122,10 @@ quotes or wallet display amounts. Do not apply today's multiplier to historical
 candles or label the percentage as split-adjusted investment performance.
 
 Discovery extension (2026-09-23): retain the existing shell, colors and controls.
-Markets now uses a bounded server-rendered directory (30 rows), with All / Private
-Markets / Public Markets navigation, a labeled search form, result count and next /
-first-page links. Filter links reuse control radius, 44px targets, cobalt active
-surface and visible focus. Cursor resets when query/group changes. Loading, provider
+Markets uses a bounded server-rendered directory (30 rows), with a labeled search
+form, result count and next / first-page links. The rail and mobile destinations
+reuse 44px-or-taller targets, cobalt active surface and visible focus. Cursor resets
+when query/group changes. Loading, provider
 failure, invalid query/cursor, stale data and no-match states must remain explicit.
 Do not render a heavy 1,000-card grid or auto-fetch eligibility for catalog rows.
 Public details reuse the asset identity, stats, token-details and surface primitives,
@@ -133,6 +135,17 @@ provider, symbol and status even when secondary classification columns collapse.
 Use 16/24px panel padding, 8/16px gaps, 14px row text and the existing surface tokens.
 Product copy distinguishes live public discovery from unimplemented public execution
 and future agents. Both market-scope panels may link to their live filtered catalogs.
+
+Market navigation revision (2026-09-23): replace the in-page All/Private/Public
+switcher with separate Private Markets and Public Markets rail/bottom destinations.
+Plain `/markets` opens Private Markets to avoid making the eight-asset private
+journey wait on the large public catalog. Each page title, count, search form,
+pagination and empty/loading copy names its current source. Keep the established
+30-result keyset pagination and official provider identity checks. Active navigation
+follows query group on the directory and provider on asset details. Public catalog
+refresh may serve its previously verified snapshot for at most 30 minutes while a
+single background refresh runs; mark it as cached, never as fresh. A cold public
+fetch still needs all upstream pages and keeps the loading state truthful.
 
 Brand identity: use the generated white orbital-S/navigation mark on its opaque
 cobalt tile, not the hero illustration or the former CSS bar mark. Shared BrandMark

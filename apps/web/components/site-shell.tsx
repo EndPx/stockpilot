@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
+import { activeNavigationSection } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
-import { MarketsIcon, OverviewIcon, ShieldIcon } from "./icons";
+import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
 
 const navigation = [
-  { href: "/app", label: "Overview", icon: OverviewIcon },
-  { href: "/markets", label: "Markets", icon: MarketsIcon },
+  { href: "/app", label: "Overview", icon: OverviewIcon, section: "overview" },
+  { href: "/markets?group=private", label: "Private Markets", icon: PrivateMarketsIcon, section: "private" },
+  { href: "/markets?group=public", label: "Public Markets", icon: MarketsIcon, section: "public" },
 ];
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
@@ -21,13 +23,11 @@ function Brand({ inverse = false }: { inverse?: boolean }) {
   );
 }
 
-function isActive(pathname: string, href: string) {
-  return href === "/markets" ? pathname.startsWith("/markets") : pathname === href;
-}
-
 export function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const landing = pathname === "/";
+  const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
   if (landing) {
     return (
@@ -53,10 +53,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <aside className="app-sidebar">
         <Brand />
         <nav aria-label="App navigation" className="sidebar-nav">
-          {navigation.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
+          {navigation.map(({ href, label, icon: Icon, section }) => {
+            const active = activeSection === section;
             return (
-              <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "sidebar-link sidebar-link-active" : "sidebar-link"}>
+              <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "sidebar-link sidebar-link-active" : "sidebar-link"}>
                 <Icon className="nav-icon" />
                 <span>{label}</span>
               </Link>
@@ -78,10 +78,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <main id="main" className="app-main">{children}</main>
 
       <nav className="mobile-bottom-nav" aria-label="Mobile app navigation">
-        {navigation.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
+        {navigation.map(({ href, label, icon: Icon, section }) => {
+          const active = activeSection === section;
           return (
-            <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>
+            <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>
               <Icon className="nav-icon" />
               <span>{label}</span>
             </Link>

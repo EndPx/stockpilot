@@ -3,6 +3,7 @@ import test from "node:test";
 import { createAssetsGet } from "../app/api/assets/route";
 import { createMarketsGet } from "../app/api/markets/route";
 import { parseMarketInputs, marketHref } from "../lib/market-inputs";
+import { activeNavigationSection } from "../lib/market-navigation";
 import { RegistryQueryError } from "@stockpilot/core/asset-registry";
 
 test("public discovery API has bounded filters and no authentication or execution side effects", async () => {
@@ -26,6 +27,12 @@ test("invalid market requests return 400 before provider reads; outages remain 5
 });
 test("market navigation keeps query/filter while resetting cursors", () => {
   assert.equal(marketHref(parseMarketInputs({ q: "NVIDIA", group: "public", cursor: "old" })), "/markets?q=NVIDIA&group=public");
+  assert.equal(activeNavigationSection("/markets", null), "private");
+  assert.equal(activeNavigationSection("/markets", "private"), "private");
+  assert.equal(activeNavigationSection("/markets", "public"), "public");
+  assert.equal(activeNavigationSection("/markets/POLYMARKET", null), "private");
+  assert.equal(activeNavigationSection("/markets/xstocks/canonical-mint", null), "public");
+  assert.equal(activeNavigationSection("/app", null), "overview");
 });
 
 test("the Markets asset API remains public without an authentication cookie", async () => {

@@ -18,6 +18,10 @@ export function MarketsIcon(props: IconProps) {
   return <IconFrame {...props}><path d="M4 19V9m5 10V5m6 14v-7m5 7V3" /><path d="M3 19h18" /></IconFrame>;
 }
 
+export function PrivateMarketsIcon(props: IconProps) {
+  return <IconFrame {...props}><path d="M4 20V8l8-4 8 4v12H4Z" /><path d="M9 20v-7h6v7M8 9h.01M16 9h.01" /></IconFrame>;
+}
+
 export function ShieldIcon(props: IconProps) {
   return <IconFrame {...props}><path d="M12 3 5 6v5c0 4.8 2.8 8.1 7 10 4.2-1.9 7-5.2 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-5" /></IconFrame>;
 }
