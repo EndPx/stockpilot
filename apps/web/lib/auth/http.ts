@@ -106,10 +106,11 @@ export function setSessionCookie(
   headers: Headers,
   token: string,
   config: Pick<AuthRuntimeConfig, "secureCookies">,
+  maxAgeSeconds = AUTH_SESSION_TTL_MS / 1_000,
 ): void {
   headers.append(
     "Set-Cookie",
-    `${AUTH_SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${AUTH_SESSION_TTL_MS / 1_000}; ${cookieAttributes(config, "/")}`,
+    `${AUTH_SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${maxAgeSeconds}; ${cookieAttributes(config, "/")}`,
   );
 }
 

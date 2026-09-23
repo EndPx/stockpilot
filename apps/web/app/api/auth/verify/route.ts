@@ -6,6 +6,7 @@ import { parseAuthVerifyRequest, verifyAuthProof } from "@/lib/auth/proof";
 import { createAuthSession, encodeAuthSession, registerAuthSession, toPublicSession } from "@/lib/auth/session";
 import { enforceRateLimit, limitAuthIp, trustedClientIp } from "@/lib/auth/rate-limit";
 import { getAuthSecurityStore, type AuthSecurityStore } from "@/lib/auth/store";
+import { isPrivyMode } from "@/lib/privy/config";
 
 export function createAuthVerifyPost(securityStore?: AuthSecurityStore) {
 return async function POST(request: Request): Promise<Response> {
@@ -13,6 +14,7 @@ return async function POST(request: Request): Promise<Response> {
   let headers: Headers | undefined;
 
   try {
+    if (isPrivyMode()) throw new AuthError("AUTH_DISABLED", 503);
     config = getAuthRuntimeConfig();
     assertSameOrigin(request, config.appUrl);
     const store = securityStore ?? getAuthSecurityStore(config);

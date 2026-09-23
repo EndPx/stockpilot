@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { SiteShell } from "@/components/site-shell";
 import { SolanaProvider } from "@/providers/solana-provider";
+import { PrivyProvider } from "@/providers/privy-provider";
+import { isPrivyMode } from "@/lib/privy/config";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,9 +17,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <SolanaProvider>
-          <SiteShell>{children}</SiteShell>
-        </SolanaProvider>
+        {isPrivyMode() ? (
+          <PrivyProvider><SiteShell>{children}</SiteShell></PrivyProvider>
+        ) : (
+          <SolanaProvider><SiteShell>{children}</SiteShell></SolanaProvider>
+        )}
       </body>
     </html>
   );

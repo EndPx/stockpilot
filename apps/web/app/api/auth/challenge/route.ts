@@ -3,10 +3,13 @@ import { assertSameOrigin, getAuthRuntimeConfig } from "@/lib/auth/config";
 import { authErrorResponse, jsonResponse, readJsonBody, setChallengeCookie } from "@/lib/auth/http";
 import { enforceRateLimit, limitAuthIp, trustedClientIp } from "@/lib/auth/rate-limit";
 import { getAuthSecurityStore, type AuthSecurityStore } from "@/lib/auth/store";
+import { isPrivyMode } from "@/lib/privy/config";
+import { AuthError } from "@/lib/auth/errors";
 
 export function createAuthChallengePost(securityStore?: AuthSecurityStore) {
 return async function POST(request: Request): Promise<Response> {
   try {
+    if (isPrivyMode()) throw new AuthError("AUTH_DISABLED", 503);
     const config = getAuthRuntimeConfig();
     assertSameOrigin(request, config.appUrl);
     const store = securityStore ?? getAuthSecurityStore(config);

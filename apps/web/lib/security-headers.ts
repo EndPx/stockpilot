@@ -1,4 +1,5 @@
 export function contentSecurityPolicy(nonce: string, development: boolean): string {
+  const privy = process.env.NEXT_PUBLIC_AUTH_PROVIDER === "privy";
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
@@ -7,7 +8,8 @@ export function contentSecurityPolicy(nonce: string, development: boolean): stri
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${development ? " ws: wss:" : ""}`,
+    `connect-src 'self'${privy ? " https://auth.privy.io https://api.privy.io https://solana-mainnet.rpc.privy.systems" : ""}${development ? " ws: wss:" : ""}`,
+    ...(privy ? ["frame-src https://auth.privy.io"] : []),
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",

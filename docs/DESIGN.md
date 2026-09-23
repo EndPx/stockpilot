@@ -70,6 +70,13 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 4. Layout and scroll ownership
 
+- Sign-in (Privy migration): the document owns scrolling. At wide widths, a
+  38/62 split places an original orbital-art editorial panel beside a quiet
+  authentication panel; the form stays within a 430px measure. At narrow widths,
+  the visual panel becomes a short brand masthead above the form. Neither pane
+  creates a nested scrollbar. The PayBox reference informs composition only,
+  never photography, logo, or copy.
+
 - Landing: document-scroll cover. The hero occupies at least one viewport and
   contains original orbital artwork, not an artificial product screenshot. Desktop
   copy occupies the left 55%, artwork the right; on mobile artwork sits below copy.
@@ -96,6 +103,17 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   panel is sticky on wide screens and returns to document flow on narrow screens.
 
 ## 5. Components and states
+
+Privy sign-in extension: a dedicated `/sign-in` surface uses the existing
+BrandMark, charcoal/navy and cobalt system. The credential choice card has a
+Google primary action and email fallback using the Privy modal. The email field
+prefills the real Privy flow, not a parallel StockPilot password form. Buttons
+retain 44px targets and idle, busy, disabled and error states. If Privy is not
+configured, show a truthful unavailable state rather than a dead submit button.
+After login, show the user-owned embedded Solana address and explain that it is
+new and separate from any previous Phantom address. No transfer, agent grant or
+transaction is triggered by signing in. Keep manual/agent trading disabled until
+their separate migration and acceptance gates pass.
 
 Historical chart extension (2026-09-23): public xStocks and private PreStocks
 details share a quiet, source-backed token-price surface before the existing facts.

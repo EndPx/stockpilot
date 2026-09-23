@@ -4,14 +4,16 @@ import { AuthError } from "./errors";
 import { createSignedToken, readSignedToken } from "./tokens";
 import type { AuthSession, AuthSessionToken } from "./types";
 import { getAuthSecurityStore, type AuthSecurityStore } from "./store";
+import { isPrivyMode } from "@/lib/privy/config";
 
-export function createAuthSession(walletAddress: string, now = Date.now()): AuthSessionToken {
+export function createAuthSession(walletAddress: string, now = Date.now(), privyUserId?: string, privyTokenExpiresAt?: number): AuthSessionToken {
   return {
     kind: "session",
+    ...(privyUserId ? { authProvider: "privy" as const, privyUserId } : {}),
     walletAddress: address(walletAddress).toString(),
     sessionId: crypto.randomUUID(),
     issuedAt: now,
-    expiresAt: now + AUTH_SESSION_TTL_MS,
+    expiresAt: privyUserId ? Math.min(now + 55 * 60 * 1_000, privyTokenExpiresAt ?? now) : now + AUTH_SESSION_TTL_MS,
   };
 }
 
@@ -41,7 +43,12 @@ export async function decodeAuthSession(
     throw new AuthError("SESSION_INVALID", 401);
   }
 
-  if (!isAuthSessionToken(value) || value.expiresAt <= now || value.issuedAt > now || value.expiresAt - value.issuedAt !== AUTH_SESSION_TTL_MS) {
+  if (!isAuthSessionToken(value) || value.expiresAt <= now || value.issuedAt > now ||
+    (value.authProvider === "privy"
+      ? value.expiresAt - value.issuedAt > 55 * 60 * 1_000 || value.expiresAt <= value.issuedAt
+      : value.expiresAt - value.issuedAt !== AUTH_SESSION_TTL_MS) ||
+    (isPrivyMode() && (value.authProvider !== "privy" || !value.privyUserId)) ||
+    (!isPrivyMode() && value.authProvider === "privy")) {
     throw new AuthError("SESSION_INVALID", 401);
   }
 

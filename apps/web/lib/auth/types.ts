@@ -35,6 +35,8 @@ export type AuthChallengeToken = {
 
 export type AuthSessionToken = {
   kind: "session";
+  authProvider?: "privy";
+  privyUserId?: string;
   walletAddress: string;
   sessionId: string;
   issuedAt: number;

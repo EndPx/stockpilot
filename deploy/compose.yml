@@ -6,6 +6,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-legacy}
     restart: unless-stopped
     init: true
     read_only: true
@@ -22,6 +24,8 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?Set a random session secret of at least 32 bytes}
       REDIS_URL: redis://default:${REDIS_PASSWORD:?Set a 64-character random hex password}@redis:6379/0
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-legacy}
+      PRIVY_APP_SECRET: ${PRIVY_APP_SECRET:-}
       # Keep buys disabled for the initial deployment. There is no Jupiter key here.
       INVESTMENTS_ENABLED: "false"
       # Safe only with loopback access and the supplied proxy's X-Real-IP overwrite.

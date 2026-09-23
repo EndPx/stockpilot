@@ -33,7 +33,7 @@ function isPortfolio(value: unknown): value is Portfolio {
     item.funding !== null;
 }
 
-async function fetchPortfolio(signal: AbortSignal): Promise<Portfolio> {
+export async function fetchPortfolio(signal: AbortSignal): Promise<Portfolio> {
   const response = await fetch("/api/portfolio", {
     cache: "no-store",
     credentials: "same-origin",

@@ -42,6 +42,15 @@ AUTH_ENABLED=true
 SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 ```
 
+The Privy migration is opt-in for a later release. After Google login and
+allowed origins are configured in Privy Dashboard, and the real login has been
+accepted in a staging browser, add `NEXT_PUBLIC_AUTH_PROVIDER=privy` and
+`PRIVY_APP_SECRET=<protected server value>` to the runtime file. The auth mode
+is also a public build argument; use the same mode when building and running
+the image. Never pass the app secret as a build argument. The app keeps trading
+disabled in Privy mode. Do not switch the live mode before testing a newly
+created Privy Solana wallet and preserving a rollback image.
+
 `APP_URL` is the exact HTTPS origin, without a path. Redis rejects passwords that
 are not exactly 64 hexadecimal characters, so the assembled `REDIS_URL` is safe
 without URL escaping. Keep the session secret stable through ordinary deployments.

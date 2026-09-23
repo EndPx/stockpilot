@@ -7,6 +7,8 @@ import { activeNavigationSection } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
 import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
+import { PrivyAccountButton } from "./privy/privy-account-button";
+import { isPrivyMode } from "@/lib/privy/config";
 
 const navigation = [
   { href: "/app", label: "Overview", icon: OverviewIcon, section: "overview" },
@@ -27,6 +29,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const landing = pathname === "/";
+  if (pathname === "/sign-in") return <>{children}</>;
   const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
   if (landing) {
@@ -65,14 +68,16 @@ export function SiteShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="sidebar-assurance">
           <ShieldIcon className="nav-icon" />
-          <div><strong>Human approval</strong><span>Required for every buy</span></div>
+          {isPrivyMode()
+            ? <div><strong>Read-only migration</strong><span>Trading and agent access are off</span></div>
+            : <div><strong>Human approval</strong><span>Required for every buy</span></div>}
         </div>
-        <div className="sidebar-wallet"><WalletButton /></div>
+        <div className="sidebar-wallet">{isPrivyMode() ? <PrivyAccountButton /> : <WalletButton />}</div>
       </aside>
 
       <header className="mobile-app-header">
         <Brand />
-        <WalletButton />
+        {isPrivyMode() ? <PrivyAccountButton /> : <WalletButton />}
       </header>
 
       <main id="main" className="app-main">{children}</main>

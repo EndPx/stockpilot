@@ -2,6 +2,8 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_AUTH_PROVIDER=legacy
+ENV NEXT_PUBLIC_AUTH_PROVIDER=${NEXT_PUBLIC_AUTH_PROVIDER}
 
 # Keep this version aligned with package.json's packageManager field.
 RUN npm install --global pnpm@10.21.0

@@ -6,6 +6,40 @@ production cutover, not silently replaced on the live site before Privy works.
 This document describes the target; the current deployment still uses SIWS and
 has investment and agent execution disabled.
 
+## Current implementation checkpoint (2026-09-23)
+
+The repository now has a guarded Privy mode (`NEXT_PUBLIC_AUTH_PROVIDER=privy`):
+the two-panel `/sign-in` surface, Google/email Privy modal, automatic primary
+Solana embedded wallet creation, server-side access-token verification, a
+strict primary-wallet lookup, a short-lived StockPilot cookie and read-only
+portfolio path. The old SIWS challenge/verify endpoints and legacy Jupiter
+investment routes are disabled in Privy mode. The mode is **not yet the live
+deployment**.
+
+Local verification: web tests 99/99 and the production build pass. The
+production dependency audit has no high or critical findings after pinning
+vulnerable transitive `ws` 8.x releases to 8.21.3; three moderate findings
+remain. This is not a substitute for real-login or funded-wallet acceptance.
+
+Privy Dashboard now has Google login enabled, external-wallet login disabled,
+and automatic wallet creation restricted to Solana. Its allowed origins are
+`https://stockpilot.endpx.cloud`, `http://localhost:3000`, and
+`http://localhost:3100` for
+testing; OAuth return URLs are restricted to `/sign-in` on those three origins.
+These settings were verified after a dashboard reload. The shared Google Cloud
+OAuth project was deliberately left unchanged because it has other OAuth
+clients, unrelated consent branding and Testing status. Privy's built-in Google
+OAuth is used instead. `PRIVY_APP_SECRET` is intentionally absent from source
+and must be installed only in the protected server environment. Until the
+secret and a real Google login are verified, `/sign-in` shows an unavailable
+state instead of inviting a user into a broken login. No existing Phantom
+funds move to the new wallet.
+
+Before production cutover, remove the two localhost origins and redirect URLs,
+review Privy HttpOnly-cookie and MFA options against the implemented session
+flow, and upgrade the Privy app from development mode (150-user testing limit).
+None of those production changes is implied by enabling Google login today.
+
 ## Account and wallet boundaries
 
 1. Privy authenticates the person. The backend verifies a Privy access token

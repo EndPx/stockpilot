@@ -173,6 +173,53 @@ html:has(.landing-shell) { scroll-padding-top: 112px; }
 .auth-prompt { position: relative; display: grid; justify-items: center; padding: clamp(48px, 8vw, 90px) 24px; text-align: center; background: var(--surface); }
 .auth-prompt-mark { width: 56px; height: 56px; margin-bottom: 22px; border-radius: 16px; }
 
+/* Privy sign-in — editorial image and focused credential surface */
+.sign-in-shell { display: grid; grid-template-columns: minmax(330px, 38%) minmax(0, 1fr); min-height: 100dvh; background: var(--canvas-raised); }
+.sign-in-art { position: relative; display: flex; min-height: 100dvh; flex-direction: column; justify-content: space-between; overflow: hidden; padding: 32px clamp(24px, 3vw, 48px) 48px; background: var(--canvas); }
+.sign-in-art-image { object-fit: cover; object-position: 56% center; opacity: .8; }
+.sign-in-art::after { position: absolute; inset: 0; content: ""; background: linear-gradient(180deg, rgb(7 10 14 / 44%), transparent 26%, rgb(7 10 14 / 16%) 50%, rgb(7 10 14 / 94%) 100%); pointer-events: none; }
+.sign-in-brand, .sign-in-art-copy { position: relative; z-index: 1; }
+.sign-in-brand { display: inline-flex; width: fit-content; min-height: 44px; align-items: center; gap: 10px; font-size: 21px; font-weight: 760; letter-spacing: -.04em; }
+.sign-in-art-copy { max-width: 520px; }
+.sign-in-art-copy p { margin: 0 0 22px; color: var(--accent-text); font-size: 11px; font-weight: 760; letter-spacing: .17em; }
+.sign-in-art-copy h2 { margin: 0; font-size: clamp(2.8rem, 4.1vw, 5.6rem); font-weight: 540; line-height: 1.04; letter-spacing: -.06em; }
+.sign-in-art-copy span { display: block; max-width: 360px; margin-top: 24px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.sign-in-main { position: relative; display: grid; min-width: 0; min-height: 100dvh; place-items: center; padding: 88px 32px 90px; background: radial-gradient(ellipse at 50% 14%, rgb(84 104 255 / 8%), transparent 38%), var(--canvas-raised); }
+.sign-in-back { position: absolute; top: 36px; right: clamp(24px, 4vw, 62px); display: inline-flex; min-height: 44px; align-items: center; color: var(--muted); font-size: 13px; font-weight: 650; }
+.sign-in-back:hover { color: var(--ink); }
+.sign-in-form { width: min(100%, 430px); }
+.sign-in-kicker { margin: 0 0 20px; color: var(--accent-text); font-size: 11px; font-weight: 760; letter-spacing: .15em; text-transform: uppercase; }
+.sign-in-form h1 { margin: 0; font-size: clamp(2.5rem, 3.4vw, 4.1rem); font-weight: 580; line-height: 1.07; letter-spacing: -.055em; }
+.sign-in-subtitle { margin: 17px 0 30px; color: var(--muted); font-size: 15px; line-height: 1.65; }
+.sign-in-social, .sign-in-primary { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 12px; border-radius: 10px; font-size: 14px; font-weight: 720; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.sign-in-social { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+.sign-in-social:hover { border-color: var(--accent-text); background: var(--surface-hover); }
+.sign-in-social:active, .sign-in-primary:active { transform: translateY(1px); }
+.google-g { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--ink); color: var(--accent); font-weight: 800; }
+.sign-in-divider { display: flex; align-items: center; gap: 14px; margin: 26px 0 22px; color: var(--faint); font-size: 12px; }
+.sign-in-divider::before, .sign-in-divider::after { flex: 1; height: 1px; background: var(--line); content: ""; }
+.sign-in-form label { display: block; margin-bottom: 10px; color: var(--ink); font-size: 13px; font-weight: 670; }
+.sign-in-form input { display: block; width: 100%; min-height: 52px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 16px; background: var(--surface); color: var(--ink); font-size: 14px; }
+.sign-in-form input:focus { outline: 3px solid var(--accent-text); outline-offset: 2px; }
+.sign-in-primary { margin-top: 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+.sign-in-primary:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
+.sign-in-note { margin: 28px 0 0; color: var(--faint); font-size: 12px; line-height: 1.7; }
+.sign-in-error { margin: 18px 0 0; border-radius: 10px; padding: 12px 14px; background: #331e25; color: var(--danger); font-size: 13px; line-height: 1.5; }
+.sign-in-footnote { position: absolute; bottom: 26px; left: 32px; right: 32px; margin: 0; color: var(--faint); font-size: 11px; text-align: center; }
+.privy-account { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; }
+.privy-account-address { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; padding: 12px; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.privy-signout { min-height: 44px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
+.privy-signout:hover { color: var(--ink); }
+@media (max-width: 800px) {
+  .sign-in-shell { grid-template-columns: minmax(0, 1fr); }
+  .sign-in-art { min-height: 270px; padding: 22px 24px 28px; }
+  .sign-in-art-image { object-position: center 43%; }
+  .sign-in-art-copy p, .sign-in-art-copy span { display: none; }
+  .sign-in-art-copy h2 { font-size: clamp(2rem, 6vw, 3.2rem); }
+  .sign-in-main { min-height: 570px; padding: 92px 20px 85px; }
+  .sign-in-back { top: 20px; right: 20px; }
+}
+
 /* Markets */
 .market-count { display: grid; min-width: 112px; border-left: 1px solid var(--line-strong); padding-left: 26px; }.market-count strong { font-size: 36px; line-height: 1; letter-spacing: -.05em; }.market-count span { margin-top: 7px; color: var(--muted); font-size: 12px; }
 .section-heading-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }.section-heading-row h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }.section-heading-row > span { color: var(--muted); font-size: 11px; }
