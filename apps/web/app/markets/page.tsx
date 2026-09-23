@@ -44,7 +44,7 @@ export default async function MarketsPage({ searchParams }: { searchParams: Prom
         </form>
       </div>
       {assets.length ? <div className="catalog-list">
-        <div className="market-list-head" aria-hidden="true"><span>Product</span><span>Classification</span><span>Token Price</span><span>Execution</span><span /></div>
+        <div className="market-list-head" aria-hidden="true"><span>Product</span><span>Classification</span><span>Indicative Price</span><span>Execution</span><span /></div>
         {assets.map((asset) => <MarketDirectoryRow key={asset.id} asset={asset} />)}
       </div> : <div className="empty-surface border-0"><h3>No products match your search in {heading}.</h3><p>Try a name, symbol, or a shorter keyword.</p><Link href={marketHref({ group })} className="secondary-button mt-5">Clear search</Link></div>}
       <div className="directory-footer catalog-pagination">
@@ -52,6 +52,6 @@ export default async function MarketsPage({ searchParams }: { searchParams: Prom
         <nav aria-label="Catalog pagination">{offset > 0 && <Link className="secondary-button" href={marketHref(filter)}>First page</Link>}{nextCursor && <Link prefetch={false} className="secondary-button" href={marketHref(filter, nextCursor)}>Next page <ArrowUpRightIcon /></Link>}{filter.query && <Link className="text-link" href={marketHref({ group })}>Clear search</Link>}</nav>
       </div>
     </section>
-    <div className="catalog-source-note"><p>{stale ? "Showing a previously verified catalog while the latest update is checked." : "Official catalog snapshot."} {sources.map((source) => `${source.provider === "prestocks" ? "PreStocks" : "xStocks"}: ${new Date(source.fetchedAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC`).join(" · ")}</p><p>Canonical does not mean executable. Public products include unclassified instruments; issuer terms and restrictions apply. Prices, where provided, are reference data—not trade quotes.</p></div>
+    <div className="catalog-source-note"><p>{stale ? "Showing a previously verified catalog while the latest update is checked." : "Official catalog snapshot."} {sources.map((source) => `${source.provider === "prestocks" ? "PreStocks" : "xStocks"}: ${new Date(source.fetchedAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC`).join(" · ")}</p><p>Canonical does not mean executable. Public products include unclassified instruments; issuer terms and restrictions apply. xStocks indicative prices may be cached for up to 10 minutes and are not trade quotes.</p></div>
   </div>;
 }

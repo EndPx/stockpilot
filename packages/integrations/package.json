@@ -9,6 +9,7 @@
     "./provider-json": "./src/provider-json.ts",
     "./market-validation": "./src/market-validation.ts",
     "./xstocks": "./src/xstocks.ts",
+    "./xstocks-price": "./src/xstocks-price.ts",
     "./xstocks-classification": "./src/xstocks-classification.ts",
     "./xstocks-discovery-policy": "./src/xstocks-discovery-policy.ts",
     "./asset-domain": "./src/asset-domain.ts",
