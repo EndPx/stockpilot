@@ -11,19 +11,31 @@ the two-panel `/sign-in` surface, Google/email Privy modal, automatic primary
 Solana embedded wallet creation, server-side access-token verification, a
 strict primary-wallet lookup, a short-lived StockPilot cookie and read-only
 portfolio path. The old SIWS challenge/verify endpoints and legacy Jupiter
-investment routes are disabled in Privy mode. Release `eb2871c` is live at
-`stockpilot.endpx.cloud`; the previous `660f853` image and a protected copy of
-the prior runtime configuration remain available for rollback.
+investment routes are disabled in Privy mode. The live deployment at
+`stockpilot.endpx.cloud` now serves the signed-in read-only Overview, Credentials,
+Pre-IPO and Stocks pages. A prior image and a protected runtime configuration
+copy remain available for rollback.
 
 Local verification: 210 tests and the production build pass. The
 production dependency audit has no high or critical findings after pinning
 vulnerable transitive `ws` 8.x releases to 8.21.3; three moderate findings
 remain. The VPS image build, isolated-container smoke test, public HTTPS health,
 sign-in rendering, disabled legacy auth and investment endpoints, unauthenticated
-portfolio rejection, and security headers passed. Google OAuth reached the
-Google account chooser in the user's browser. **Post-login session and wallet
-acceptance are still pending the user's account selection**; no transaction has
-been attempted.
+portfolio rejection, and security headers passed. Subsequent browser acceptance
+with the user's Google session confirmed the server-verified primary Privy
+Solana wallet, read-only portfolio, Credentials and Markets. This wallet was
+unfunded at the last read. No transaction has been attempted.
+
+The next manual-BUY implementation is not a flag flip. The legacy signing UI
+uses Wallet Standard, while Privy exposes a Solana `useSignTransaction` method
+that returns signed transaction bytes. Its route must bind the Privy-selected
+wallet to the active server session and preserve user review and wallet approval.
+Before either investment endpoint can be enabled in Privy mode, add an
+instruction-level validator for the prepared Jupiter transaction (including
+resolved address lookup tables), durable submission/idempotency and ambiguous
+confirmation reconciliation, and tests for rejection, mismatch, expiry,
+concurrency and wallet changes. Until then, `INVESTMENTS_ENABLED=true` alone
+still returns `INVESTMENTS_DISABLED` for both Privy routes.
 
 Privy Dashboard now has Google login enabled, external-wallet login disabled,
 and automatic wallet creation restricted to Solana. Its allowed origins are
