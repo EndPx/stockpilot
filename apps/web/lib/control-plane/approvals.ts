@@ -12,20 +12,22 @@ export class ApprovalError extends Error {
   }
 }
 
-async function assertOwnerWallet(store: ControlStore, identity: ControlIdentity): Promise<void> {
+async function assertOwnerWallet(store: ControlStore, identity: ControlIdentity): Promise<boolean> {
   const account = await store.query<{ primary_wallet_address: string }>(
     "SELECT primary_wallet_address FROM control_accounts WHERE id = $1", [identity.privyUserId],
   );
-  if (!account.rows.length || account.rows[0].primary_wallet_address !== identity.walletAddress) {
+  if (!account.rows.length) return false;
+  if (account.rows[0].primary_wallet_address !== identity.walletAddress) {
     throw new ControlPlaneError("WALLET_BINDING_MISMATCH", "Verified wallet does not match this StockPilot account.");
   }
+  return true;
 }
 
 export async function listOwnerRequests(identity: ControlIdentity, status: RequestStatus | "ALL" = "ALL", limit = 50,
   store: ControlStore = controlStore): Promise<OwnerRequest[]> {
   if (!["ALL", "PENDING_APPROVAL", "APPROVED", "REJECTED", "EXPIRED", "CANCELLED", "BLOCKED"].includes(status) ||
       !Number.isInteger(limit) || limit < 1 || limit > 100) throw new ApprovalError("INVALID_FILTER", "Invalid approval filter.");
-  await assertOwnerWallet(store, identity);
+  if (!await assertOwnerWallet(store, identity)) return [];
   return store.transaction(async (db) => {
     await expirePendingRequests(db, identity.privyUserId);
     const rows = await db.query<RequestRow & { client_name: string }>(
@@ -42,7 +44,7 @@ export async function listOwnerRequests(identity: ControlIdentity, status: Reque
 export async function getOwnerRequest(identity: ControlIdentity, requestId: string,
   store: ControlStore = controlStore): Promise<OwnerRequest> {
   if (!/^[0-9a-f-]{36}$/.test(requestId)) throw new ApprovalError("REQUEST_NOT_FOUND", "Request not found.");
-  await assertOwnerWallet(store, identity);
+  if (!await assertOwnerWallet(store, identity)) throw new ApprovalError("REQUEST_NOT_FOUND", "Request not found.");
   return store.transaction(async (db) => {
     await expirePendingRequests(db, identity.privyUserId);
     const result = await db.query<RequestRow & { client_name: string }>(
@@ -60,7 +62,7 @@ export async function decideRequest(identity: ControlIdentity, requestId: string
   if (!/^[0-9a-f-]{36}$/.test(requestId) || !["APPROVED", "REJECTED"].includes(decision)) {
     throw new ApprovalError("REQUEST_NOT_FOUND", "Request not found.");
   }
-  await assertOwnerWallet(store, identity);
+  if (!await assertOwnerWallet(store, identity)) throw new ApprovalError("REQUEST_NOT_FOUND", "Request not found.");
   // Expiry must commit even when the following decision is rejected.
   await store.transaction((db) => expirePendingRequests(db, identity.privyUserId));
   return store.transaction(async (db) => {

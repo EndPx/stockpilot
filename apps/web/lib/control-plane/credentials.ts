@@ -23,6 +23,40 @@ export type AgentPrincipal = {
   scopes: ClientScope[];
 };
 
+export type CredentialSummary = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  displayPrefix: string;
+  status: "ACTIVE" | "REVOKED" | "EXPIRED";
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+};
+
+export async function listCredentials(identity: ControlIdentity, store: ControlStore = controlStore): Promise<CredentialSummary[]> {
+  const rows = await store.query<{
+    id: string; client_id: string; client_name: string; display_prefix: string;
+    status: CredentialSummary["status"]; created_at: Date; last_used_at: Date | null;
+    expires_at: Date | null; revoked_at: Date | null;
+  }>(`SELECT k.id, k.client_id, c.name AS client_name, k.display_prefix,
+       CASE WHEN k.revoked_at IS NOT NULL OR c.status = 'REVOKED' THEN 'REVOKED'
+            WHEN k.expires_at <= now() OR c.expires_at <= now() OR c.status = 'EXPIRED' THEN 'EXPIRED'
+            ELSE 'ACTIVE' END AS status,
+       k.created_at, k.last_used_at, k.expires_at, k.revoked_at
+     FROM control_credentials k JOIN control_clients c ON c.id = k.client_id
+     JOIN control_accounts a ON a.id = c.account_id
+     WHERE c.account_id = $1 AND a.primary_wallet_address = $2
+     ORDER BY k.created_at DESC, k.id DESC LIMIT 100`, [identity.privyUserId, identity.walletAddress]);
+  return rows.rows.map((row) => ({
+    id: row.id, clientId: row.client_id, clientName: row.client_name,
+    displayPrefix: row.display_prefix, status: row.status,
+    createdAt: row.created_at.toISOString(), lastUsedAt: row.last_used_at?.toISOString() ?? null,
+    expiresAt: row.expires_at?.toISOString() ?? null, revokedAt: row.revoked_at?.toISOString() ?? null,
+  }));
+}
+
 function getPepper(): Buffer {
   const pepper = process.env.CONTROL_PLANE_KEY_PEPPER;
   if (!pepper || Buffer.byteLength(pepper, "utf8") < 32) {
