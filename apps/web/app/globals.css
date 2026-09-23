@@ -126,7 +126,7 @@ html:has(.landing-shell) { scroll-padding-top: 112px; }
 .sidebar-link-active { background: var(--surface); color: var(--ink); box-shadow: inset 3px 0 0 var(--accent), inset 0 1px 0 rgb(255 255 255 / 4%); }
 .sidebar-assurance { display: flex; gap: 11px; margin-top: auto; border: 1px solid var(--line); border-radius: 15px; padding: 14px; color: var(--muted); }
 .sidebar-assurance strong, .sidebar-assurance span { display: block; }.sidebar-assurance strong { color: var(--ink); font-size: 12px; }.sidebar-assurance span { margin-top: 3px; font-size: 10px; }
-.sidebar-wallet { margin-top: 10px; }.sidebar-wallet .wallet-trigger { width: 100%; justify-content: flex-start; }
+.sidebar-wallet { position: relative; margin-top: 10px; }.sidebar-wallet .wallet-trigger { width: 100%; justify-content: flex-start; }
 .app-main { min-height: 100vh; margin-left: 248px; padding: clamp(40px, 5vw, 76px) clamp(28px, 6vw, 96px) 72px; }
 .app-main > * { width: min(100%, 1180px); min-width: 0; margin-inline: auto; }
 .mobile-app-header, .mobile-bottom-nav { display: none; }
@@ -206,10 +206,30 @@ html:has(.landing-shell) { scroll-padding-top: 112px; }
 .sign-in-note { margin: 28px 0 0; color: var(--faint); font-size: 12px; line-height: 1.7; }
 .sign-in-error { margin: 18px 0 0; border-radius: 10px; padding: 12px 14px; background: #331e25; color: var(--danger); font-size: 13px; line-height: 1.5; }
 .sign-in-footnote { position: absolute; bottom: 26px; left: 32px; right: 32px; margin: 0; color: var(--faint); font-size: 11px; text-align: center; }
-.privy-account { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; }
-.privy-account-address { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; padding: 12px; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.privy-signout { min-height: 44px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
-.privy-signout:hover { color: var(--ink); }
+.privy-account { position: relative; min-width: 0; }
+.privy-account-trigger { display: flex; min-width: 0; min-height: 56px; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 16px; padding: 8px; background: var(--surface); color: var(--ink); cursor: pointer; list-style: none; transition: background .18s ease, border-color .18s ease; }
+.privy-account-trigger::-webkit-details-marker { display: none; }
+.privy-account-trigger:hover, .privy-account[open] .privy-account-trigger { border-color: var(--line-strong); background: var(--surface-hover); }
+.privy-account-avatar { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: var(--accent-pale); color: var(--accent-text); font-size: 11px; font-weight: 800; letter-spacing: -.02em; }
+.privy-account-label { min-width: 0; flex: 1; overflow: hidden; font-size: 12px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.privy-account-chevron { width: 16px; height: 16px; flex: 0 0 auto; color: var(--muted); transition: transform .18s ease; }
+.privy-account[open] .privy-account-chevron { transform: rotate(180deg); }
+.privy-account-panel { position: absolute; z-index: 40; bottom: calc(100% + 8px); left: 0; width: min(280px, calc(100vw - 32px)); border: 1px solid var(--line-strong); border-radius: 16px; padding: 16px; background: var(--surface); box-shadow: 0 18px 48px rgb(0 0 0 / 32%); }
+.privy-account-caption { margin: 0; color: var(--faint); font-size: 10px; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+.privy-account-email { margin: 6px 0 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 730; }
+.privy-account-wallet { display: flex; align-items: center; gap: 8px; margin: 12px 0 14px; color: var(--muted); font-size: 12px; }.privy-account-wallet svg { width: 16px; height: 16px; }
+.privy-account-option { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 10px; border: 0; border-top: 1px solid var(--line); padding: 9px 2px; background: transparent; color: var(--ink); text-align: left; font-size: 13px; font-weight: 660; cursor: pointer; }
+.privy-account-option:hover { color: var(--accent-text); }.privy-account-option svg { width: 17px; height: 17px; color: var(--muted); }
+.privy-account-panel .wallet-error { display: block; margin-top: 8px; }
+.privy-wallet-card { display: grid; gap: 22px; padding: 24px; }
+.privy-wallet-card-heading { display: flex; min-width: 0; align-items: center; gap: 14px; }
+.privy-wallet-card-icon { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; border-radius: 16px; background: var(--accent-pale); color: var(--accent-text); }.privy-wallet-card-icon svg { width: 24px; height: 24px; }
+.privy-wallet-card-heading h2 { margin: 4px 0 0; font-size: 23px; font-weight: 670; letter-spacing: -.035em; }.privy-wallet-card-heading p:last-child { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.privy-wallet-card-address { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 20px; }.privy-wallet-card-address > span { color: var(--muted); font-size: 12px; }
+.privy-wallet-card-address code { width: fit-content; max-width: 100%; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; line-height: 1.7; user-select: all; }
+.privy-wallet-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.privy-wallet-copy-error { margin: 0; color: var(--danger); font-size: 12px; }
+.credential-state { padding: 32px 24px; color: var(--muted); }.credential-note { max-width: 68ch; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
 @media (max-width: 800px) {
   .sign-in-shell { grid-template-columns: minmax(0, 1fr); }
   .sign-in-art { min-height: 270px; padding: 22px 24px 28px; }
@@ -330,6 +350,10 @@ html:has(.landing-shell) { scroll-padding-top: 112px; }
   .app-sidebar { display: none; }
   .mobile-app-header { position: sticky; inset: 0 0 auto; z-index: 20; display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding: 10px 20px; background: rgb(11 16 23 / 94%); backdrop-filter: blur(18px); }
   .mobile-bottom-nav { position: fixed; z-index: 30; right: 16px; bottom: max(14px, env(safe-area-inset-bottom)); left: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; border: 1px solid rgb(255 255 255 / 10%); border-radius: 19px; padding: 6px; background: rgb(11 16 23 / 94%); box-shadow: 0 18px 48px rgb(0 0 0 / 26%); backdrop-filter: blur(18px); }
+  .mobile-bottom-nav-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .mobile-app-header .privy-account-trigger { width: 44px; min-height: 44px; justify-content: center; padding: 4px; }
+  .mobile-app-header .privy-account-label, .mobile-app-header .privy-account-chevron { display: none; }
+  .mobile-app-header .privy-account-panel { top: calc(100% + 8px); right: 0; bottom: auto; left: auto; }
   .mobile-nav-link { display: grid; min-height: 52px; place-items: center; align-content: center; gap: 3px; border-radius: 14px; color: var(--muted); font-size: 10px; font-weight: 700; }.mobile-nav-link .nav-icon { width: 19px; height: 19px; }.mobile-nav-link-active { background: var(--accent-pale); color: var(--accent-text); }
   .app-main { margin-left: 0; padding: 30px 20px 106px; }
   .hero-section { min-height: 1080px; align-items: start; padding: 140px 32px 450px; }.hero-copy { width: 100%; max-width: 620px; }
@@ -350,6 +374,8 @@ html:has(.landing-shell) { scroll-padding-top: 112px; }
   .market-scope { grid-template-columns: 1fr; padding: 0 20px 72px; }.market-scope article { padding: 28px; }.market-scope h3 { margin-top: 36px; }
   .landing-statement, .landing-workflow { padding: 72px 20px; }.landing-statement { gap: 24px; }.landing-footer { grid-template-columns: 1fr; text-align: center; }.landing-footer .brand { justify-self: center; }.landing-footer p { margin: 0; }
   .mobile-app-header { padding-inline: 16px; }.mobile-app-header .brand { font-size: 16px; }.mobile-app-header .wallet-trigger { max-width: 160px; }.mobile-app-header .wallet-trigger span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-bottom-nav-four .mobile-nav-link { font-size: 9px; text-align: center; }
+  .privy-wallet-card { padding: 20px; }.privy-wallet-card-heading h2 { font-size: 21px; }.privy-wallet-card-actions { align-items: stretch; flex-direction: column; }.privy-wallet-card-actions > * { width: 100%; justify-content: center; }
   .app-main { padding: 24px 16px 104px; }.dashboard-stack { gap: 22px; }.app-page-header { min-height: 0; align-items: start; }.page-title { font-size: 2.55rem; }.page-description { font-size: 14px; }.market-count { display: none; }
   .portfolio-summary-grid { grid-template-columns: 1fr 1fr; }.metric-block { padding: 20px; }.metric-block:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }.metric-block:nth-child(2) { border-left: 0; }.metric-value { font-size: 1.8rem; }.metric-block:not(.metric-block-primary) .metric-value { font-size: 1.52rem; overflow-wrap: anywhere; }.metric-block p:last-child { line-height: 1.5; }
   .position-row { grid-template-columns: 1fr; padding: 16px 18px; }.surface { border-radius: 20px; }.surface-header { padding: 18px; }.auth-prompt { padding-block: 50px; }

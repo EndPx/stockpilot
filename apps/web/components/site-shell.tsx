@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { activeNavigationSection } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
-import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon } from "./icons";
+import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
 import { PrivyAccountButton } from "./privy/privy-account-button";
 import { isPrivyMode } from "@/lib/privy/config";
@@ -15,6 +15,7 @@ const navigation = [
   { href: "/markets?group=private", label: "Private Markets", icon: PrivateMarketsIcon, section: "private" },
   { href: "/markets?group=public", label: "Public Markets", icon: MarketsIcon, section: "public" },
 ];
+const credentialsNavigation = { href: "/app/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
   return (
@@ -30,6 +31,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const landing = pathname === "/";
   if (pathname === "/sign-in") return <>{children}</>;
+  const privy = isPrivyMode();
+  const appNavigation = privy ? [navigation[0], credentialsNavigation, ...navigation.slice(1)] : navigation;
   const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
   if (landing) {
@@ -56,7 +59,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <aside className="app-sidebar">
         <Brand />
         <nav aria-label="App navigation" className="sidebar-nav">
-          {navigation.map(({ href, label, icon: Icon, section }) => {
+          {appNavigation.map(({ href, label, icon: Icon, section }) => {
             const active = activeSection === section;
             return (
               <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "sidebar-link sidebar-link-active" : "sidebar-link"}>
@@ -68,22 +71,22 @@ export function SiteShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="sidebar-assurance">
           <ShieldIcon className="nav-icon" />
-          {isPrivyMode()
+          {privy
             ? <div><strong>Read-only migration</strong><span>Trading and agent access are off</span></div>
             : <div><strong>Human approval</strong><span>Required for every buy</span></div>}
         </div>
-        <div className="sidebar-wallet">{isPrivyMode() ? <PrivyAccountButton /> : <WalletButton />}</div>
+        <div className="sidebar-wallet">{privy ? <PrivyAccountButton /> : <WalletButton />}</div>
       </aside>
 
       <header className="mobile-app-header">
         <Brand />
-        {isPrivyMode() ? <PrivyAccountButton /> : <WalletButton />}
+        {privy ? <PrivyAccountButton /> : <WalletButton />}
       </header>
 
       <main id="main" className="app-main">{children}</main>
 
-      <nav className="mobile-bottom-nav" aria-label="Mobile app navigation">
-        {navigation.map(({ href, label, icon: Icon, section }) => {
+      <nav className={privy ? "mobile-bottom-nav mobile-bottom-nav-four" : "mobile-bottom-nav"} aria-label="Mobile app navigation">
+        {appNavigation.map(({ href, label, icon: Icon, section }) => {
           const active = activeSection === section;
           return (
             <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>

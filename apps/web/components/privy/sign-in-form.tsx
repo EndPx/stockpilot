@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { exchangePrivySession } from "@/lib/privy/client-session";
 
 export function SignInForm() {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
@@ -18,17 +19,7 @@ export function SignInForm() {
     setStatus("verifying");
     setErrorMessage("");
     try {
-      const token = await getAccessToken();
-      if (!token) throw new Error("Your Privy session is not ready. Try signing in again.");
-      const response = await fetch("/api/auth/privy", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "same-origin",
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-        throw new Error(body?.error?.message ?? "StockPilot could not verify your account.");
-      }
+      await exchangePrivySession(getAccessToken);
       router.replace("/app");
       router.refresh();
     } catch (error) {

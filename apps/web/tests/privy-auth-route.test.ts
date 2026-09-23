@@ -3,7 +3,7 @@ import test from "node:test";
 import { createPrivyAuthPost } from "../app/api/auth/privy/route";
 import { createAuthSession, decodeAuthSession, encodeAuthSession } from "../lib/auth/session";
 import { MemoryAuthSecurityStore } from "../lib/auth/store";
-import { PrivyVerificationError, selectPrimaryEmbeddedSolanaWallet } from "../lib/privy/server";
+import { PrivyVerificationError, PrivyWalletPendingError, selectPrimaryEmbeddedSolanaWallet, waitForPrimaryEmbeddedSolanaWallet } from "../lib/privy/server";
 
 const walletAddress = "11111111111111111111111111111111";
 const secret = "privy-test-only-session-secret-longer-than-32-bytes";
@@ -16,6 +16,33 @@ test("only one primary Privy-owned embedded Solana wallet is authority", () => {
   for (const candidates of [[], [phantom], [additional], [primary, primary], [{ ...primary, address: "invalid" }]]) {
     assert.throws(() => selectPrimaryEmbeddedSolanaWallet(candidates), PrivyVerificationError);
   }
+});
+
+test("wallet provisioning waits briefly without retrying invalid wallet data", async () => {
+  const primary = { type: "wallet", chain_type: "solana", wallet_client_type: "privy", connector_type: "embedded", wallet_index: 0, address: walletAddress };
+  let reads = 0;
+  const delays: number[] = [];
+  const result = await waitForPrimaryEmbeddedSolanaWallet(async () => {
+    reads += 1;
+    return reads < 3 ? [] : [primary];
+  }, async (ms) => { delays.push(ms); });
+  assert.equal(result, walletAddress);
+  assert.equal(reads, 3);
+  assert.deepEqual(delays, [250, 500]);
+
+  reads = 0;
+  await assert.rejects(waitForPrimaryEmbeddedSolanaWallet(async () => {
+    reads += 1;
+    return [];
+  }, async () => {}), PrivyWalletPendingError);
+  assert.equal(reads, 6);
+
+  reads = 0;
+  await assert.rejects(waitForPrimaryEmbeddedSolanaWallet(async () => {
+    reads += 1;
+    return [primary, primary];
+  }, async () => {}), PrivyVerificationError);
+  assert.equal(reads, 1);
 });
 
 test("Privy exchange binds only the verified user's wallet and caps session expiry", async () => {
@@ -72,6 +99,14 @@ test("Privy exchange binds only the verified user's wallet and caps session expi
     }));
     assert.equal(expiredResponse.status, 401);
     assert.equal(expiredResponse.headers.get("set-cookie"), null);
+
+    const pendingPost = createPrivyAuthPost(async () => { throw new PrivyWalletPendingError("wallet provisioning"); }, store);
+    const pendingResponse = await pendingPost(new Request("http://localhost:3000/api/auth/privy", {
+      method: "POST", headers: { origin: "http://localhost:3000", authorization: `Bearer ${"x".repeat(40)}` },
+    }));
+    assert.equal(pendingResponse.status, 503);
+    assert.equal((await pendingResponse.json()).error.code, "AUTH_WALLET_PENDING");
+    assert.equal(pendingResponse.headers.get("set-cookie"), null);
   } finally {
     if (previous.mode === undefined) delete process.env.NEXT_PUBLIC_AUTH_PROVIDER; else process.env.NEXT_PUBLIC_AUTH_PROVIDER = previous.mode;
     if (previous.auth === undefined) delete process.env.AUTH_ENABLED; else process.env.AUTH_ENABLED = previous.auth;

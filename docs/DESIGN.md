@@ -25,8 +25,8 @@ graphite workspace with inset sidebar navigation and a vivid electric-blue
 execution color. Financial data is dense but never theatrical.
 
 Primary journeys are: understand the product, browse official PreStocks and xStocks, inspect
-one asset, connect and authenticate a Solana wallet, review the real on-chain
-portfolio, and explicitly approve a BUY. Human authorization and source clarity
+one asset, sign in through Privy, inspect the verified Solana wallet and real
+on-chain portfolio, and later explicitly approve a BUY. Human authorization and source clarity
 remain more important than decorative polish.
 
 Must not have: copied Paybox assets/copy, fake P&L or historical charts, token
@@ -92,11 +92,17 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   Two editorial market-scope panels distinguish PreStocks private markets from
   live xStocks public discovery. Public execution remains unimplemented.
 - App desktop: fixed 248px navigation rail; the document owns vertical scrolling;
-  content has a 1180px readable maximum and broad breathing room.
+  content has a 1180px readable maximum and broad breathing room. The account
+  capsule is anchored at the rail bottom; its disclosure opens upward within
+  the rail and creates no nested scrollbar (StyleGallery fixed-sidenav-shell +
+  anchored overlay pattern). The email truncates within the capsule, while its
+  full value is available in the disclosure.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
   scrolling and receives safe bottom padding; no nested page scrollers. Bottom
-  navigation has Overview, Private Markets, and Public Markets as three equal
-  44px-or-taller targets; the desktop rail exposes the same destinations.
+  navigation has Overview, Credentials, Private Markets, and Public Markets as
+  four equal 44px-or-taller targets in Privy mode; legacy mode keeps its three
+  destinations. The account disclosure opens below the mobile header, never
+  underneath the fixed navigation.
 - Markets: page-grid/list on desktop, compact market rows on mobile, with an
   optional horizontal reel for source-backed highlights.
 - Asset: supporting-pane layout. Market facts and About are primary; the investment
@@ -114,6 +120,28 @@ After login, show the user-owned embedded Solana address and explain that it is
 new and separate from any previous Phantom address. No transfer, agent grant or
 transaction is triggered by signing in. Keep manual/agent trading disabled until
 their separate migration and acceptance gates pass.
+
+Privy account and credentials revision (2026-09-23): the rail-bottom capsule
+uses the user's actual Google/email identity with a compact initial tile and
+chevron. Its disclosure states the full signed-in identity, links to the
+Credentials view, and offers Sign out; there is no nonfunctional “Sign in on
+mobile” action. The same account control is compact in the mobile header.
+Credentials is a read-only wallet identity page, not a vault: one server-verified
+primary Solana wallet, its full public address, copy action, mainnet label, and
+explorer link. Never provide reveal/export private key, agent grant, funding
+claim, or a fake EVM wallet. Overview repeats the same wallet identity before
+portfolio metrics, including when RPC balances are unavailable. The wallet
+address is taken from the StockPilot server session, not from client-supplied
+identity. Copy feedback is announced to assistive technology. The disclosure
+has closed/open, focus, long-email, mobile and signing-out states; wallet
+identity has loading, authenticated, unavailable, copied and copy-failure
+states.
+
+During first Google sign-in, “authenticated” can precede automatic embedded
+Solana wallet provisioning. Show a truthful finishing state while a bounded
+wallet-only wait completes. If provisioning still has not finished, show a
+specific recoverable message rather than “authentication request invalid”. Do
+not apply automatic retry to investment preparation or execution.
 
 Historical chart extension (2026-09-23): public xStocks and private PreStocks
 details share a quiet, source-backed token-price surface before the existing facts.

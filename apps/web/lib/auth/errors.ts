@@ -8,6 +8,7 @@ const DEFAULT_MESSAGES: Record<AuthErrorCode, string> = {
   AUTH_DOMAIN_MISMATCH: "The sign-in request belongs to a different site.",
   AUTH_REPLAY_DETECTED: "This sign-in request was already used. Request a new one.",
   AUTH_REQUEST_INVALID: "The authentication request is not valid.",
+  AUTH_WALLET_PENDING: "Your Solana wallet is still being created. Please try again shortly.",
   AUTH_DISABLED: "Wallet sign-in is not available on this deployment.",
   AUTH_UNAVAILABLE: "Authentication is temporarily unavailable. Please try again later.",
   AUTH_RATE_LIMITED: "Too many requests. Please wait before trying again.",

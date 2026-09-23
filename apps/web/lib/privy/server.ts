@@ -4,6 +4,7 @@ import { PrivyClient } from "@privy-io/node";
 import { PRIVY_APP_ID } from "./config";
 
 export class PrivyVerificationError extends Error {}
+export class PrivyWalletPendingError extends PrivyVerificationError {}
 
 export type VerifiedPrivyWallet = { userId: string; walletAddress: string; tokenExpiresAt: number };
 
@@ -15,9 +16,26 @@ export function selectPrimaryEmbeddedSolanaWallet(linkedAccounts: unknown): stri
     item.wallet_client_type === "privy" && item.connector_type === "embedded" &&
     item.wallet_index === 0 && typeof item.address === "string"
   );
+  if (wallets.length === 0) throw new PrivyWalletPendingError("Primary embedded Solana wallet is not ready");
   if (wallets.length !== 1) throw new PrivyVerificationError("One primary embedded Solana wallet is required");
   try { return address(wallets[0].address as string).toString(); }
   catch { throw new PrivyVerificationError("Primary Solana wallet address is invalid"); }
+}
+
+/** Privy may finish OAuth before automatic Solana wallet creation is visible to the server. */
+export async function waitForPrimaryEmbeddedSolanaWallet(
+  readLinkedAccounts: () => Promise<unknown>,
+  pause: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<string> {
+  const delaysMs = [250, 500, 750, 1_000, 1_250] as const;
+  for (let attempt = 0; ; attempt += 1) {
+    const linkedAccounts = await readLinkedAccounts();
+    try { return selectPrimaryEmbeddedSolanaWallet(linkedAccounts); }
+    catch (error) {
+      if (!(error instanceof PrivyWalletPendingError) || attempt >= delaysMs.length) throw error;
+    }
+    await pause(delaysMs[attempt]);
+  }
 }
 
 export async function verifyPrivyWallet(accessToken: string): Promise<VerifiedPrivyWallet> {
@@ -33,7 +51,10 @@ export async function verifyPrivyWallet(accessToken: string): Promise<VerifiedPr
   } catch {
     throw new PrivyVerificationError("Invalid Privy access token");
   }
-  const user = await client.users()._get(userId);
-  if (user.id !== userId) throw new PrivyVerificationError("Privy user mismatch");
-  return { userId, walletAddress: selectPrimaryEmbeddedSolanaWallet(user.linked_accounts), tokenExpiresAt };
+  const walletAddress = await waitForPrimaryEmbeddedSolanaWallet(async () => {
+    const user = await client.users()._get(userId);
+    if (user.id !== userId) throw new PrivyVerificationError("Privy user mismatch");
+    return user.linked_accounts;
+  });
+  return { userId, walletAddress, tokenExpiresAt };
 }

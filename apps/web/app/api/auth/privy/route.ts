@@ -5,7 +5,7 @@ import { enforceRateLimit, trustedClientIp } from "@/lib/auth/rate-limit";
 import { createAuthSession, encodeAuthSession, registerAuthSession, toPublicSession } from "@/lib/auth/session";
 import { getAuthSecurityStore, type AuthSecurityStore } from "@/lib/auth/store";
 import { isPrivyMode } from "@/lib/privy/config";
-import { PrivyVerificationError, verifyPrivyWallet, type VerifiedPrivyWallet } from "@/lib/privy/server";
+import { PrivyVerificationError, PrivyWalletPendingError, verifyPrivyWallet, type VerifiedPrivyWallet } from "@/lib/privy/server";
 
 export function createPrivyAuthPost(
   verify: (token: string) => Promise<VerifiedPrivyWallet> = verifyPrivyWallet,
@@ -32,6 +32,7 @@ return async function POST(request: Request): Promise<Response> {
     setSessionCookie(headers, token, config, Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1_000)));
     return jsonResponse(toPublicSession(session), { headers });
   } catch (error) {
+    if (error instanceof PrivyWalletPendingError) return authErrorResponse(new AuthError("AUTH_WALLET_PENDING", 503));
     if (error instanceof PrivyVerificationError) return authErrorResponse(new AuthError("AUTH_REQUEST_INVALID", 401));
     if (!(error instanceof AuthError)) return authErrorResponse(new AuthError("AUTH_UNAVAILABLE", 503));
     return authErrorResponse(error);
