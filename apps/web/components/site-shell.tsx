@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { activeNavigationSection } from "@/lib/market-navigation";
@@ -8,6 +8,7 @@ import { BrandMark } from "./brand-mark";
 import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
 import { PrivyAccountButton } from "./privy/privy-account-button";
+import { MarketLoadingIndicator } from "./market-loading-indicator";
 import { isPrivyMode } from "@/lib/privy/config";
 
 const navigation = [
@@ -16,6 +17,11 @@ const navigation = [
   { href: "/markets?group=public", label: "Public Markets", icon: MarketsIcon, section: "public" },
 ];
 const credentialsNavigation = { href: "/app/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
+
+function MarketNavigationStatus({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+  return pending ? <div className="market-navigation-pending"><MarketLoadingIndicator label={`Loading ${label}`} /></div> : null;
+}
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
   return (
@@ -62,9 +68,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
           {appNavigation.map(({ href, label, icon: Icon, section }) => {
             const active = activeSection === section;
             return (
-              <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "sidebar-link sidebar-link-active" : "sidebar-link"}>
+              <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-label={label} aria-current={active ? "page" : undefined} className={active ? "sidebar-link sidebar-link-active" : "sidebar-link"}>
                 <Icon className="nav-icon" />
                 <span>{label}</span>
+                {(section === "private" || section === "public") && <MarketNavigationStatus label={label} />}
               </Link>
             );
           })}
@@ -89,9 +96,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
         {appNavigation.map(({ href, label, icon: Icon, section }) => {
           const active = activeSection === section;
           return (
-            <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>
+            <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-label={label} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>
               <Icon className="nav-icon" />
               <span>{label}</span>
+              {(section === "private" || section === "public") && <MarketNavigationStatus label={label} />}
             </Link>
           );
         })}

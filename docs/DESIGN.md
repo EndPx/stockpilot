@@ -193,6 +193,17 @@ refresh may serve its previously verified snapshot for at most 30 minutes while 
 single background refresh runs; mark it as cached, never as fresh. A cold public
 fetch still needs all upstream pages and keeps the loading state truthful.
 
+Market transition feedback (2026-09-23): both Private and Public Markets links
+show immediate, centered pending feedback while an unprefetched navigation waits;
+the route's Suspense fallback continues the same feedback while catalog data
+streams. Use the existing cobalt/line tokens for one 40px spinner and a short
+"Loading markets" label, not a fabricated percentage or shimmer. Center the
+indicator in the available main-content viewport (StyleGallery super-center);
+the document remains the only scroll owner and the rail/mobile navigation
+remains usable. The spinner rotates using transform only. Reduced-motion mode
+uses a calm opacity pulse, with the visible label and an accessible status
+announcement present regardless of animation.
+
 Brand identity: use the generated white orbital-S/navigation mark on its opaque
 cobalt tile, not the hero illustration or the former CSS bar mark. Shared BrandMark
 renders at 32px (8px corner radius) in navigation/footer and 56px (16px radius) in
