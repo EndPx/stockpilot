@@ -1,25 +1,29 @@
 # Privy-only identity and wallet migration
 
-Decision: Privy is the target login and Solana wallet for StockPilot. Google is
-the primary sign-in method. Phantom/Wallet Standard sign-in is removed at the
-production cutover, not silently replaced on the live site before Privy works.
-This document describes the target; the current deployment still uses SIWS and
-has investment and agent execution disabled.
+Decision: Privy is the login and Solana wallet for StockPilot. Google is the
+primary sign-in method. Phantom/Wallet Standard sign-in was removed from the
+live app at the Privy cutover. Investment and agent execution remain disabled.
 
 ## Current implementation checkpoint (2026-09-23)
 
-The repository now has a guarded Privy mode (`NEXT_PUBLIC_AUTH_PROVIDER=privy`):
+The repository has a guarded Privy mode (`NEXT_PUBLIC_AUTH_PROVIDER=privy`):
 the two-panel `/sign-in` surface, Google/email Privy modal, automatic primary
 Solana embedded wallet creation, server-side access-token verification, a
 strict primary-wallet lookup, a short-lived StockPilot cookie and read-only
 portfolio path. The old SIWS challenge/verify endpoints and legacy Jupiter
-investment routes are disabled in Privy mode. The mode is **not yet the live
-deployment**.
+investment routes are disabled in Privy mode. Release `eb2871c` is live at
+`stockpilot.endpx.cloud`; the previous `660f853` image and a protected copy of
+the prior runtime configuration remain available for rollback.
 
-Local verification: web tests 99/99 and the production build pass. The
+Local verification: 210 tests and the production build pass. The
 production dependency audit has no high or critical findings after pinning
 vulnerable transitive `ws` 8.x releases to 8.21.3; three moderate findings
-remain. This is not a substitute for real-login or funded-wallet acceptance.
+remain. The VPS image build, isolated-container smoke test, public HTTPS health,
+sign-in rendering, disabled legacy auth and investment endpoints, unauthenticated
+portfolio rejection, and security headers passed. Google OAuth reached the
+Google account chooser in the user's browser. **Post-login session and wallet
+acceptance are still pending the user's account selection**; no transaction has
+been attempted.
 
 Privy Dashboard now has Google login enabled, external-wallet login disabled,
 and automatic wallet creation restricted to Solana. Its allowed origins are
@@ -29,16 +33,14 @@ testing; OAuth return URLs are restricted to `/sign-in` on those three origins.
 These settings were verified after a dashboard reload. The shared Google Cloud
 OAuth project was deliberately left unchanged because it has other OAuth
 clients, unrelated consent branding and Testing status. Privy's built-in Google
-OAuth is used instead. `PRIVY_APP_SECRET` is intentionally absent from source
-and must be installed only in the protected server environment. Until the
-secret and a real Google login are verified, `/sign-in` shows an unavailable
-state instead of inviting a user into a broken login. No existing Phantom
-funds move to the new wallet.
+OAuth is used instead. `PRIVY_APP_SECRET` is absent from source and installed
+only in the root-owned, mode-`0600` server runtime file. A missing secret makes
+`/sign-in` unavailable. No existing Phantom funds move to the new wallet.
 
-Before production cutover, remove the two localhost origins and redirect URLs,
-review Privy HttpOnly-cookie and MFA options against the implemented session
-flow, and upgrade the Privy app from development mode (150-user testing limit).
-None of those production changes is implied by enabling Google login today.
+Before expanding beyond the current limited production beta, remove the two
+localhost origins and redirect URLs and review Privy HttpOnly-cookie and MFA
+options against the implemented session flow. The user accepted leaving the
+Privy app in development mode with its 150-user limit for now.
 
 ## Account and wallet boundaries
 
@@ -96,8 +98,9 @@ fail closed rather than dropping the address restriction.
    Google login. Put the public app ID in client configuration and secrets only
    in protected server configuration; never commit or paste secrets in chat.
 2. Implement Privy-only sign-in, verified session, wallet creation/selection,
-   logout and portfolio read in an isolated release. Preserve the current live
-   deployment until Google login and the new wallet are accepted in a browser.
+   logout and portfolio read in an isolated release. The live cutover was made
+   at the user's request with rollback available; finish real Google login and
+   new-wallet browser acceptance before funding or enabling execution.
 3. Implement and test manual BUY and SELL with the embedded wallet and the
    complete transaction validator/reconciliation. Keep execution disabled until
    small mainnet acceptance on the new wallet.
