@@ -73,16 +73,17 @@ function PreparingLabel({ workflow }: { workflow: Workflow }) {
   return <>{label}</>;
 }
 
-function AuthenticatedInvestmentForm({
-  account,
+export function InvestmentForm({
+  connectedWalletAddress,
   asset,
   sessionWalletAddress,
+  sign,
 }: {
-  account: ConnectedAccount;
+  connectedWalletAddress: string;
   asset: InvestmentAsset;
   sessionWalletAddress: string;
+  sign: (transaction: Uint8Array) => Promise<Uint8Array>;
 }) {
-  const signTransaction = useSignTransaction(account, SOLANA_CHAIN);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const reviewButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -162,9 +163,9 @@ function AuthenticatedInvestmentForm({
     try {
       const result = await runInvestmentApproval({
         prepared,
-        connectedWalletAddress: account.address,
+        connectedWalletAddress,
         sessionWalletAddress,
-        sign: async (transaction) => (await signTransaction({ transaction })).signedTransaction,
+        sign,
         execute: executeSigned,
         refreshPortfolio: () => loadPortfolio(),
       });
@@ -300,6 +301,24 @@ function AuthenticatedInvestmentForm({
   );
 }
 
+function LegacyAuthenticatedInvestmentForm({
+  account,
+  asset,
+  sessionWalletAddress,
+}: {
+  account: ConnectedAccount;
+  asset: InvestmentAsset;
+  sessionWalletAddress: string;
+}) {
+  const signTransaction = useSignTransaction(account, SOLANA_CHAIN);
+  return <InvestmentForm
+    connectedWalletAddress={account.address}
+    asset={asset}
+    sessionWalletAddress={sessionWalletAddress}
+    sign={async (transaction) => (await signTransaction({ transaction })).signedTransaction}
+  />;
+}
+
 export function InvestmentPanel({ asset }: { asset: InvestmentAsset }) {
   const auth = useAuth();
   const connected = useConnectedWallet(solanaClient);
@@ -330,7 +349,7 @@ export function InvestmentPanel({ asset }: { asset: InvestmentAsset }) {
         ) : !transactionCapable ? (
           <p role="alert" className="investment-error mt-0">This wallet cannot sign the versioned Solana transaction required for this investment.</p>
         ) : (
-          <AuthenticatedInvestmentForm
+          <LegacyAuthenticatedInvestmentForm
             account={connected.account}
             asset={asset}
             sessionWalletAddress={auth.sessionWalletAddress!}

@@ -7,7 +7,9 @@ import { MarketChart } from "@/components/market-chart";
 import { DataStatus } from "@/components/data-status";
 import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { InvestmentPanel } from "@/components/investment-panel";
+import { PrivyInvestmentPanel } from "@/components/privy/privy-investment-panel";
 import { investmentsEnabled } from "@/lib/investments/config";
+import { isPrivyMode } from "@/lib/privy/config";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
 import { formatUsd, formatValuation } from "@/lib/format";
@@ -80,7 +82,9 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
           </section>
         </div>
 
-        {investmentsEnabled() ? <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} /> : (
+        {investmentsEnabled() ? (isPrivyMode()
+          ? <PrivyInvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
+          : <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />) : (
           <aside className="surface p-6"><p className="eyebrow">Read-only release</p><h2 className="mt-3">Investments are not enabled</h2><p className="mt-4 text-muted">Explore official market data and verified wallet holdings. This deployment cannot prepare or submit investment transactions.</p></aside>
         )}
       </div>

@@ -285,6 +285,11 @@ loading balance, invalid amount, insufficient balance, preparing, review, signin
 submitting, confirming, rejection, expired order, failure, and confirmed states.
 `Approve in Wallet` is the only signing action. Success requires Jupiter execution,
 shows actual input/output, links to Solscan, and refreshes the portfolio from chain.
+The Privy manual-BUY implementation reuses this existing review surface and its
+states. Wallet discovery must select exactly the server-session Solana address,
+never the first connected wallet. While the Privy execution kill switch remains
+closed, the production detail page continues to show the truthful read-only panel;
+no inactive BUY control is shown.
 
 ## 6. Interaction and motion
 

@@ -30,6 +30,13 @@ The next manual-BUY implementation is not a flag flip. The legacy signing UI
 uses Wallet Standard, while Privy exposes a Solana `useSignTransaction` method
 that returns signed transaction bytes. Its route must bind the Privy-selected
 wallet to the active server session and preserve user review and wallet approval.
+The first code checkpoint now includes a Privy signer adapter and panel that reuse
+the existing manual review flow. The client selects the one wallet matching the
+server-verified primary wallet, requests a mainnet sign-only transaction through
+Privy, and submits the returned wire bytes only through the existing execution
+API. Unit tests cover wallet selection and malformed signing results. This code
+is deliberately unreachable on the current production page because both Privy
+investment endpoints remain disabled; it is not a mainnet acceptance result.
 Before either investment endpoint can be enabled in Privy mode, add an
 instruction-level validator for the prepared Jupiter transaction (including
 resolved address lookup tables), durable submission/idempotency and ambiguous
