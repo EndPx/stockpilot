@@ -3,6 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { activeNavigationSection } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
 import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
@@ -20,7 +21,11 @@ const credentialsNavigation = { href: "/app/credentials", label: "Credentials", 
 
 function MarketNavigationStatus({ label }: { label: string }) {
   const { pending } = useLinkStatus();
-  return pending ? <div className="market-navigation-pending"><MarketLoadingIndicator label={`Loading ${label}`} /></div> : null;
+  if (!pending || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="market-navigation-pending"><MarketLoadingIndicator label={`Loading ${label}`} /></div>,
+    document.body,
+  );
 }
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
