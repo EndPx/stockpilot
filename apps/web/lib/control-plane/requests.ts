@@ -4,7 +4,7 @@ import { parseUsdcAmount } from "@stockpilot/core/investments";
 import { SOLANA_MAINNET_USDC_MINT } from "@stockpilot/core/solana";
 import { assertAssetIdentity, type InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import { marketRegistry } from "@/lib/markets";
-import { controlStore, type ControlStore } from "./db";
+import { controlStore, type ControlQuery, type ControlStore } from "./db";
 import type { AgentPrincipal } from "./credentials";
 
 export type RequestStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXPIRED" | "CANCELLED" | "BLOCKED";
@@ -27,7 +27,7 @@ export type InvestmentRequestRecord = {
   decidedAt: string | null;
 };
 
-type RequestRow = {
+export type RequestRow = {
   id: string; client_id: string; asset_id: string; asset_name: string; asset_symbol: string;
   provider: "prestocks"; market_type: "PRE_IPO"; canonical_mint: string; funding_mint: string;
   amount_usd: string; policy_version: number; policy_max_investment_usd: string;
@@ -51,6 +51,86 @@ export function normalizeRequest(row: RequestRow): InvestmentRequestRecord {
     status: row.status, createdAt: row.created_at.toISOString(),
     expiresAt: row.expires_at.toISOString(), decidedAt: row.decided_at?.toISOString() ?? null,
   };
+}
+
+export async function expirePendingRequests(db: ControlQuery, accountId: string, clientId?: string): Promise<void> {
+  const expired = await db.query<{ id: string; client_id: string }>(
+    `UPDATE control_investment_requests
+     SET status = 'EXPIRED', decided_at = now()
+     WHERE account_id = $1 AND ($2::uuid IS NULL OR client_id = $2)
+       AND status = 'PENDING_APPROVAL' AND expires_at <= now()
+     RETURNING id, client_id`, [accountId, clientId ?? null],
+  );
+  for (const row of expired.rows) {
+    await db.query(
+      `INSERT INTO control_activity_events(id, account_id, client_id, request_id, event_type, actor_type)
+       VALUES ($1, $2, $3, $4, 'APPROVAL_EXPIRED', 'SYSTEM')`,
+      [randomUUID(), accountId, row.client_id, row.id],
+    );
+  }
+}
+
+export async function getClientRequest(principal: AgentPrincipal, requestId: string, store: ControlStore = controlStore): Promise<InvestmentRequestRecord> {
+  if (!/^[0-9a-f-]{36}$/.test(requestId)) throw new RequestError("REQUEST_NOT_FOUND", "Request not found.");
+  return store.transaction(async (db) => {
+    await expirePendingRequests(db, principal.accountId, principal.clientId);
+    const result = await db.query<RequestRow>(
+      `SELECT r.* FROM control_investment_requests r
+       JOIN control_credentials k ON k.client_id = r.client_id
+       JOIN control_clients c ON c.id = r.client_id
+       JOIN control_grant_policies p ON p.client_id = c.id
+       WHERE r.id = $1 AND r.account_id = $2 AND r.client_id = $3
+         AND k.id = $4 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
+         AND c.status = 'ACTIVE' AND c.revoked_at IS NULL
+         AND (c.expires_at IS NULL OR c.expires_at > now())
+         AND 'requests:read-own' = ANY(p.scopes)`,
+      [requestId, principal.accountId, principal.clientId, principal.credentialId],
+    );
+    if (!result.rows.length) throw new RequestError("REQUEST_NOT_FOUND", "Request not found.");
+    return normalizeRequest(result.rows[0]);
+  });
+}
+
+export async function listClientRequests(principal: AgentPrincipal, limit = 25, before?: string, store: ControlStore = controlStore): Promise<{
+  requests: InvestmentRequestRecord[]; nextCursor: string | null;
+}> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new RequestError("INVALID_INPUT", "Invalid page size.");
+  let cursor: { createdAt: string; id: string } | null = null;
+  if (before) {
+    try {
+      if (before.length > 300 || !/^[A-Za-z0-9_-]+$/.test(before)) throw new Error();
+      const parsed = JSON.parse(Buffer.from(before, "base64url").toString("utf8"));
+      if (typeof parsed.createdAt !== "string" || !Number.isFinite(Date.parse(parsed.createdAt)) ||
+          typeof parsed.id !== "string" || !/^[0-9a-f-]{36}$/.test(parsed.id)) throw new Error();
+      cursor = parsed;
+    } catch { throw new RequestError("INVALID_INPUT", "Invalid request cursor."); }
+  }
+  return store.transaction(async (db) => {
+    await expirePendingRequests(db, principal.accountId, principal.clientId);
+    const rows = await db.query<RequestRow>(
+      `SELECT r.* FROM control_investment_requests r
+       JOIN control_credentials k ON k.client_id = r.client_id
+       JOIN control_clients c ON c.id = r.client_id
+       JOIN control_grant_policies p ON p.client_id = c.id
+       WHERE r.account_id = $1 AND r.client_id = $2 AND k.id = $3
+         AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
+         AND c.status = 'ACTIVE' AND c.revoked_at IS NULL
+         AND (c.expires_at IS NULL OR c.expires_at > now())
+         AND 'requests:read-own' = ANY(p.scopes)
+         AND ($4::timestamptz IS NULL OR (r.created_at, r.id) < ($4::timestamptz, $5::uuid))
+       ORDER BY r.created_at DESC, r.id DESC LIMIT $6`,
+      [principal.accountId, principal.clientId, principal.credentialId,
+        cursor?.createdAt ?? null, cursor?.id ?? null, limit + 1],
+    );
+    const page = rows.rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      requests: page.map(normalizeRequest),
+      nextCursor: rows.rows.length > limit && last
+        ? Buffer.from(JSON.stringify({ createdAt: last.created_at.toISOString(), id: last.id })).toString("base64url")
+        : null,
+    };
+  });
 }
 
 export type AssetResolver = (assetId: string) => Promise<{ asset: InvestmentAsset | null; stale: boolean }>;

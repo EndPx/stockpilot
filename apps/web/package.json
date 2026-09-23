@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts tests/control-plane-migration.test.ts && tsx --conditions=react-server --test tests/control-plane-clients.test.ts tests/control-plane-credentials.test.ts tests/control-plane-policies.test.ts tests/control-plane-requests.test.ts tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
+    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts tests/control-plane-migration.test.ts && tsx --conditions=react-server --test tests/control-plane-clients.test.ts tests/control-plane-credentials.test.ts tests/control-plane-policies.test.ts tests/control-plane-requests.test.ts tests/control-plane-approvals.test.ts tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
     "validate:portfolio-read": "tsx --conditions=react-server scripts/validate-portfolio-read.ts",
     "doctor": "npx react-doctor@latest",
     "migrate:control-plane": "node scripts/migrate-control-plane.mjs"
