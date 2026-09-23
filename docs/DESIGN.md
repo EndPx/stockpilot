@@ -116,6 +116,12 @@ Google primary action and email fallback using the Privy modal. The email field
 prefills the real Privy flow, not a parallel StockPilot password form. Buttons
 retain 44px targets and idle, busy, disabled and error states. If Privy is not
 configured, show a truthful unavailable state rather than a dead submit button.
+In Privy mode, direct visits and client navigation to Overview, Credentials,
+Private Markets, Public Markets and asset details require an active server
+session. Unauthenticated or expired sessions redirect to `/sign-in` with a
+validated same-site return path. Landing and sign-in remain public; read-only
+market APIs retain their separate public contract. A temporary session-store
+failure fails closed with an unavailable response, not a misleading login loop.
 After login, show the user-owned embedded Solana address and explain that it is
 new and separate from any previous Phantom address. No transfer, agent grant or
 transaction is triggered by signing in. Keep manual/agent trading disabled until

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { exchangePrivySession } from "@/lib/privy/client-session";
 
-export function SignInForm() {
+export function SignInForm({ returnTo }: { returnTo: string }) {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -20,7 +20,7 @@ export function SignInForm() {
     setErrorMessage("");
     try {
       await exchangePrivySession(getAccessToken);
-      router.replace("/app");
+      router.replace(returnTo);
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Sign-in failed. Please try again.");
