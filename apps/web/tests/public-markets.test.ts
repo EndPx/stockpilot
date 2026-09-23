@@ -3,7 +3,7 @@ import test from "node:test";
 import { createAssetsGet } from "../app/api/assets/route";
 import { createMarketsGet } from "../app/api/markets/route";
 import { parseMarketInputs, marketHref } from "../lib/market-inputs";
-import { activeNavigationSection } from "../lib/market-navigation";
+import { activeNavigationSection, marketSectionLabels } from "../lib/market-navigation";
 import { RegistryQueryError } from "@stockpilot/core/asset-registry";
 
 test("public discovery API has bounded filters and no authentication or execution side effects", async () => {
@@ -26,6 +26,7 @@ test("invalid market requests return 400 before provider reads; outages remain 5
   assert.equal((await invalidCursor(new Request("http://localhost/api/markets?cursor=bad"))).status, 400);
 });
 test("market navigation keeps query/filter while resetting cursors", () => {
+  assert.deepEqual(marketSectionLabels, { private: "Pre-IPO", public: "Stocks" });
   assert.equal(marketHref(parseMarketInputs({ q: "NVIDIA", group: "public", cursor: "old" })), "/markets?q=NVIDIA&group=public");
   assert.equal(activeNavigationSection("/markets", null), "private");
   assert.equal(activeNavigationSection("/markets", "private"), "private");

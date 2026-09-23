@@ -4,7 +4,7 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { activeNavigationSection } from "@/lib/market-navigation";
+import { activeNavigationSection, marketSectionLabels } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
 import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
@@ -14,8 +14,8 @@ import { isPrivyMode } from "@/lib/privy/config";
 
 const navigation = [
   { href: "/app", label: "Overview", icon: OverviewIcon, section: "overview" },
-  { href: "/markets?group=private", label: "Private Markets", icon: PrivateMarketsIcon, section: "private" },
-  { href: "/markets?group=public", label: "Public Markets", icon: MarketsIcon, section: "public" },
+  { href: "/markets?group=private", label: marketSectionLabels.private, icon: PrivateMarketsIcon, section: "private" },
+  { href: "/markets?group=public", label: marketSectionLabels.public, icon: MarketsIcon, section: "public" },
 ];
 const credentialsNavigation = { href: "/app/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
 

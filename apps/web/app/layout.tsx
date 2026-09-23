@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "StockPilot", template: "%s | StockPilot" },
-  description: "Explore tokenized public and private markets on Solana through official PreStocks and xStocks catalogs. Discovery is live; agent controls are in development.",
+  description: "Explore Stocks and Pre-IPO tokenized products on Solana through official xStocks and PreStocks catalogs. Discovery is live; agent controls are in development.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

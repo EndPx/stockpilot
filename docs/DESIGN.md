@@ -89,8 +89,8 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   No landing wallet control, Markets link or Portfolio link in the header.
   Display type is 52–96px desktop, 44–60px mobile; body copy remains legible over a
   dark image scrim. Decorative image has empty alt and responsive optimized output.
-  Two editorial market-scope panels distinguish PreStocks private markets from
-  live xStocks public discovery. Public execution remains unimplemented.
+  Two editorial market-scope panels distinguish Pre-IPO (sourced from PreStocks)
+  from Stocks (live xStocks discovery). Public execution remains unimplemented.
 - App desktop: fixed 248px navigation rail; the document owns vertical scrolling;
   content has a 1180px readable maximum and broad breathing room. The account
   capsule is anchored at the rail bottom; its disclosure opens upward within
@@ -99,7 +99,7 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   full value is available in the disclosure.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
   scrolling and receives safe bottom padding; no nested page scrollers. Bottom
-  navigation has Overview, Credentials, Private Markets, and Public Markets as
+  navigation has Overview, Credentials, Pre-IPO, and Stocks as
   four equal 44px-or-taller targets in Privy mode; legacy mode keeps its three
   destinations. The account disclosure opens below the mobile header, never
   underneath the fixed navigation.
@@ -117,7 +117,7 @@ prefills the real Privy flow, not a parallel StockPilot password form. Buttons
 retain 44px targets and idle, busy, disabled and error states. If Privy is not
 configured, show a truthful unavailable state rather than a dead submit button.
 In Privy mode, direct visits and client navigation to Overview, Credentials,
-Private Markets, Public Markets and asset details require an active server
+Pre-IPO, Stocks and asset details require an active server
 session. Unauthenticated or expired sessions redirect to `/sign-in` with a
 validated same-site return path. Landing and sign-in remain public; read-only
 market APIs retain their separate public contract. A temporary session-store
@@ -193,8 +193,9 @@ Product copy distinguishes live public discovery from unimplemented public execu
 and future agents. Both market-scope panels may link to their live filtered catalogs.
 
 Market navigation revision (2026-09-23): replace the in-page All/Private/Public
-switcher with separate Private Markets and Public Markets rail/bottom destinations.
-Plain `/markets` opens Private Markets to avoid making the eight-asset private
+switcher with separate Pre-IPO and Stocks rail/bottom destinations. These are
+the user-facing names; `private` and `public` remain stable internal group keys.
+Plain `/markets` opens Pre-IPO to avoid making the eight-asset private
 journey wait on the large public catalog. Each page title, count, search form,
 pagination and empty/loading copy names its current source. Keep the established
 30-result keyset pagination and official provider identity checks. Active navigation
@@ -203,7 +204,7 @@ refresh may serve its previously verified snapshot for at most 30 minutes while 
 single background refresh runs; mark it as cached, never as fresh. A cold public
 fetch still needs all upstream pages and keeps the loading state truthful.
 
-Market transition feedback (2026-09-23): both Private and Public Markets links
+Market transition feedback (2026-09-23): both Pre-IPO and Stocks links
 show immediate, centered pending feedback while an unprefetched navigation waits;
 the route's Suspense fallback continues the same feedback while catalog data
 streams. Use the existing cobalt/line tokens for one 40px spinner and a short

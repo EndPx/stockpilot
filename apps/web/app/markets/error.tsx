@@ -9,7 +9,7 @@ export default function MarketsError({ retry }: { error: Error & { digest?: stri
       <p className="mt-4 max-w-xl leading-7 text-muted">Market data is temporarily unavailable. Try again in a moment.</p>
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <button type="button" className="button" onClick={() => retry()}>Try Again</button>
-        <Link href="/markets" className="secondary-button">Back to Markets</Link>
+        <Link href="/markets" className="secondary-button">Back to Pre-IPO</Link>
       </div>
     </section>
   );

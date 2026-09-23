@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowUpRightIcon } from "@/components/icons";
 import orbital from "@/public/images/stockpilot-orbital.png";
 import { investmentsEnabled } from "@/lib/investments/config";
+import { marketSectionLabels } from "@/lib/market-navigation";
 
 export default function HomePage() {
   const canInvest = investmentsEnabled();
@@ -20,7 +21,7 @@ export default function HomePage() {
             <Link href="/app" className="button button-light">Open the app <ArrowUpRightIcon /></Link>
             <a href="#market-scope" className="hero-secondary">Discover StockPilot <span aria-hidden="true">↓</span></a>
           </div>
-          <p className="hero-stage">Discover public and private markets today.<br />Agent controls are in development. {canInvest ? "Public-market execution is not enabled." : "Investment execution is currently disabled."}</p>
+          <p className="hero-stage">Discover Stocks and Pre-IPO today.<br />Agent controls are in development. {canInvest ? "Public-market execution is not enabled." : "Investment execution is currently disabled."}</p>
         </div>
         <div className="hero-caption" aria-hidden="true"><span>STOCKPILOT / 01</span><span>A human at the center.</span></div>
       </section>
@@ -31,18 +32,18 @@ export default function HomePage() {
         <p>From private-company exposure to tokenized public-market products. One focused experience, with the source of every asset made clear.</p>
       </section>
 
-      <section className="market-scope" aria-label="Public and private market discovery">
+      <section className="market-scope" aria-label="Stocks and Pre-IPO discovery">
         <article className="scope-private">
-          <div className="scope-heading"><span>Private markets</span><span className="scope-status"><i /> Live catalog</span></div>
+          <div className="scope-heading"><span>{marketSectionLabels.private}</span><span className="scope-status"><i /> Live catalog</span></div>
           <h3>Before the<br />opening bell.</h3>
           <p>Explore pre-IPO exposure through official PreStocks. Every private-market asset in StockPilot comes exclusively from PreStocks.</p>
-          <Link href="/markets?group=private" className="text-link">Explore PreStocks <ArrowUpRightIcon /></Link>
+          <Link href="/markets?group=private" className="text-link">Explore {marketSectionLabels.private} <ArrowUpRightIcon /></Link>
         </article>
         <article className="scope-public">
-          <div className="scope-heading"><span>Public markets</span><span className="scope-status">Live discovery</span></div>
+          <div className="scope-heading"><span>{marketSectionLabels.public}</span><span className="scope-status">Live discovery</span></div>
           <h3>Beyond the<br />traditional ticker.</h3>
           <p>Explore the official xStocks public-market catalog. Classification is shown where verified; discovery does not mean a product is ready to trade.</p>
-          <Link href="/markets?group=public" className="text-link">Explore xStocks <ArrowUpRightIcon /></Link>
+          <Link href="/markets?group=public" className="text-link">Explore {marketSectionLabels.public} <ArrowUpRightIcon /></Link>
         </article>
       </section>
 

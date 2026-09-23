@@ -8,7 +8,8 @@ import { MarketChart } from "@/components/market-chart";
 import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { getPublicMarket } from "@/lib/markets";
 import { marketLabels } from "@/lib/market-inputs";
-export const metadata: Metadata = { title: "Public market product" };
+import { marketSectionLabels } from "@/lib/market-navigation";
+export const metadata: Metadata = { title: "Stock details" };
 export const dynamic = "force-dynamic";
 
 export default async function PublicMarketPage({ params }: { params: Promise<{ mint: string }> }) {
@@ -16,12 +17,12 @@ export default async function PublicMarketPage({ params }: { params: Promise<{ m
   if (!isAddress(mint)) notFound();
   let result;
   try { result = await getPublicMarket(mint); } catch {
-    return <section className="surface empty-surface"><h1 className="page-title">Product temporarily unavailable</h1><p>We could not verify the current issuer catalog. No transaction was requested.</p><Link href="/markets?group=public" className="secondary-button mt-5">Back to Public Markets</Link></section>;
+    return <section className="surface empty-surface"><h1 className="page-title">Product temporarily unavailable</h1><p>We could not verify the current issuer catalog. No transaction was requested.</p><Link href="/markets?group=public" className="secondary-button mt-5">Back to {marketSectionLabels.public}</Link></section>;
   }
   const { asset, stale } = result;
   if (!asset) notFound();
   return <div className="asset-page public-asset-page">
-    <Link href="/markets?group=public" className="back-link"><ArrowLeftIcon /> Public Markets</Link>
+    <Link href="/markets?group=public" className="back-link"><ArrowLeftIcon /> {marketSectionLabels.public}</Link>
     <header className="asset-hero"><div className="asset-identity"><AssetLogo imageUrl={asset.imageUrl} symbol={asset.symbol} large /><div><p className="eyebrow">{asset.symbol} / xStocks</p><h1>{asset.name}</h1></div></div><span className="catalog-status">Official issuer catalog</span></header>
     <div className="asset-layout">
       <div className="asset-primary">

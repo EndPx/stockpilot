@@ -11,8 +11,9 @@ import { investmentsEnabled } from "@/lib/investments/config";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
 import { formatUsd, formatValuation } from "@/lib/format";
+import { marketSectionLabels } from "@/lib/market-navigation";
 
-export const metadata: Metadata = { title: "Asset details" };
+export const metadata: Metadata = { title: "Pre-IPO details" };
 export const dynamic = "force-dynamic";
 
 export default async function AssetPage({ params }: { params: Promise<{ symbol: string }> }) {
@@ -27,7 +28,7 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
 
   return (
     <div className="asset-page">
-      <Link href="/markets?group=private" className="back-link"><ArrowLeftIcon /> Private Markets</Link>
+      <Link href="/markets?group=private" className="back-link"><ArrowLeftIcon /> {marketSectionLabels.private}</Link>
 
       <header className="asset-hero">
         <div className="asset-identity">
