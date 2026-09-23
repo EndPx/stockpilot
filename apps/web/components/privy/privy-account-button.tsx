@@ -68,7 +68,7 @@ export function PrivyAccountButton() {
         <p className="privy-account-caption">Signed in as</p>
         <p className="privy-account-email">{email}</p>
         {address && <p className="privy-account-wallet"><WalletIcon /> {`${address.slice(0, 4)}…${address.slice(-4)}`}</p>}
-        <Link href="/app/credentials" className="privy-account-option" onClick={() => { if (disclosure.current) disclosure.current.open = false; }}>
+        <Link href="/credentials" className="privy-account-option" onClick={() => { if (disclosure.current) disclosure.current.open = false; }}>
           <WalletIcon /> View credentials
         </Link>
         <button type="button" className="privy-account-option" disabled={busy} onClick={() => void signOut()}>

@@ -49,3 +49,15 @@ export function CheckIcon(props: IconProps) {
 export function SparkIcon(props: IconProps) {
   return <IconFrame {...props}><path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3Z" /><path d="m18.5 16 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z" /></IconFrame>;
 }
+
+export function AgentIcon(props: IconProps) {
+  return <IconFrame {...props}><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6" /></IconFrame>;
+}
+
+export function ActivityIcon(props: IconProps) {
+  return <IconFrame {...props}><path d="M3 12h4l2-5 4 10 2-5h6" /></IconFrame>;
+}
+
+export function MoreIcon(props: IconProps) {
+  return <IconFrame {...props}><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></IconFrame>;
+}

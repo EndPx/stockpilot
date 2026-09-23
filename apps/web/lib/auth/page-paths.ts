@@ -1,6 +1,9 @@
 export function isProtectedPage(pathname: string): boolean {
   return pathname === "/app" || pathname.startsWith("/app/") ||
-    pathname === "/markets" || pathname.startsWith("/markets/");
+    pathname === "/markets" || pathname.startsWith("/markets/") ||
+    ["/clients", "/credentials", "/approvals", "/activity"].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
 }
 
 /** Only app-local page paths may be passed to the client router after sign-in. */

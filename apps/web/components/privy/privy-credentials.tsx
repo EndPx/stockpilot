@@ -11,7 +11,7 @@ type CredentialState =
   | { kind: "ready"; walletAddress: string }
   | { kind: "error"; message: string };
 
-export function PrivyCredentials() {
+export function PrivyCredentials({ embedded = false }: { embedded?: boolean }) {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const [state, setState] = useState<CredentialState>({ kind: "loading" });
   const [retry, setRetry] = useState(0);
@@ -34,7 +34,7 @@ export function PrivyCredentials() {
 
   return (
     <div className="dashboard-stack">
-      <header className="app-page-header"><div><h1 className="page-title">Credentials</h1><p className="page-description">Your verified Solana wallet identity. Only its public address is shown here.</p></div></header>
+      {embedded ? <h2 className="control-section-title">Your Solana wallet</h2> : <header className="app-page-header"><div><h1 className="page-title">Credentials</h1><p className="page-description">Your verified Solana wallet identity. Only its public address is shown here.</p></div></header>}
       {!ready || (authenticated && state.kind === "loading") ? (
         <section className="surface credential-state" role="status">Checking your Solana wallet…</section>
       ) : !authenticated ? (

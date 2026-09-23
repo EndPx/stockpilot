@@ -18,6 +18,7 @@ function request(path: string, token?: string): NextRequest {
 test("return path only accepts protected same-origin pages", () => {
   assert.equal(safeReturnPath("/markets?group=public&q=TSLA"), "/markets?group=public&q=TSLA");
   assert.equal(safeReturnPath("/app/credentials"), "/app/credentials");
+  assert.equal(safeReturnPath("/approvals?status=PENDING_APPROVAL"), "/approvals?status=PENDING_APPROVAL");
   for (const target of ["https://evil.example/", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/sign-in", "/application", "/markets-other", ["/app"], undefined]) {
     assert.equal(safeReturnPath(target), "/app");
   }
@@ -40,7 +41,7 @@ test("Privy page guard redirects guests, rejects bad sessions and admits active 
     assert.equal(await guardPrivyPage(request("/sign-in"), store), null);
     assert.equal(await guardPrivyPage(request("/api/markets"), store), null);
 
-    for (const path of ["/app", "/app/credentials", "/markets?group=public", "/markets/xstocks/ABC"]) {
+    for (const path of ["/app", "/app/credentials", "/markets?group=public", "/markets/xstocks/ABC", "/clients", "/credentials", "/approvals", "/activity"]) {
       const response = await guardPrivyPage(request(path), store);
       assert.equal(response?.status, 307);
       const location = new URL(response?.headers.get("location") ?? "");

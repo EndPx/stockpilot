@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { activeNavigationSection, marketSectionLabels } from "@/lib/market-navigation";
 import { BrandMark } from "./brand-mark";
-import { MarketsIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
+import { ActivityIcon, AgentIcon, CheckIcon, MarketsIcon, MoreIcon, OverviewIcon, PrivateMarketsIcon, ShieldIcon, WalletIcon } from "./icons";
 import { WalletButton } from "./wallet/wallet-button";
 import { PrivyAccountButton } from "./privy/privy-account-button";
 import { MarketLoadingIndicator } from "./market-loading-indicator";
@@ -17,7 +17,10 @@ const navigation = [
   { href: "/markets?group=private", label: marketSectionLabels.private, icon: PrivateMarketsIcon, section: "private" },
   { href: "/markets?group=public", label: marketSectionLabels.public, icon: MarketsIcon, section: "public" },
 ];
-const credentialsNavigation = { href: "/app/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
+const credentialsNavigation = { href: "/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
+const clientNavigation = { href: "/clients", label: "Agents", icon: AgentIcon, section: "clients" };
+const approvalsNavigation = { href: "/approvals", label: "Approvals", icon: CheckIcon, section: "approvals" };
+const activityNavigation = { href: "/activity", label: "Activity", icon: ActivityIcon, section: "activity" };
 
 function MarketNavigationStatus({ label }: { label: string }) {
   const { pending } = useLinkStatus();
@@ -43,7 +46,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const landing = pathname === "/";
   if (pathname === "/sign-in") return <>{children}</>;
   const privy = isPrivyMode();
-  const appNavigation = privy ? [navigation[0], credentialsNavigation, ...navigation.slice(1)] : navigation;
+  const appNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation, credentialsNavigation, approvalsNavigation, activityNavigation] : navigation;
+  const mobileNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation] : navigation;
   const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
   if (landing) {
@@ -84,7 +88,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="sidebar-assurance">
           <ShieldIcon className="nav-icon" />
           {privy
-            ? <div><strong>Read-only migration</strong><span>Trading and agent access are off</span></div>
+            ? <div><strong>Agent requests</strong><span>Human approval required. Trading is off.</span></div>
             : <div><strong>Human approval</strong><span>Required for every buy</span></div>}
         </div>
         <div className="sidebar-wallet">{privy ? <PrivyAccountButton /> : <WalletButton />}</div>
@@ -97,8 +101,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
 
       <main id="main" className="app-main">{children}</main>
 
-      <nav className={privy ? "mobile-bottom-nav mobile-bottom-nav-four" : "mobile-bottom-nav"} aria-label="Mobile app navigation">
-        {appNavigation.map(({ href, label, icon: Icon, section }) => {
+      <nav className={privy ? "mobile-bottom-nav mobile-bottom-nav-five" : "mobile-bottom-nav"} aria-label="Mobile app navigation">
+        {mobileNavigation.map(({ href, label, icon: Icon, section }) => {
           const active = activeSection === section;
           return (
             <Link key={href} href={href} prefetch={section === "public" ? false : undefined} aria-label={label} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"}>
@@ -108,6 +112,12 @@ export function SiteShell({ children }: { children: ReactNode }) {
             </Link>
           );
         })}
+        {privy && <details className="mobile-nav-more">
+          <summary className={activeSection === "credentials" || activeSection === "approvals" || activeSection === "activity" ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"} aria-label="More pages"><MoreIcon className="nav-icon" /><span>More</span></summary>
+          <div className="mobile-nav-menu">
+            {[credentialsNavigation, approvalsNavigation, activityNavigation].map(({ href, label }) => <Link key={href} href={href}>{label}</Link>)}
+          </div>
+        </details>}
       </nav>
     </div>
   );

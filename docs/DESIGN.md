@@ -26,7 +26,8 @@ execution color. Financial data is dense but never theatrical.
 
 Primary journeys are: understand the product, browse official PreStocks and xStocks, inspect
 one asset, sign in through Privy, inspect the verified Solana wallet and real
-on-chain portfolio, and later explicitly approve a BUY. Human authorization and source clarity
+on-chain portfolio, register an agent client, issue a one-time MCP credential,
+review bounded investment requests, and inspect activity. Human authorization and source clarity
 remain more important than decorative polish.
 
 Must not have: copied Paybox assets/copy, fake P&L or historical charts, token
@@ -107,9 +108,9 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   full value is available in the disclosure.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
   scrolling and receives safe bottom padding; no nested page scrollers. Bottom
-  navigation has Overview, Credentials, Pre-IPO, and Stocks as
-  four equal 44px-or-taller targets in Privy mode; legacy mode keeps its three
-  destinations. The account disclosure opens below the mobile header, never
+  navigation has Overview, Pre-IPO, Stocks, Agents, and a More disclosure for
+  Credentials, Approvals, and Activity in Privy mode; legacy mode keeps its three
+  destinations. Every target is at least 44px. The account disclosure opens below the mobile header, never
   underneath the fixed navigation.
 - Markets: page-grid/list on desktop, compact market rows on mobile, with an
   optional horizontal reel for source-backed highlights.
@@ -140,7 +141,7 @@ uses the user's actual Google/email identity with a compact initial tile and
 chevron. Its disclosure states the full signed-in identity, links to the
 Credentials view, and offers Sign out; there is no nonfunctional “Sign in on
 mobile” action. The same account control is compact in the mobile header.
-Credentials is a read-only wallet identity page, not a vault: one server-verified
+The wallet section of Credentials is a read-only wallet identity, not a vault: one server-verified
 primary Solana wallet, its full public address, copy action, mainnet label, and
 explorer link. Never provide reveal/export private key, agent grant, funding
 claim, or a fake EVM wallet. Overview repeats the same wallet identity before
@@ -150,6 +151,25 @@ identity. Copy feedback is announced to assistive technology. The disclosure
 has closed/open, focus, long-email, mobile and signing-out states; wallet
 identity has loading, authenticated, unavailable, copied and copy-failure
 states.
+
+Agent control plane extension (2026-09-23): retain the compact graphite shell.
+Desktop rail includes Agents, Credentials, Approvals, and Activity as operational
+destinations. Agents lists named clients, their type, active/revoked state, last
+use and policy; creation requires explicit scope and per-request/daily limits.
+Credentials includes the verified Solana wallet section plus agent credential
+summaries. Newly issued bearer credentials appear exactly once in a distinct
+copy panel with a warning to store them securely; revisiting never reveals the
+secret. Rotation and revocation are explicit destructive actions with confirmation.
+Show hosted MCP endpoint and short connection instructions for Claude Code,
+Codex, Cursor, and a custom client, but never place a live key in a URL or
+persist it in browser storage. Approvals separates pending from decided requests;
+detail shows client, canonical asset/mint, USDC amount, policy snapshot,
+deadline, and clear Approve/Reject. Approve records consent only: no wallet
+signature, order preparation or execution occurs. Activity gives actor, event,
+client, related request and timestamp. All views distinguish loading, empty,
+error, and ready states; mutation controls distinguish idle, busy, success and
+failure. A failed load is never represented as an empty list. Financial execution
+remains off in production until a separately reviewed and accepted gate.
 
 During first Google sign-in, “authenticated” can precede automatic embedded
 Solana wallet provisioning. Show a truthful finishing state while a bounded
