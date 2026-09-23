@@ -55,6 +55,15 @@ at read/decision time and persisted transactionally; the initial lifetime is 15
 minutes. Request contents never mutate; a changed amount, asset or client is a
 new request.
 
+Persistence checkpoint: `apps/web/migrations/0001_agent_control_plane.sql` is an
+additive migration. `pnpm --filter @stockpilot/web migrate:control-plane` requires
+the server-only `CONTROL_PLANE_DATABASE_URL`, takes a PostgreSQL advisory lock,
+records a SHA-256 of each applied file and refuses edited migrations. Neither the
+web server nor startup automatically runs DDL. PGlite tests execute the complete
+SQL and verify immutable intent, terminal decisions, audit append-only behavior
+and cross-account foreign-key rejection. This does not substitute for a migration
+rehearsal against the exact production PostgreSQL image before deployment.
+
 ## Credential and policy rules
 
 Generate at least 256 random secret bits with the platform CSPRNG. Use a

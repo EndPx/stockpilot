@@ -7,9 +7,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts && tsx --conditions=react-server --test tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
+    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts tests/control-plane-migration.test.ts && tsx --conditions=react-server --test tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
     "validate:portfolio-read": "tsx --conditions=react-server scripts/validate-portfolio-read.ts",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "migrate:control-plane": "node scripts/migrate-control-plane.mjs"
   },
   "dependencies": {
     "@privy-io/node": "^0.35.0",
@@ -21,13 +22,16 @@
     "@solana/wallet-standard-util": "1.1.4",
     "@stockpilot/core": "workspace:*",
     "next": "16.3.5",
+    "pg": "8.16.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "redis": "^6.2.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.15",
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/pg": "8.15.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "react-grab": "^0.2.0",
