@@ -160,6 +160,10 @@ inspection; pointer inspection is an enhancement, not the only access mechanism.
 Show the selected close, UTC interval end, USD axis, actual-period change, fetched
 time and linked pool/source attribution. An expandable semantic close-price table
 provides the same data without requiring vision or pointer use.
+Show both USD and percentage movement across available closes, labeled as a DEX
+pool move for the selected period. On public detail pages, keep the issuer's
+indicative token quote in the hero as the primary reference; the chart remains
+visibly separate and must not imply the two price series are interchangeable.
 Keep 24px padding (18px on mobile), tabular figures, a 220px plot, and existing
 surface/ink/muted/line/cobalt tokens. Empty, loading, provider failure, partial/gapped
 history and omitted ambiguous candles are explicit, not fabricated flat lines.
@@ -246,6 +250,23 @@ Markets preserves normal, searching, no match, no provider assets, stale cache,
 and invalid input states. Token Price, Mark Price, and valuation remain separate.
 Any visual comparison uses those actual fields and is labeled as a reference—not a
 historical chart or executable quote.
+
+Market directory table revision (2026-09-23): the supplied PreStocks screenshot
+sets the information hierarchy, not the palette. Use a semantic table with one
+product per ruled row, 44px issuer logo, readable product name and ticker,
+tabular issuer values, truncated Solana address with a labeled copy control,
+an optional issuer Information link, and a cobalt Explore action to internal
+details. Pre-IPO columns are Product, Token price, Implied valuation, Mark price
+with premium, Mark valuation, Address and actions. Premium means
+`(token price / mark price − 1) × 100`; show it only for two valid positive issuer
+prices and label it as a comparison, not daily performance. Stocks use the same
+row primitive but show only their available issuer quote, classification,
+underlying symbol, address and actions; do not invent mark/valuation fields.
+At narrow widths, each row reflows into a compact card with product, main price,
+mark comparison where available, and the Explore action. Secondary valuations and
+address move to the detail page rather than causing horizontal document scroll.
+The document remains the only scroll owner. Empty, stale and unavailable states
+continue to use the directory's existing copy and controls.
 
 Investment entry preserves disconnected, unauthenticated, incompatible wallet,
 loading balance, invalid amount, insufficient balance, preparing, review, signing,

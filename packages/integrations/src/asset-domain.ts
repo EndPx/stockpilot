@@ -28,6 +28,11 @@ export type InvestmentAsset = MarketClassification & {
   description: string | null;
   imageUrl: string | null;
   tokenPriceUsd: number | null;
+  /** Issuer-provided PreStocks reference fields; absent for xStocks. */
+  markPriceUsd?: number | null;
+  impliedValuationUsd?: number | null;
+  markValuationUsd?: number | null;
+  externalUrl?: string | null;
   metadata?: {
     issuerId: string;
     sourceUrl: string;

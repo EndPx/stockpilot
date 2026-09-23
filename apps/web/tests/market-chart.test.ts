@@ -57,6 +57,8 @@ test("a flat or single-candle history stays finite and is not invented performan
 
 test("historical chart has keyboard inspection, equivalent table, timezone and honest gap disclosure", () => {
   const html = renderToStaticMarkup(createElement(PriceHistory, { history: history(), symbol: "AAPLx" }));
+  assert.match(html, /\+\$2 \(\+2\.00%\)/);
+  assert.match(html, /1D DEX pool move/);
   assert.match(html, /type="range"/);
   assert.match(html, /aria-valuetext=/);
   assert.match(html, /<table>/);
@@ -64,6 +66,15 @@ test("historical chart has keyboard inspection, equivalent table, timezone and h
   assert.match(html, /missing trading intervals/);
   assert.match(html, /not your investment return/);
   assert.doesNotMatch(html, /Buy|Sell|Sign transaction/);
+});
+
+test("a falling pool series labels its negative move without implying stock performance", () => {
+  const value = history();
+  value.candles[2] = { ...value.candles[2], open: 98, high: 99, low: 97, close: 98 };
+  const html = renderToStaticMarkup(createElement(PriceHistory, { history: value, symbol: "AAPLx" }));
+  assert.match(html, /−\$2 \(−2\.00%\)/);
+  assert.match(html, /1D DEX pool move/);
+  assert.doesNotMatch(html, /underlying stock move/);
 });
 
 test("initial chart preserves loading and clearly distinguishes public/private token-price scope", () => {

@@ -27,14 +27,17 @@ export function PriceHistory({ history, symbol }: { history: MarketHistory; symb
   const geometry = chartGeometry(history);
   const first = history.candles[0];
   const last = history.candles[history.candles.length - 1];
-  const change = ((last.close - first.close) / first.close) * 100;
+  const priceDelta = last.close - first.close;
+  const change = (priceDelta / first.close) * 100;
+  const deltaSign = priceDelta > 0 ? "+" : priceDelta < 0 ? "−" : "";
+  const periodLabel = history.range === "1d" ? "1D" : history.range === "1w" ? "1W" : "1M";
   const hasGaps = history.candles.some((candle, index) => index > 0 && candle.time - history.candles[index - 1].time > history.intervalSeconds);
   const intervalLabel = history.intervalSeconds < 3600 ? `${history.intervalSeconds / 60}-minute` : `${history.intervalSeconds / 3600}-hour`;
   const selectedDescription = `${chartPrice(selected.close)} · ${chartTime(selected.time + history.intervalSeconds)} UTC`;
   return <>
     <div className="market-chart-reading">
       <div><strong>{chartPrice(selected.close)}</strong><span>Candle closed {chartTime(selected.time + history.intervalSeconds)} UTC</span></div>
-      <div className="market-chart-change"><b className={change < 0 ? "market-chart-down" : change > 0 ? "market-chart-up" : ""}>{history.candles.length > 1 ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}</b><span>{history.candles.length > 1 ? "Over available data" : "One available candle"}</span></div>
+      <div className="market-chart-change"><b className={change < 0 ? "market-chart-down" : change > 0 ? "market-chart-up" : ""}>{history.candles.length > 1 ? `${deltaSign}${chartPrice(Math.abs(priceDelta))} (${deltaSign}${Math.abs(change).toFixed(2)}%)` : "—"}</b><span>{history.candles.length > 1 ? `${periodLabel} DEX pool move · available candles` : "One available candle"}</span></div>
     </div>
     <div className="market-chart-plot">
       <div className="market-chart-axis" aria-hidden="true">{geometry.ticks.map((tick, index) => <span key={index}>{chartPrice(tick)}</span>)}</div>

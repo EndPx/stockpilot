@@ -43,10 +43,11 @@ export default async function MarketsPage({ searchParams }: { searchParams: Prom
           <button type="submit">Search</button>
         </form>
       </div>
-      {assets.length ? <div className="catalog-list">
-        <div className="market-list-head" aria-hidden="true"><span>Product</span><span>Classification</span><span>Indicative Price</span><span>Execution</span><span /></div>
-        {assets.map((asset) => <MarketDirectoryRow key={asset.id} asset={asset} />)}
-      </div> : <div className="empty-surface border-0"><h3>No products match your search in {heading}.</h3><p>Try a name, symbol, or a shorter keyword.</p><Link href={marketHref({ group })} className="secondary-button mt-5">Clear search</Link></div>}
+      {assets.length ? <div className="catalog-list"><table className={`market-table market-table-${group}`}>
+        <caption className="sr-only">{heading} products from the official {providerName} catalog. Prices and valuations are issuer reference data, not executable quotes.</caption>
+        <thead><tr>{group === "private" ? <><th scope="col">Product</th><th scope="col">Token price</th><th scope="col">Implied val.</th><th scope="col">Mark price <small>Premium</small></th><th scope="col">Mark val.</th><th scope="col">Address</th><th scope="col"><span className="sr-only">Actions</span></th></> : <><th scope="col">Product</th><th scope="col">Indicative price</th><th scope="col">Classification</th><th scope="col">Underlying</th><th scope="col">Address</th><th scope="col"><span className="sr-only">Actions</span></th></>}</tr></thead>
+        <tbody>{assets.map((asset) => <MarketDirectoryRow key={asset.id} asset={asset} />)}</tbody>
+      </table></div> : <div className="empty-surface border-0"><h3>No products match your search in {heading}.</h3><p>Try a name, symbol, or a shorter keyword.</p><Link href={marketHref({ group })} className="secondary-button mt-5">Clear search</Link></div>}
       <div className="directory-footer catalog-pagination">
         <span>{total ? `${offset + 1}–${offset + assets.length} of ${total.toLocaleString("en-US")}` : "0 results"}</span>
         <nav aria-label="Catalog pagination">{offset > 0 && <Link className="secondary-button" href={marketHref(filter)}>First page</Link>}{nextCursor && <Link prefetch={false} className="secondary-button" href={marketHref(filter, nextCursor)}>Next page <ArrowUpRightIcon /></Link>}{filter.query && <Link className="text-link" href={marketHref({ group })}>Clear search</Link>}</nav>
