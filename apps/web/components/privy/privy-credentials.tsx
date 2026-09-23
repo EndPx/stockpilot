@@ -34,7 +34,7 @@ export function PrivyCredentials() {
 
   return (
     <div className="dashboard-stack">
-      <header className="app-page-header"><div><p className="eyebrow">Account</p><h1 className="page-title mt-2">Credentials</h1><p className="page-description">Your verified Solana wallet identity. Only its public address is shown here.</p></div></header>
+      <header className="app-page-header"><div><h1 className="page-title">Credentials</h1><p className="page-description">Your verified Solana wallet identity. Only its public address is shown here.</p></div></header>
       {!ready || (authenticated && state.kind === "loading") ? (
         <section className="surface credential-state" role="status">Checking your Solana wallet…</section>
       ) : !authenticated ? (

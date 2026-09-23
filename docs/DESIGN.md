@@ -63,9 +63,16 @@ connection with StockPilot authentication.
 ## 3. Type and spacing
 
 Use the local/system sans stack; do not make an external font request. Display
-headings are 48–72px on the landing page and 32–44px in the app. Operational body
-copy is 14–16px with generous line height. Financial figures use tabular numerals.
-Use an 8px spacing base with 20px mobile gutters and 32–48px desktop section gaps.
+headings are 48–72px on the landing page. The signed-in app uses a distinct,
+compact operational scale informed by the observed PayBox dashboard hierarchy:
+28px page title (26px mobile), 16px section heading, 14px navigation,
+13px supporting copy, 12px metadata, and 26–28px primary financial figures. Wallet public
+addresses stay at 13px monospace, wrapping rather than truncating on narrow
+screens. Market row product names remain 14px and data 12–14px. Never shrink
+interactive targets below 44px or reduce contrast to achieve density. Financial
+figures use tabular numerals. Use an 8px spacing base with 20px mobile gutters;
+the app's repeated panels use 16–20px internal padding and 16–20px gaps, while
+the landing retains broader editorial spacing.
 Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 4. Layout and scroll ownership
@@ -92,7 +99,8 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   Two editorial market-scope panels distinguish Pre-IPO (sourced from PreStocks)
   from Stocks (live xStocks discovery). Public execution remains unimplemented.
 - App desktop: fixed 248px navigation rail; the document owns vertical scrolling;
-  content has a 1180px readable maximum and broad breathing room. The account
+  content has a 1320px maximum for dense data panels, while prose inside panels
+  retains a narrower readable measure. The account
   capsule is anchored at the rail bottom; its disclosure opens upward within
   the rail and creates no nested scrollbar (StyleGallery fixed-sidenav-shell +
   anchored overlay pattern). The email truncates within the capsule, while its
@@ -265,6 +273,10 @@ underlying symbol, address and actions; do not invent mark/valuation fields.
 At narrow widths, each row reflows into a compact card with product, main price,
 mark comparison where available, and the Explore action. Secondary valuations and
 address move to the detail page rather than causing horizontal document scroll.
+At intermediate widths (560–780px of directory space), that compact row stays
+horizontal: product, reference price, mark comparison when present, and actions
+share one line instead of creating tall, sparse cards. At phone widths, the
+two-column stacked card remains readable and touch targets stay 44px high.
 The document remains the only scroll owner. Empty, stale and unavailable states
 continue to use the directory's existing copy and controls.
 

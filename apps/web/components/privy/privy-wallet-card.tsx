@@ -22,7 +22,6 @@ export function PrivyWalletCard({ address }: { address: string }) {
       <div className="privy-wallet-card-heading">
         <span className="privy-wallet-card-icon"><WalletIcon /></span>
         <div>
-          <p className="eyebrow">Your credentials</p>
           <h2 id="privy-wallet-heading">Solana wallet</h2>
           <p>Created through Privy · Solana mainnet</p>
         </div>

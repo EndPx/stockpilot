@@ -37,7 +37,7 @@ export function PrivyPortfolioOverview() {
 
   return (
     <div className="dashboard-stack">
-      <header className="app-page-header"><div><p className="eyebrow">Overview</p><h1 className="page-title mt-2">Your portfolio</h1><p className="mt-3 text-sm text-muted">Your Privy Solana wallet on mainnet.</p></div></header>
+      <header className="app-page-header"><div><h1 className="page-title">Your portfolio</h1><p className="page-description">Your Privy Solana wallet on mainnet.</p></div></header>
       {ready && authenticated && walletAddress && <PrivyWalletCard address={walletAddress} />}
       {!ready ? <PortfolioLoading /> : !authenticated ? (
         <section className="surface empty-surface"><h2 className="text-2xl font-semibold">Your StockPilot portfolio</h2><p className="mt-4">Sign in with Google or email to view your Privy Solana wallet.</p><Link href="/sign-in" className="button mt-6">Sign in</Link></section>
