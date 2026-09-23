@@ -43,7 +43,7 @@ export default async function MarketsPage({ searchParams }: { searchParams: Prom
         </form>
       </div>
       {assets.length ? <div className="catalog-list">
-        <div className="market-list-head" aria-hidden="true"><span>Product / issuer</span><span>Classification</span><span>Token Price</span><span>Execution</span><span /></div>
+        <div className="market-list-head" aria-hidden="true"><span>Product</span><span>Classification</span><span>Token Price</span><span>Execution</span><span /></div>
         {assets.map((asset) => <MarketDirectoryRow key={asset.id} asset={asset} />)}
       </div> : <div className="empty-surface border-0"><h3>No {heading.toLowerCase()} products match your search.</h3><p>Try a name, symbol, or a shorter keyword.</p><Link href={marketHref({ group })} className="secondary-button mt-5">Clear search</Link></div>}
       <div className="directory-footer catalog-pagination">

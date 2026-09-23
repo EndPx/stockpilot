@@ -183,8 +183,12 @@ Do not render a heavy 1,000-card grid or auto-fetch eligibility for catalog rows
 Public details reuse the asset identity, stats, token-details and surface primitives,
 but have a read-only discovery panel instead of investment controls. Execution
 "Not checked" is neutral text, never a green readiness badge. Mobile must retain
-provider, symbol and status even when secondary classification columns collapse.
-Use 16/24px panel padding, 8/16px gaps, 14px row text and the existing surface tokens.
+symbol and status even when secondary classification columns collapse; the page
+heading and source note retain provider attribution.
+The market title and source note carry issuer attribution; individual rows show
+the product name and ticker without repeating PreStocks or xStocks. The source
+remains available on each detail page. Use 16/24px panel padding, 8/16px gaps,
+14px row text and the existing surface tokens.
 Product copy distinguishes live public discovery from unimplemented public execution
 and future agents. Both market-scope panels may link to their live filtered catalogs.
 
@@ -209,6 +213,10 @@ the document remains the only scroll owner and the rail/mobile navigation
 remains usable. The spinner rotates using transform only. Reduced-motion mode
 uses a calm opacity pulse, with the visible label and an accessible status
 announcement present regardless of animation.
+Opening a private or public asset row uses the same centered spinner immediately
+while unprefetched navigation waits, then the same route-level fallback until
+the asset page renders. Its label identifies the pending asset detail. No fake
+price or skeleton figures appear during this transition.
 
 Brand identity: use the generated white orbital-S/navigation mark on its opaque
 cobalt tile, not the hero illustration or the former CSS bar mark. Shared BrandMark
