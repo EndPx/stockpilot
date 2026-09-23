@@ -17,16 +17,16 @@ export type ClientRecord = {
 };
 
 export class ControlPlaneError extends Error {
-  constructor(readonly code: "INVALID_CLIENT" | "WALLET_BINDING_MISMATCH" | "CLIENT_NOT_FOUND", message: string) {
+  constructor(readonly code: "INVALID_CLIENT" | "INVALID_POLICY" | "WALLET_BINDING_MISMATCH" | "CLIENT_NOT_FOUND" | "POLICY_NOT_FOUND", message: string) {
     super(message);
     this.name = "ControlPlaneError";
   }
 }
 
 const clientTypes = new Set<ClientType>(["CLAUDE_CODE", "CODEX", "CURSOR", "CUSTOM"]);
-const permittedScopes = new Set<ClientScope>(["markets:read", "portfolio:read", "investments:request", "requests:read-own", "approvals:read-own"]);
+export const permittedScopes = new Set<ClientScope>(["markets:read", "portfolio:read", "investments:request", "requests:read-own", "approvals:read-own"]);
 
-function parsePositiveUsd(value: string): string {
+export function parsePositiveUsd(value: string): string {
   if (typeof value !== "string" || !/^(?:0|[1-9]\d{0,7})(?:\.\d{1,6})?$/.test(value) || Number(value) <= 0) {
     throw new ControlPlaneError("INVALID_CLIENT", "Enter a positive USDC limit with at most six decimals.");
   }
