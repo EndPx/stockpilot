@@ -7,12 +7,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts tests/control-plane-migration.test.ts && tsx --conditions=react-server --test tests/control-plane-clients.test.ts tests/control-plane-credentials.test.ts tests/control-plane-policies.test.ts tests/control-plane-requests.test.ts tests/control-plane-approvals.test.ts tests/control-plane-activity.test.ts tests/control-plane-web-api.test.ts tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
+    "test": "tsx --test tests/auth-*.test.ts tests/wallet.test.ts tests/portfolio-ui.test.ts tests/market-chart.test.ts tests/market-directory-ui.test.ts tests/xstocks-price.test.ts tests/security-headers.test.ts tests/control-plane-migration.test.ts && tsx --conditions=react-server --test tests/control-plane-clients.test.ts tests/control-plane-credentials.test.ts tests/control-plane-policies.test.ts tests/control-plane-requests.test.ts tests/control-plane-approvals.test.ts tests/control-plane-activity.test.ts tests/control-plane-web-api.test.ts tests/control-plane-mcp.test.ts tests/control-plane-mcp-route.test.ts tests/privy-auth-route.test.ts tests/solana-read-adapter.test.ts tests/portfolio-route.test.ts tests/public-markets.test.ts tests/market-history-route.test.ts tests/investment-*.test.ts",
     "validate:portfolio-read": "tsx --conditions=react-server scripts/validate-portfolio-read.ts",
     "doctor": "npx react-doctor@latest",
     "migrate:control-plane": "node scripts/migrate-control-plane.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
     "@privy-io/node": "^0.35.0",
     "@privy-io/react-auth": "^3.45.0",
     "@solana-program/memo": "0.8.0",
@@ -26,7 +27,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "redis": "^6.2.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",
