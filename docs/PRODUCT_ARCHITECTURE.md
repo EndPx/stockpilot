@@ -2,6 +2,14 @@
 
 Status: architecture correction, 2026-09-23. This document supersedes PreStocks-only **product positioning**, not the proven human execution security boundary. No agent execution, credential issuance, database, sell or automation is implemented by this revision.
 
+Target identity decision (2026-09-23): replace Phantom/Wallet Standard login
+entirely with Google sign-in and a user-owned Privy embedded Solana wallet at a
+separately accepted cutover. Agent delegation remains a later explicit opt-in;
+the current SIWS deployment stays unchanged until the replacement is verified.
+See [PRIVY_MIGRATION.md](PRIVY_MIGRATION.md) for the new identity and signing
+boundaries. The SIWS account descriptions below document the current system and
+must not be mistaken for the target authentication design.
+
 > Your AI agent for tokenized stocks on Solana.
 
 This is the product direction. Today the app exposes official PreStocks discovery, wallet authentication, portfolio reads and the existing human BUY flow. Mainnet acceptance remains unproven. Public equities and the agent control plane must not be advertised as operational until their gates pass.
