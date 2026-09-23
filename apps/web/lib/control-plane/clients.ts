@@ -1,5 +1,5 @@
 import "server-only";
-import { inControlTransaction, getControlPool } from "./db";
+import { controlStore, type ControlQuery, type ControlStore } from "./db";
 
 export type ControlIdentity = { privyUserId: string; walletAddress: string };
 export type ClientType = "CLAUDE_CODE" | "CODEX" | "CURSOR" | "CUSTOM";
@@ -22,19 +22,6 @@ export class ControlPlaneError extends Error {
     this.name = "ControlPlaneError";
   }
 }
-
-type Queryable = { query<Row extends Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: Row[] }> };
-type Store = {
-  transaction<T>(work: (client: Queryable) => Promise<T>): Promise<T>;
-  query<Row extends Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
-};
-
-const defaultStore: Store = {
-  transaction: (work) => inControlTransaction((client) => work({
-    query: (text, values) => client.query(text, values),
-  })),
-  query: (text, values) => getControlPool().query(text, values),
-};
 
 const clientTypes = new Set<ClientType>(["CLAUDE_CODE", "CODEX", "CURSOR", "CUSTOM"]);
 const permittedScopes = new Set<ClientScope>(["markets:read", "portfolio:read", "investments:request", "requests:read-own", "approvals:read-own"]);
@@ -63,7 +50,7 @@ function validateInput(input: { name: string; clientType: ClientType; scopes: Cl
   return { name, clientType: input.clientType, scopes: input.scopes, maxInvestmentUsd, dailyRequestLimitUsd };
 }
 
-async function ensureAccount(client: Queryable, identity: ControlIdentity): Promise<void> {
+async function ensureAccount(client: ControlQuery, identity: ControlIdentity): Promise<void> {
   if (!identity.privyUserId || !identity.walletAddress) throw new ControlPlaneError("INVALID_CLIENT", "Verified account identity is required.");
   await client.query("INSERT INTO control_accounts(id, primary_wallet_address) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING", [identity.privyUserId, identity.walletAddress]);
   const account = await client.query<{ primary_wallet_address: string }>(
@@ -81,7 +68,7 @@ export async function createClient(input: {
   scopes: ClientScope[];
   maxInvestmentUsd: string;
   dailyRequestLimitUsd: string;
-}, store: Store = defaultStore): Promise<ClientRecord> {
+}, store: ControlStore = controlStore): Promise<ClientRecord> {
   const validated = validateInput(input);
   return store.transaction(async (client) => {
     await ensureAccount(client, input.identity);
@@ -112,7 +99,7 @@ export async function createClient(input: {
   });
 }
 
-export async function listClients(identity: ControlIdentity, store: Store = defaultStore): Promise<ClientRecord[]> {
+export async function listClients(identity: ControlIdentity, store: ControlStore = controlStore): Promise<ClientRecord[]> {
   const account = await store.query<{ primary_wallet_address: string }>(
     "SELECT primary_wallet_address FROM control_accounts WHERE id = $1", [identity.privyUserId],
   );
@@ -133,7 +120,7 @@ export async function listClients(identity: ControlIdentity, store: Store = defa
   }));
 }
 
-export async function revokeClient(identity: ControlIdentity, clientId: string, store: Store = defaultStore): Promise<void> {
+export async function revokeClient(identity: ControlIdentity, clientId: string, store: ControlStore = controlStore): Promise<void> {
   await store.transaction(async (client) => {
     await ensureAccount(client, identity);
     const result = await client.query<{ id: string }>(`UPDATE control_clients

@@ -38,3 +38,18 @@ export async function inControlTransaction<T>(work: (client: PoolClient) => Prom
     client.release();
   }
 }
+
+export type ControlQuery = {
+  query<Row extends Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
+};
+
+export type ControlStore = ControlQuery & {
+  transaction<T>(work: (client: ControlQuery) => Promise<T>): Promise<T>;
+};
+
+export const controlStore: ControlStore = {
+  transaction: (work) => inControlTransaction((client) => work({
+    query: (text, values) => client.query(text, values),
+  })),
+  query: (text, values) => getControlPool().query(text, values),
+};
