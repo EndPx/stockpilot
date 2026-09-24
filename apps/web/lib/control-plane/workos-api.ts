@@ -15,7 +15,8 @@ export class WorkosApiStatusError extends Error {
   }
 }
 
-export type WorkosProtocolFailure = "invalid_identity" | "missing_redirect" | "malformed_redirect" | "untrusted_redirect";
+export type WorkosProtocolFailure = "invalid_identity" | "missing_redirect" | "malformed_redirect" |
+  "untrusted_origin" | "untrusted_path" | "untrusted_redirect";
 
 /** Fixed diagnostic codes only; never carry provider payloads or redirect values. */
 export class WorkosApiProtocolError extends Error {
@@ -85,7 +86,12 @@ export async function completeWorkosExternalAuth(
   let url: URL;
   try { url = new URL(redirect); }
   catch { throw new WorkosApiProtocolError("malformed_redirect"); }
-  if (url.origin !== config.issuer || url.pathname !== "/oauth/authorize/complete" ||
-    url.username || url.password || url.hash) throw new WorkosApiProtocolError("untrusted_redirect");
+  if (url.origin !== config.issuer) throw new WorkosApiProtocolError("untrusted_origin");
+  if (url.username || url.password || url.hash) throw new WorkosApiProtocolError("untrusted_redirect");
+  // AuthKit's documented path and its OAuth2 completion variant are both
+  // restricted to the configured HTTPS issuer, never an arbitrary redirect.
+  if (url.pathname !== "/oauth/authorize/complete" && url.pathname !== "/oauth2/authorize/complete") {
+    throw new WorkosApiProtocolError("untrusted_path");
+  }
   return url;
 }
