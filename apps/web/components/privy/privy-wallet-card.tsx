@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRightIcon, WalletIcon } from "@/components/icons";
 
-export function PrivyWalletCard({ address }: { address: string }) {
+export function PrivyWalletCard({ address, compact = false }: { address: string; compact?: boolean }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   useEffect(() => setCopyState("idle"), [address]);
@@ -18,16 +18,16 @@ export function PrivyWalletCard({ address }: { address: string }) {
   }
 
   return (
-    <section className="surface privy-wallet-card" aria-labelledby="privy-wallet-heading">
-      <div className="privy-wallet-card-heading">
+    <section className={compact ? "surface privy-wallet-card privy-wallet-card-compact" : "surface privy-wallet-card"} aria-labelledby="privy-wallet-heading">
+      {!compact && <div className="privy-wallet-card-heading">
         <span className="privy-wallet-card-icon"><WalletIcon /></span>
         <div>
           <h2 id="privy-wallet-heading">Solana wallet</h2>
           <p>Created through Privy · Solana mainnet</p>
         </div>
-      </div>
+      </div>}
       <div className="privy-wallet-card-address">
-        <span>Public wallet address</span>
+        <span id={compact ? "privy-wallet-heading" : undefined}>Public Solana address</span>
         <code>{address}</code>
       </div>
       <div className="privy-wallet-card-actions">

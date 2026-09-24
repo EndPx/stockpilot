@@ -10,7 +10,7 @@ export function getControlPool(): Pool {
   const pool = new Pool({
     connectionString,
     max: 5,
-    connectionTimeoutMillis: 3_000,
+    connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
     statement_timeout: 5_000,
     query_timeout: 6_000,

@@ -1,7 +1,8 @@
 # StockPilot on an existing VPS
 
-This deployment runs one Next.js standalone container and one private Redis
-container. The app binds only `127.0.0.1:3100` on the host; the existing reverse
+This deployment runs one Next.js standalone container and private Redis. The
+control plane uses a dedicated Neon PostgreSQL project. The app binds only
+`127.0.0.1:3100` on the host; the existing reverse
 proxy supplies HTTPS. Trading starts disabled, and no Jupiter API key is needed.
 The domain and VPS must be confirmed before applying these instructions remotely.
 
@@ -9,7 +10,8 @@ The domain and VPS must be confirmed before applying these instructions remotely
 
 - Use Linux Docker Engine and Docker Compose v2.20 or newer, with an existing
   reverse proxy. Verify port 3100 is unused and allow memory/disk headroom for
-  other VPS applications before starting this project.
+  other VPS applications before starting this project. The VPS needs outbound
+  access to Neon's PostgreSQL endpoint on port 5432.
 - The Dockerfile builds with Node 24 Alpine and pnpm 10.21.0 using the frozen
   lockfile. `apps/web/next.config.ts` must use `output: "standalone"` with the
   repository root as `outputFileTracingRoot`.
@@ -38,18 +40,30 @@ STOCKPILOT_IMAGE=stockpilot:release-REPLACE_WITH_COMMIT
 APP_URL=https://REPLACE_WITH_APPROVED_DOMAIN
 SESSION_SECRET=REPLACE_WITH_64_RANDOM_HEX_CHARACTERS
 REDIS_PASSWORD=REPLACE_WITH_DIFFERENT_64_RANDOM_HEX_CHARACTERS
+CONTROL_PLANE_KEY_PEPPER=REPLACE_WITH_THIRD_64_RANDOM_HEX_CHARACTERS
+CONTROL_PLANE_DATABASE_URL=REPLACE_WITH_NEON_RUNTIME_CONNECTION_URL
+CONTROL_PLANE_MIGRATION_URL=REPLACE_WITH_NEON_DIRECT_CONNECTION_URL
 AUTH_ENABLED=true
+NEXT_PUBLIC_AUTH_PROVIDER=privy
+PRIVY_APP_SECRET=REPLACE_WITH_EXISTING_PROTECTED_SERVER_VALUE
 SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 ```
 
-The Privy migration is opt-in for a later release. After Google login and
-allowed origins are configured in Privy Dashboard, and the real login has been
-accepted in a staging browser, add `NEXT_PUBLIC_AUTH_PROVIDER=privy` and
-`PRIVY_APP_SECRET=<protected server value>` to the runtime file. The auth mode
-is also a public build argument; use the same mode when building and running
-the image. Never pass the app secret as a build argument. The app keeps trading
-disabled in Privy mode. Do not switch the live mode before testing a newly
-created Privy Solana wallet and preserving a rollback image.
+Privy is already the live authentication mode. Preserve its existing app secret,
+session secret, and Redis password when updating the VPS. The auth mode is also
+a public build argument; build and run the image with `privy`. Never pass the
+Privy app secret as a build argument. Trading remains disabled in this release.
+
+Use the dedicated StockPilot Neon project `aged-heart-64192941`, production
+branch `br-super-paper-b3dx3inq` in Singapore. Both URLs must target that
+branch's `neondb` database, use TLS with `sslmode=verify-full`, and remain
+server-side secrets. Its connection pooler was disabled at the preflight check,
+so the first single-container release should use the direct endpoint for both
+runtime (which caps its local pool at five connections) and migration. Do not
+use the `-pooler` hostname until pooling has been enabled and connectivity has
+been tested. Migration must always use the direct endpoint because it holds a
+session-level advisory lock across transactions. Set the URLs with a protected
+editor or secret manager, not in a shell command argument or source archive.
 
 `APP_URL` is the exact HTTPS origin, without a path. Redis rejects passwords that
 are not exactly 64 hexadecimal characters, so the assembled `REDIS_URL` is safe
@@ -57,6 +71,11 @@ without URL escaping. Keep the session secret stable through ordinary deployment
 Set `AUTH_ENABLED=false` if the initial release should offer discovery only.
 `INVESTMENTS_ENABLED` is hardcoded to `false` in Compose, and changing the env file
 cannot enable buys. Enabling trading is a separate release/security decision.
+The control plane has no transaction signer or execution tool. Keep the Neon
+credentials and credential pepper stable across ordinary deployments.
+For an existing VPS runtime file, run `sh deploy/init-control-plane.sh` once
+on that VPS; it appends only a missing pepper and prints no secrets. Add both
+Neon URLs separately to the same protected file before starting the new image.
 
 When archiving a release on Windows, use `git -c core.autocrlf=false archive`.
 The repository also fixes Linux deployment asset line endings through
@@ -79,6 +98,8 @@ Record the previous release tag before changing `STOCKPILOT_IMAGE`.
 ```sh
 docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml config --quiet
 docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml build --pull app
+docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml --profile migrate build migrate
+docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml --profile migrate run --rm migrate
 docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml up -d --no-build --wait
 docker compose --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml ps
 curl --fail http://127.0.0.1:3100/api/health
@@ -87,8 +108,11 @@ curl --fail http://127.0.0.1:3100/api/health
 The health endpoint checks process availability and reports feature flags; it does
 not certify provider/RPC availability or Redis persistence. Verify separately that
 both Compose services are healthy and the response has `investmentsEnabled: false`.
-The Redis service publishes no host ports and belongs only to this project's
-internal network. The app has a second network for outbound provider/RPC requests.
+Redis publishes no host ports and belongs only to this project's internal
+network. The app and one-shot migration have outbound access to Neon.
+Migration is an explicit release gate with checksums for applied SQL; do not
+start the new app if it fails. Rehearse it on a separate Neon branch before
+the production rollout, using that branch's own pooled and direct URLs.
 
 ### Existing NGINX host (the confirmed Hostinger VPS)
 
@@ -134,24 +158,12 @@ Confirm unauthenticated API requests fail as expected, trading stays disabled,
 and the host's 3100 and 6379 ports are inaccessible from outside. These checks do
 not require a buy, a wallet transaction signature, or a Jupiter key.
 
-After confirming the exact live origin, run `node deploy/smoke-auth.mjs` from a
-checkout with the workspace dependencies installed. It tests real HTTPS/Redis
-authentication, replay denial, revocation, cross-origin rejection and disabled
-investment endpoints using only a throwaway in-memory SIWS identity. It does not
-connect a real wallet or create a financial transaction. The default run makes ten
-HTTP requests, performs no RPC calls, and must print all ten named `PASS` checks.
-
-Optionally run `node deploy/smoke-auth.mjs --portfolio` to add one authenticated
-`GET /api/portfolio` after session restoration. This triggers read-only server RPC
-calls and verifies the generated wallet has zero SOL/USDC balances, zero portfolio
-value, and no holdings, with the response bound to that same wallet. This mode
-makes eleven HTTP requests and must print eleven named `PASS` checks. It never
-logs wallet addresses, keys, proofs, or cookies, and adds no financial preparation
-or execution. Both modes allow at most one additional logout request for cleanup
-on failure (eleven/twelve requests maximum), use a ten-second timeout per request,
-and reject responses over 64 KiB. A failure exits nonzero without exposing
-authentication data. Run the optional check only after confirming the live image
-and its read-only RPC configuration.
+The legacy `deploy/smoke-auth.mjs` exercises SIWS and is not an acceptance test
+for the live Privy mode. Instead, verify Google login in a browser, the generated
+wallet and read-only portfolio, and authenticated Agents/Approvals API behavior.
+Check that unauthenticated requests fail, agent controls persist after reload,
+and trading endpoints remain disabled. Do not submit a real investment as part
+of this rollout.
 
 ## Updates and rollback
 
@@ -197,6 +209,10 @@ maintenance environment, rotate `SESSION_SECRET` before exposing the restored
 service, and invalidate old sessions/challenges. Do not combine a stale Redis
 restore with the old secret. Record the backup time and verify the restore process
 before relying on it for recovery.
+
+Back up the Neon project separately and verify a restore procedure; a VPS
+snapshot does not contain Neon's managed data. Monitor Neon compute, storage,
+connection failures, and the short restore window on the selected plan.
 
 The app filesystem is read-only except bounded tmpfs mounts for `/tmp` and Next's
 image cache; cached images disappear on restart. There are no host source mounts

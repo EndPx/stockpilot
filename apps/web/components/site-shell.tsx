@@ -11,6 +11,7 @@ import { WalletButton } from "./wallet/wallet-button";
 import { PrivyAccountButton } from "./privy/privy-account-button";
 import { MarketLoadingIndicator } from "./market-loading-indicator";
 import { isPrivyMode } from "@/lib/privy/config";
+import { ThemeToggle } from "./theme-toggle";
 
 const navigation = [
   { href: "/app", label: "Overview", icon: OverviewIcon, section: "overview" },
@@ -46,7 +47,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const landing = pathname === "/";
   if (pathname === "/sign-in") return <>{children}</>;
   const privy = isPrivyMode();
-  const appNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation, credentialsNavigation, approvalsNavigation, activityNavigation] : navigation;
+  const appNavigation = privy ? [navigation[0], credentialsNavigation, clientNavigation, approvalsNavigation, activityNavigation, ...navigation.slice(1)] : navigation;
   const mobileNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation] : navigation;
   const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
@@ -73,6 +74,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <a href="#main" className="skip-link">Skip to content</a>
       <aside className="app-sidebar">
         <Brand />
+        {privy && <ThemeToggle />}
         <nav aria-label="App navigation" className="sidebar-nav">
           {appNavigation.map(({ href, label, icon: Icon, section }) => {
             const active = activeSection === section;
@@ -96,7 +98,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
 
       <header className="mobile-app-header">
         <Brand />
-        {privy ? <PrivyAccountButton /> : <WalletButton />}
+        <div className="mobile-header-actions">{privy && <ThemeToggle />}{privy ? <PrivyAccountButton /> : <WalletButton />}</div>
       </header>
 
       <main id="main" className="app-main">{children}</main>

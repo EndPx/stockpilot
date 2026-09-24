@@ -11,7 +11,7 @@ const migrationsDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", 
 const files = (await readdir(migrationsDirectory)).filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name)).sort();
 if (files.length === 0) throw new Error("No control-plane migrations found");
 
-const pool = new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 3_000 });
+const pool = new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 20_000 });
 const client = await pool.connect();
 try {
   await client.query("SELECT pg_advisory_lock(hashtext('stockpilot-control-plane-migrations'))");

@@ -112,6 +112,13 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   Credentials, Approvals, and Activity in Privy mode; legacy mode keeps its three
   destinations. Every target is at least 44px. The account disclosure opens below the mobile header, never
   underneath the fixed navigation.
+- Overview control-plane revision (2026-09-23): use a two-column page-grid at
+  roomy widths: a minmax(0, 1.7fr) wallet/portfolio column and a minmax(280px,
+  1fr) Activity column. The document alone scrolls. The left column shows the
+  public Solana address, Portfolio Estimate, Available to Invest, Network Balance,
+  then positions; Activity shows the latest server-recorded events with a View all
+  destination. At constrained widths the columns stack, with Activity after the
+  portfolio. Loading and failure are distinct from an empty event history.
 - Markets: page-grid/list on desktop, compact market rows on mobile, with an
   optional horizontal reel for source-backed highlights.
 - Asset: supporting-pane layout. Market facts and About are primary; the investment
@@ -170,6 +177,24 @@ client, related request and timestamp. All views distinguish loading, empty,
 error, and ready states; mutation controls distinguish idle, busy, success and
 failure. A failed load is never represented as an empty list. Financial execution
 remains off in production until a separately reviewed and accepted gate.
+
+Control-plane navigation/theme revision (2026-09-23): in Privy mode the desktop
+rail groups Overview, Credentials, Agents, Approvals, Activity before market
+discovery. The app has a two-state Light/Dark theme control in the rail and
+mobile header. Dark remains the default; a user's explicit choice persists in
+local storage and applies before first paint on later visits. The theme only
+changes the authenticated app shell, leaving the orbital landing and sign-in
+unchanged. Light app tokens: canvas `#f4f6fa`, raised `#eef2f7`, surface `#fff`,
+ink `#18212f`, muted `#526174`, faint `#64748b`, line `#dce3ec`, strong line
+`#9aa9ba`, rail `#f9fbfd`, hover `#e9eef7`, pale cobalt `#e8ecff`, accent text
+`#354ccc`, success `#176a4f`, warning `#80550c`, danger `#b6363e`. Surfaces keep
+the same radius and a low-contrast, broad shadow. Theme control has focused,
+pressed, and announced states, with no decorative page-cover animation. Agents
+starts with three honest MCP-client presets (Claude Code, Codex, Cursor), not
+unimplemented ChatGPT/Grok OAuth. Its active client list precedes the creation
+form, where scopes and limits remain explicit. Approvals keeps pending/decided
+filters and links to the full request review; an empty list never claims a trade
+occurred. The obsolete Phantom migration paragraph is removed from Credentials.
 
 During first Google sign-in, “authenticated” can precede automatic embedded
 Solana wallet provisioning. Show a truthful finishing state while a bounded

@@ -17,6 +17,11 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
+# Migrations run as an explicit, one-shot release gate with full pg dependencies.
+FROM build AS migration
+USER node
+CMD ["node", "apps/web/scripts/migrate-control-plane.mjs"]
+
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \

@@ -40,10 +40,7 @@ export function PrivyCredentials({ embedded = false }: { embedded?: boolean }) {
       ) : !authenticated ? (
         <section className="surface empty-surface"><h2 className="text-xl font-semibold">Sign in to view your wallet</h2><p className="mt-3">Your wallet address is available after Google or email sign-in.</p><Link href="/sign-in" className="button mt-6">Sign in</Link></section>
       ) : state.kind === "ready" ? (
-        <>
-          <PrivyWalletCard address={state.walletAddress} />
-          <p className="credential-note">This is your StockPilot wallet. Assets in a previous Phantom wallet do not move here automatically. Private keys and agent permissions are not exposed on this page.</p>
-        </>
+        <PrivyWalletCard address={state.walletAddress} />
       ) : (
         <section className="surface empty-surface" role="alert"><h2 className="text-xl font-semibold">Wallet unavailable</h2><p className="mt-3">{state.kind === "error" ? state.message : "Your wallet is not ready yet."}</p><button type="button" className="button mt-6" onClick={() => setRetry((value) => value + 1)}>Try again</button></section>
       )}

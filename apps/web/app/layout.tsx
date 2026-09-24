@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import { SiteShell } from "@/components/site-shell";
 import { SolanaProvider } from "@/providers/solana-provider";
 import { PrivyProvider } from "@/providers/privy-provider";
@@ -14,8 +15,10 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Every HTML response must render with its request-specific CSP nonce.
   await connection();
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><script nonce={nonce} src="/theme-init.js" /></head>
       <body className="font-sans antialiased">
         {isPrivyMode() ? (
           <PrivyProvider><SiteShell>{children}</SiteShell></PrivyProvider>

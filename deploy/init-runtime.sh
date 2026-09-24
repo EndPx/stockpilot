@@ -12,14 +12,17 @@ install -d -m 0700 /etc/stockpilot
 umask 077
 session_secret="$(openssl rand -hex 32)"
 redis_password="$(openssl rand -hex 32)"
+control_pepper="$(openssl rand -hex 32)"
 printf '%s\n' \
   "STOCKPILOT_IMAGE=stockpilot:release-$release" \
   'APP_URL=https://stockpilot.endpx.cloud' \
   "SESSION_SECRET=$session_secret" \
   "REDIS_PASSWORD=$redis_password" \
+  "CONTROL_PLANE_KEY_PEPPER=$control_pepper" \
   'AUTH_ENABLED=true' \
   'SOLANA_RPC_URL=https://api.mainnet-beta.solana.com' \
   > /etc/stockpilot/runtime.env
-unset session_secret redis_password
+unset session_secret redis_password control_pepper
 chmod 0600 /etc/stockpilot/runtime.env
 echo 'Protected runtime configuration created; financial execution remains disabled.'
+echo 'Configure protected Neon runtime and direct migration URLs before starting the app.'

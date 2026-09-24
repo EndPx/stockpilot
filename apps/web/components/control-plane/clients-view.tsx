@@ -65,11 +65,32 @@ export function ClientsView() {
     finally { setBusy(false); }
   }
 
+  function choosePreset(preset: (typeof clientTypes)[number]) {
+    setType(preset);
+    if (!name) setName(preset === "CLAUDE_CODE" ? "Claude Code" : preset === "CODEX" ? "Codex" : "Cursor");
+    document.getElementById("client-name")?.focus();
+  }
+
   return <div className="dashboard-stack">
-    <PageHeader title="Agents" description="Register an MCP client and define what it may read or request. Agents cannot execute trades." action={<Link className="secondary-button" href="/credentials">Credentials</Link>} />
+    <PageHeader title="Agents" description="Create a bounded MCP client for your AI tool. Clients can read or request within their policy, but cannot execute trades." action={<Link className="secondary-button" href="/credentials">Credentials</Link>} />
+    <section className="surface control-panel"><div className="surface-header"><h2>Connect an agent</h2><span className="control-muted">Choose a client to configure</span></div>
+      <div className="agent-presets">
+        <button type="button" onClick={() => choosePreset("CLAUDE_CODE")}>Claude Code</button>
+        <button type="button" onClick={() => choosePreset("CODEX")}>Codex</button>
+        <button type="button" onClick={() => choosePreset("CURSOR")}>Cursor</button>
+      </div>
+    </section>
+    <section className="surface control-panel"><div className="surface-header"><h2>Your clients</h2><span className="control-muted">{items?.length ?? "—"} clients</span></div>
+      <LoadState items={items} error={error} retry={reload} empty="No agent clients yet. Configure one below." />
+      {items && items.length > 0 && <div className="control-list">{items.map((client) => <article className="control-row" key={client.id}>
+        <div className="control-row-main"><strong>{client.name}</strong><span>{client.clientType.replaceAll("_", " ")} · {client.scopes.length} permissions · Last used {formatDate(client.lastUsedAt)}</span></div>
+        <span className={`control-status ${client.status === "ACTIVE" ? "control-status-active" : ""}`}>{client.status.toLowerCase()}</span>
+        <div className="control-row-actions"><button type="button" className="secondary-button" onClick={() => void openPolicy(client.id)}>Policy</button>{client.status === "ACTIVE" && <button type="button" className="secondary-button control-danger" disabled={busy} onClick={() => void revoke(client)}>Revoke</button>}</div>
+      </article>)}</div>}
+    </section>
     <section className="surface control-panel"><div className="surface-header"><h2>New client</h2></div>
       <form className="control-form" onSubmit={create}>
-        <label>Client name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required placeholder="My Claude assistant" /></label>
+        <label>Client name<input id="client-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required placeholder="My Claude assistant" /></label>
         <label>Client type<select value={type} onChange={(event) => setType(event.target.value as typeof type)}>{clientTypes.map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></label>
         <fieldset><legend>Permissions</legend><div className="control-checks">{scopeOptions.map((option) => <label key={option.value}><input type="checkbox" checked={scopes.includes(option.value)} onChange={(event) => setScopes((current) => event.target.checked ? [...current, option.value] : current.filter((value) => value !== option.value))} />{option.label}</label>)}</div></fieldset>
         <div className="control-form-pair"><label>Maximum per request · USDC<input type="number" inputMode="decimal" min="0.000001" step="0.000001" value={max} onChange={(event) => setMax(event.target.value)} required /></label><label>24-hour request limit · USDC<input type="number" inputMode="decimal" min="0.000001" step="0.000001" value={daily} onChange={(event) => setDaily(event.target.value)} required /></label></div>
@@ -78,14 +99,6 @@ export function ClientsView() {
       </form>
     </section>
     {feedback && <p role="status" className="control-feedback">{feedback}</p>}
-    <section className="surface control-panel"><div className="surface-header"><h2>Your clients</h2><span className="control-muted">{items?.length ?? "—"} clients</span></div>
-      <LoadState items={items} error={error} retry={reload} empty="No agent clients yet. Create one above to connect an MCP client." />
-      {items && items.length > 0 && <div className="control-list">{items.map((client) => <article className="control-row" key={client.id}>
-        <div className="control-row-main"><strong>{client.name}</strong><span>{client.clientType.replaceAll("_", " ")} · {client.scopes.length} permissions · Last used {formatDate(client.lastUsedAt)}</span></div>
-        <span className={`control-status ${client.status === "ACTIVE" ? "control-status-active" : ""}`}>{client.status.toLowerCase()}</span>
-        <div className="control-row-actions"><button type="button" className="secondary-button" onClick={() => void openPolicy(client.id)}>Policy</button>{client.status === "ACTIVE" && <button type="button" className="secondary-button control-danger" disabled={busy} onClick={() => void revoke(client)}>Revoke</button>}</div>
-      </article>)}</div>}
-    </section>
     {selected && <section className="surface control-panel"><div className="surface-header"><h2>Grant policy</h2><button className="secondary-button" type="button" onClick={() => { setSelected(null); setPolicy(null); }}>Close</button></div>
       {!policy ? <div className="control-state" role="status">Loading policy…</div> : <form className="control-form" onSubmit={savePolicy}>
         <p className="control-note">Version {policy.version} · {policy.approvalMode.replaceAll("_", " ")} · Provider: PreStocks · Market: Pre-IPO</p>
