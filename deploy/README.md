@@ -47,6 +47,9 @@ AUTH_ENABLED=true
 NEXT_PUBLIC_AUTH_PROVIDER=privy
 PRIVY_APP_SECRET=REPLACE_WITH_EXISTING_PROTECTED_SERVER_VALUE
 SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+AGENT_OAUTH_ENABLED=false
+WORKOS_AUTHKIT_ISSUER=
+WORKOS_API_KEY=
 ```
 
 Privy is already the live authentication mode. Preserve its existing app secret,
@@ -73,6 +76,11 @@ Set `AUTH_ENABLED=false` if the initial release should offer discovery only.
 cannot enable buys. Enabling trading is a separate release/security decision.
 The control plane has no transaction signer or execution tool. Keep the Neon
 credentials and credential pepper stable across ordinary deployments.
+The WorkOS variables are server-only. A temporary Staging OAuth demo may set
+`AGENT_OAUTH_ENABLED=true` with the matching Staging issuer/key, but its key
+expires and Staging must not become the permanent customer-facing environment.
+WorkOS Production requires its own issuer and key; switching environments does
+not migrate OAuth users or agent grants. Keep trading disabled in either case.
 For an existing VPS runtime file, run `sh deploy/init-control-plane.sh` once
 on that VPS; it appends only a missing pepper and prints no secrets. Add both
 Neon URLs separately to the same protected file before starting the new image.

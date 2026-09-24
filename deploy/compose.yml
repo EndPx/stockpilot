@@ -33,6 +33,10 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
       CONTROL_PLANE_DATABASE_URL: ${CONTROL_PLANE_DATABASE_URL:?Set the protected Neon runtime connection URL}
       CONTROL_PLANE_KEY_PEPPER: ${CONTROL_PLANE_KEY_PEPPER:?Set a distinct random control-plane credential pepper}
+      # WorkOS Connect is opt-in; issuer/key remain server-only runtime secrets.
+      AGENT_OAUTH_ENABLED: ${AGENT_OAUTH_ENABLED:-false}
+      WORKOS_AUTHKIT_ISSUER: ${WORKOS_AUTHKIT_ISSUER:-}
+      WORKOS_API_KEY: ${WORKOS_API_KEY:-}
     depends_on:
       redis:
         condition: service_healthy
