@@ -70,16 +70,22 @@ export async function verifyOAuthCredential(
     verifyToken?: typeof verifySignedToken;
     readUser?: typeof getWorkosUserById;
     resolve?: typeof resolveOAuthPrincipal;
+    onFailure?: (reason: "token_shape" | "jwt_rejected" | "identity_mismatch" | "principal_unavailable") => void;
   } = {},
 ): Promise<AgentPrincipal | null> {
   if (typeof token !== "string" || token.length < 100 || token.length > 8_192 ||
-    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
+    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+    dependencies.onFailure?.("token_shape");
+    return null;
+  }
   const claims = await (dependencies.verifyToken ?? verifySignedToken)(token, config);
-  if (!claims) return null;
+  if (!claims) { dependencies.onFailure?.("jwt_rejected"); return null; }
   // Local connection revocation is checked on every request below. A WorkOS
   // consent revoked only upstream may leave an already-issued JWT usable until
   // its expiry; CIMD clients do not give us an introspection client secret.
   const user = await (dependencies.readUser ?? getWorkosUserById)(claims.subject, config);
-  if (user.id !== claims.subject) return null;
-  return (dependencies.resolve ?? resolveOAuthPrincipal)(claims, user.externalId, config);
+  if (user.id !== claims.subject) { dependencies.onFailure?.("identity_mismatch"); return null; }
+  const principal = await (dependencies.resolve ?? resolveOAuthPrincipal)(claims, user.externalId, config);
+  if (!principal) dependencies.onFailure?.("principal_unavailable");
+  return principal;
 }

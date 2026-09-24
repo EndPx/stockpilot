@@ -11,32 +11,28 @@ const hosts: { id: Host; label: string; hint: string; steps: string[] }[] = [
   { id: "chatgpt", label: "ChatGPT", hint: "Custom connector", steps: [
     "In ChatGPT on the web, enable developer mode and add a custom MCP connector.",
     "Paste the StockPilot server URL below and select OAuth when asked for authentication.",
-    "Connect the connector. Sign in to StockPilot in the browser when a protected tool requests access, then return to ChatGPT.",
+    "Connect the connector. Sign in to StockPilot when ChatGPT requests access, then ask it to list StockPilot markets.",
   ] },
   { id: "claude", label: "Claude", hint: "Connector settings", steps: [
     "Open Claude’s connector settings and add a custom connector.",
     "Paste the StockPilot server URL below and save the connector.",
-    "Choose Connect. Complete the StockPilot sign-in and authorization in the browser, then return to Claude.",
+    "Choose Connect. Complete browser authorization, then ask Claude to list StockPilot markets.",
   ] },
   { id: "codex", label: "Codex", hint: "Remote MCP server", steps: [
     "Add a custom remote MCP server in your Codex MCP settings.",
     "Use the StockPilot server URL below and OAuth authentication, not a key in the URL.",
-    "Complete browser sign-in when Codex requests authorization, then return to Codex.",
+    "Complete browser sign-in when Codex requests authorization, then ask Codex to list StockPilot markets.",
   ] },
 ];
 
 function HostMark({ host }: { host: Host }) {
+  const images: Record<Host, string> = {
+    chatgpt: "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/e6/9a/0e/e69a0e54-a15f-4b2a-cb42-84788edb896e/AppIcon-0-0-1x_U007epad-0-0-0-1-0-P3-85-220.png/256x256bb.png",
+    claude: "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a9/40/3a/a9403a63-cb4d-517c-2f12-44ebe9175936/AppIcon-0-0-1x_U007epad-0-1-85-220.png/256x256bb.png",
+    codex: "https://images.ctfassets.net/kftzwdyauwt9/7E1L5KrvfinYdmBBNDPhf5/710a8a46258bafe8fe2d26f31ff242c0/Codex_Landing_Page_SEO.png?fit=thumb&w=256&h=256&f=center&fm=png",
+  };
   return <span className={`agent-host-mark agent-host-mark-${host}`} aria-hidden="true">
-    {host === "chatgpt" ? <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      {[0, 60, 120, 180, 240, 300].map((angle) => <path key={angle} d="M24 8c6 0 9 4 9 9 0 3-2 6-5 8l-8 5" transform={`rotate(${angle} 24 24)`} stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />)}
-      <circle cx="24" cy="24" r="3" fill="currentColor" />
-    </svg> : host === "claude" ? <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <path d="M24 6v36M6 24h36M11.3 11.3l25.4 25.4m0-25.4L11.3 36.7M17 7l14 34M7 17l34 14M31 7 17 41M41 17 7 31" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" />
-      <circle cx="24" cy="24" r="4.5" fill="currentColor" />
-    </svg> : <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <rect x="7" y="9" width="34" height="30" rx="7" stroke="currentColor" strokeWidth="2.7" />
-      <path d="m17 20 5 4-5 4m10 0h7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>}
+    <img src={images[host]} width="256" height="256" alt="" loading="lazy" referrerPolicy="no-referrer" />
   </span>;
 }
 
@@ -192,7 +188,7 @@ export function ClientsView() {
     <PageHeader title="Agents" description="Connect an AI app with browser authorization, then review what its client can access." action={<Link className="secondary-button" href="/credentials">Credentials</Link>} />
     <AgentConnectionGuide status={oauthStatus} error={oauthError} retry={() => setOauthRevision((value) => value + 1)} />
     <section className="surface control-panel"><div className="surface-header"><h2>Your agents</h2><div className="control-row-actions"><span className="control-muted">{items?.length ?? "—"} clients</span><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div></div>
-      <LoadState items={items} error={error} retry={reload} empty="No agents connected yet. Once an AI app completes OAuth, refresh this list." />
+      <LoadState items={items} error={error} retry={reload} empty="No agent has made an authorized tool request yet. After browser authorization, ask your AI app to list StockPilot markets, then refresh." />
       {items && items.length > 0 && <div className="control-list">{items.map((client) => <article className="control-row" key={client.id}>
         <div className="control-row-main"><strong>{client.name}</strong><span>{client.clientType.replaceAll("_", " ")} · {client.scopes.length} permissions · Last used {formatDate(client.lastUsedAt)}</span></div>
         <span className={`control-status ${client.status === "ACTIVE" ? "control-status-active" : ""}`}>{client.status.toLowerCase()}</span>

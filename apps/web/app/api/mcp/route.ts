@@ -12,6 +12,16 @@ import { verifyOAuthCredential } from "@/lib/control-plane/oauth-tokens";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Fixed, low-frequency failure categories only. Never log bearer bytes, claims,
+// account IDs, client IDs, query strings, IPs, or request bodies.
+const diagnosticAt = new Map<string, number>();
+function recordAuthFailure(reason: string): void {
+  const now = Date.now();
+  if (now - (diagnosticAt.get(reason) ?? 0) < 60_000) return;
+  diagnosticAt.set(reason, now);
+  console.warn("[mcp-auth] Rejected", { reason });
+}
+
 function unauthorized(): Response {
   const oauth = getAgentOAuthConfig();
   const challenge = oauth
@@ -38,13 +48,19 @@ return async function POST(request: Request): Promise<Response> {
     const security = dependencies.securityStore ?? getAuthSecurityStore(config);
     await enforceRateLimit(security, "ip:mcp", trustedClientIp(request, config), 120);
     const header = request.headers.get("authorization");
-    if (!header || !/^Bearer [A-Za-z0-9._-]{1,8192}$/.test(header)) return unauthorized();
+    if (!header) { recordAuthFailure("missing_bearer"); return unauthorized(); }
+    if (!/^Bearer [A-Za-z0-9._-]{1,8192}$/.test(header)) { recordAuthFailure("invalid_bearer_format"); return unauthorized(); }
     const token = header.slice(7);
     const oauth = getAgentOAuthConfig();
     const principal = /^sp_live_[0-9a-f]{32}_[A-Za-z0-9_-]{43}$/.test(token)
       ? await (dependencies.verify ?? verifyCredential)(token)
-      : oauth ? await (dependencies.verifyOAuth ?? verifyOAuthCredential)(token, oauth) : null;
-    if (!principal) return unauthorized();
+      : oauth ? await (dependencies.verifyOAuth ?? verifyOAuthCredential)(token, oauth, {
+        onFailure: (reason) => recordAuthFailure(`oauth_${reason}`),
+      }) : null;
+    if (!principal) {
+      if (!oauth) recordAuthFailure("oauth_unavailable");
+      return unauthorized();
+    }
     await enforceRateLimit(security, "credential:mcp", principal.authMethod === "oauth"
       ? `${principal.oauthIssuer}:${principal.oauthSubject}:${principal.oauthClientId}` : principal.credentialId, 60);
     await enforceRateLimit(security, "account:mcp", principal.accountId, 180);

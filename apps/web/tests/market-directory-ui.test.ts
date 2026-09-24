@@ -27,23 +27,37 @@ test("market rows show ticker without repeating provider names", () => {
     assert.match(html, /EXMP/);
     assert.match(html, /<tr/);
     assert.match(html, /Explore/);
-    assert.match(html, /Copy Example Inc Solana address/);
+    assert.match(html, /View Example Inc Solana token on Solscan/);
+    assert.match(html, /https:\/\/solscan\.io\/token\/11111111111111111111111111111111/);
+    assert.doesNotMatch(html, /Copy Example Inc Solana address/);
     assert.doesNotMatch(html, /PreStocks|xStocks/);
   }
 });
 
 test("Pre-IPO rows show only verified issuer fields and compare token to mark", () => {
-  const asset: InvestmentAsset = { canonical: true, executionStatus: "UNKNOWN", id: "prestocks:11111111111111111111111111111111", provider: "prestocks", marketType: "PRE_IPO", name: "Example Inc", symbol: "EXMP", mintAddress: "11111111111111111111111111111111", imageUrl: null, description: null, tokenPriceUsd: 1293.05, markPriceUsd: 1020.54, impliedValuationUsd: 1_600_000_000_000, markValuationUsd: 1_260_000_000_000, externalUrl: "https://example.com/product" };
+  const asset: InvestmentAsset = { canonical: true, executionStatus: "UNKNOWN", id: "prestocks:11111111111111111111111111111111", provider: "prestocks", marketType: "PRE_IPO", name: "Example Inc", symbol: "EXMP", mintAddress: "11111111111111111111111111111111", imageUrl: null, description: null, tokenPriceUsd: 1293.05, markPriceUsd: 1020.54, impliedValuationUsd: 1_600_000_000_000, markValuationUsd: 1_260_000_000_000, externalUrl: "https://prestocks.com/example" };
   const html = renderToStaticMarkup(createElement(MarketDirectoryRow, { asset }));
   assert.match(html, /\$1,293\.05/);
   assert.match(html, /\$1,020\.54/);
   assert.match(html, /\+26\.7% premium/);
   assert.match(html, /\$1\.6T/);
   assert.match(html, /Information/);
-  assert.match(html, /https:\/\/example\.com\/product/);
+  assert.match(html, /https:\/\/prestocks\.com\/example/);
   assert.equal(formatMarketPremium(marketPremium(1030.23, 1050.84)), "-2.0%");
   assert.equal(marketPremium(null, 100), null);
   assert.equal(marketPremium(100, 0), null);
+});
+
+test("Information links to human catalogs, not API records or untrusted issuer URLs", () => {
+  const base: InvestmentAsset = { canonical: true, executionStatus: "UNKNOWN", id: "xstocks:11111111111111111111111111111111", provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT", name: "Example Inc", symbol: "EXMPx", mintAddress: "11111111111111111111111111111111", imageUrl: null, description: null, tokenPriceUsd: null, metadata: { issuerId: "xstocks", sourceUrl: "https://api.xstocks.fi/api/v2/public/assets/EXMPx", underlyingSymbol: "EXMP", classificationSource: null, underlyingIsin: null, productIsin: null, isTradingHalted: null } };
+  const publicHtml = renderToStaticMarkup(createElement(MarketDirectoryRow, { asset: base }));
+  assert.match(publicHtml, /href="https:\/\/xstocks\.fi\/products"[^>]*>Information/);
+  assert.doesNotMatch(publicHtml, /api\.xstocks\.fi/);
+  const privateHtml = renderToStaticMarkup(createElement(MarketDirectoryRow, { asset: { ...base, provider: "prestocks", marketType: "PRE_IPO", externalUrl: "https://example.com/not-the-issuer" } }));
+  assert.match(privateHtml, /href="https:\/\/prestocks\.com\/products"[^>]*>Information/);
+  assert.doesNotMatch(privateHtml, /example\.com/);
+  const apiHtml = renderToStaticMarkup(createElement(MarketDirectoryRow, { asset: { ...base, provider: "prestocks", marketType: "PRE_IPO", externalUrl: "https://prestocks.com/api/product/EXMP" } }));
+  assert.match(apiHtml, /href="https:\/\/prestocks\.com\/products"[^>]*>Information/);
 });
 
 test("catalog rows do not repeat issuer suffixes in product names", () => {

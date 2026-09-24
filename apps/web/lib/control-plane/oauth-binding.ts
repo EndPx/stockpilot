@@ -7,6 +7,16 @@ import type { AgentOAuthConfig } from "./oauth-config";
 type OAuthIdentity = { privyUserId: string; walletAddress: string; workosUserId: string };
 type OAuthClaims = { subject: string; clientId: string };
 
+export function oauthClientName(clientId: string): string {
+  try {
+    const url = new URL(clientId);
+    if (url.protocol !== "https:" || url.username || url.password || url.hash) return "OAuth client";
+    if (url.hostname === "chatgpt.com") return url.pathname.startsWith("/oauth/codex/") ? "Codex" : "ChatGPT";
+    if (url.hostname === "claude.ai") return "Claude";
+  } catch { /* Opaque DCR client IDs have no public product name. */ }
+  return "OAuth client";
+}
+
 /** Called only after the browser's active Privy session and embedded wallet have been reverified. */
 export async function bindOAuthSubject(identity: OAuthIdentity, config: AgentOAuthConfig, store: ControlStore = controlStore): Promise<void> {
   await store.transaction(async (db) => {
@@ -59,7 +69,7 @@ export async function resolveOAuthPrincipal(
     let clientId = connection.rows[0]?.client_id;
     if (!clientId) {
       clientId = randomUUID();
-      const name = `OAuth ${claims.clientId.slice(0, 40)}`;
+      const name = oauthClientName(claims.clientId);
       await db.query(
         "INSERT INTO control_clients(id, account_id, name, client_type) VALUES ($1, $2, $3, 'CUSTOM')",
         [clientId, binding.account_id, name],

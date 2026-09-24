@@ -25,12 +25,16 @@ test("ready Agent onboarding names OAuth, host setup, and the server URL without
   assert.match(html, /agent-host-mark-chatgpt/);
   assert.match(html, /agent-host-mark-claude/);
   assert.match(html, /agent-host-mark-codex/);
+  assert.match(html, /mzstatic\.com\/image\/thumb/);
+  assert.match(html, /images\.ctfassets\.net/);
+  assert.doesNotMatch(html, /<svg[^>]*viewBox="0 0 48 48"/);
   assert.equal((html.match(/aria-haspopup="dialog"/g) ?? []).length, 3);
   assert.match(html, /<dialog[^>]*class="agent-connect-dialog"/);
   assert.doesNotMatch(html.split("<dialog")[0], /stockpilot\.endpx\.cloud\/api\/mcp|Copy server URL/);
   assert.match(html, /stockpilot\.endpx\.cloud\/api\/mcp/);
   assert.match(html, /Copy server URL/);
   assert.match(html, /Complete OAuth/);
+  assert.match(html, /ask it to list StockPilot markets/);
   assert.doesNotMatch(html, /sp_live_|New client|Create client|Issue key/);
 });
 

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import { bindOAuthSubject, resolveOAuthPrincipal } from "../lib/control-plane/oauth-binding";
+import { bindOAuthSubject, oauthClientName, resolveOAuthPrincipal } from "../lib/control-plane/oauth-binding";
 import { getAgentOAuthConfig } from "../lib/control-plane/oauth-config";
 import { authorizationServerMetadata, protectedResourceMetadata } from "../lib/control-plane/oauth-metadata";
 import { parseWorkosAccessClaims, verifyOAuthCredential, verifySignedToken } from "../lib/control-plane/oauth-tokens";
@@ -174,8 +174,37 @@ test("OAuth subject requires browser binding; connection defaults to markets-onl
 
 test("OAuth credential verification rejects malformed tokens before any remote call", async () => {
   let remoteCalls = 0;
+  const failures: string[] = [];
   assert.equal(await verifyOAuthCredential("not-a-jwt", config, {
     readUser: async () => { remoteCalls++; return { id: subject, externalId: privy }; },
+    onFailure: (reason) => failures.push(reason),
   }), null);
   assert.equal(remoteCalls, 0);
+  assert.deepEqual(failures, ["token_shape"]);
+});
+
+test("known OAuth client domains get readable agent names without trusting arbitrary client metadata", () => {
+  assert.equal(oauthClientName("https://chatgpt.com/oauth/codex/example/client.json"), "Codex");
+  assert.equal(oauthClientName("https://chatgpt.com/oauth/connectors/example.json"), "ChatGPT");
+  assert.equal(oauthClientName("https://claude.ai/oauth/client.json"), "Claude");
+  assert.equal(oauthClientName("https://chatgpt.com.evil.example/client.json"), "OAuth client");
+  assert.equal(oauthClientName("client_01JP8BD0CZ401TDF9X54NT5ZEK"), "OAuth client");
+});
+
+test("OAuth diagnostics classify token and binding failure without exposing credential material", async () => {
+  const failures: string[] = [];
+  const fakeToken = `${"a".repeat(40)}.${"b".repeat(40)}.${"c".repeat(40)}`;
+  const report = (reason: string) => { failures.push(reason); };
+  assert.equal(await verifyOAuthCredential(fakeToken, config, {
+    verifyToken: async () => null,
+    onFailure: report,
+  }), null);
+  assert.equal(await verifyOAuthCredential(fakeToken, config, {
+    verifyToken: async () => ({ subject, clientId }),
+    readUser: async () => ({ id: subject, externalId: privy }),
+    resolve: async () => null,
+    onFailure: report,
+  }), null);
+  assert.deepEqual(failures, ["jwt_rejected", "principal_unavailable"]);
+  assert.equal(failures.join(" ").includes(fakeToken), false);
 });
