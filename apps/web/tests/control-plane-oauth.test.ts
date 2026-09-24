@@ -79,6 +79,9 @@ test("WorkOS completion accepts only provider redirect and exact external Privy 
   const oauth2Redirect = `${issuer}/oauth2/authorize/complete?state=opaque`;
   assert.equal((await completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
     mockFetch({ redirect_uri: oauth2Redirect }))).toString(), oauth2Redirect);
+  const providerOwnedRedirect = `${issuer}/connect/finish?state=opaque`;
+  assert.equal((await completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
+    mockFetch({ redirect_uri: providerOwnedRedirect }))).toString(), providerOwnedRedirect);
   await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
     mockFetch({ redirect_uri: "https://evil.example/steal" })), (error) => {
       assert.ok(error instanceof WorkosApiProtocolError);
@@ -87,8 +90,8 @@ test("WorkOS completion accepts only provider redirect and exact external Privy 
       return true;
     });
   await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
-    mockFetch({ redirect_uri: `${issuer}/oauth2/authorize/elsewhere?state=opaque` })),
-    (error) => error instanceof WorkosApiProtocolError && error.code === "untrusted_path");
+    mockFetch({ redirect_uri: `https://attacker@${new URL(issuer).host}/connect/finish?state=opaque` })),
+    (error) => error instanceof WorkosApiProtocolError && error.code === "untrusted_redirect");
   await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
     mockFetch({ redirect_uri: `${issuer}/oauth2/authorize/complete?state=opaque#fragment` })),
     (error) => error instanceof WorkosApiProtocolError && error.code === "untrusted_redirect");
