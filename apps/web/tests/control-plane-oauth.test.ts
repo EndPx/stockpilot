@@ -143,6 +143,36 @@ test("JWT signature verifier enforces WorkOS issuer, exact MCP audience, expiry 
   assert.equal(await verifySignedToken(await signed(issuer, resource, "-1h"), config, keys), null);
 });
 
+test("JWT diagnostics report fixed categories without recording token material", async () => {
+  const { publicKey, privateKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  jwk.kid = "test-workos-key";
+  const keys = createLocalJWKSet({ keys: [jwk] });
+  const claims = { sub: subject, client_id: clientId, sid: "app_consent_01JPXN6KAQW83AMXXY5WX3RHTJ",
+    jti: "01JPXN6KFGZQYW3AM2DEVX84YS", scope: "openid profile" };
+  const signed = (payload: Record<string, unknown>, tokenIssuer = issuer, audience: string | string[] = resource,
+    expiresIn = "5m") => new SignJWT(payload).setProtectedHeader({ alg: "RS256", kid: jwk.kid })
+    .setIssuer(tokenIssuer).setAudience(audience).setIssuedAt().setExpirationTime(expiresIn).sign(privateKey);
+  const failures: string[] = [];
+  const check = async (token: string, expected: string) => {
+    failures.length = 0;
+    assert.equal(await verifySignedToken(token, config, keys, (reason) => failures.push(reason)), null);
+    assert.deepEqual(failures, [expected]);
+    assert.equal(failures.join(" ").includes(token), false);
+  };
+  await check(await signed(claims, "https://other.example"), "jwt_issuer");
+  await check(await signed(claims, issuer, "https://other.example/api/mcp"), "jwt_audience");
+  await check(await signed(claims, issuer, [resource, "https://other.example/api/mcp"]), "jwt_audience");
+  await check(await signed(claims, issuer, resource, "-1h"), "jwt_expired");
+  await check(await signed({ ...claims, sid: undefined }), "jwt_claims_consent");
+  await check(await signed({ ...claims, scope: "profile" }), "jwt_claims_scope");
+  failures.length = 0;
+  const token = await signed(claims);
+  assert.equal(await verifySignedToken(token, config, async () => { throw Object.assign(new Error("private"),
+    { code: "ERR_JWKS_TIMEOUT" }); }, (reason) => failures.push(reason)), null);
+  assert.deepEqual(failures, ["jwt_key_unavailable"]);
+});
+
 test("OAuth subject requires browser binding; connection defaults to markets-only and revocation stays closed", async () => {
   const db = await PGlite.create();
   await db.exec(scripts.join("\n"));
