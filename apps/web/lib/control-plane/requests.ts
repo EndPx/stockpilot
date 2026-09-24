@@ -173,15 +173,14 @@ function amountMicros(value: string): bigint {
 
 export async function createInvestmentRequest(
   principal: AgentPrincipal,
-  input: { assetId: string; amountUsd: string; clientRequestId?: string },
+  input: { assetId: string; amountUsd: string; clientRequestId: string },
   store: ControlStore = controlStore,
   resolveAsset: AssetResolver = resolveCanonicalPreStock,
 ): Promise<InvestmentRequestRecord> {
   if (!input || typeof input.assetId !== "string" || !/^prestocks:[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input.assetId) ||
       typeof input.amountUsd !== "string" ||
-      (input.clientRequestId !== undefined && (typeof input.clientRequestId !== "string" ||
-        !/^[A-Za-z0-9_-]{16,128}$/.test(input.clientRequestId)))) {
-    throw new RequestError("INVALID_INPUT", "A canonical PreStocks assetId and amountUsd are required.");
+      typeof input.clientRequestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(input.clientRequestId)) {
+    throw new RequestError("INVALID_INPUT", "A canonical PreStocks assetId, amountUsd and clientRequestId are required.");
   }
   if (!principal.scopes.includes("investments:request")) {
     throw new RequestError("CLIENT_NOT_ALLOWED", "Client is not permitted to request this investment.");
@@ -222,19 +221,17 @@ export async function createInvestmentRequest(
         !grant.allowed_providers.includes(asset.provider) || !grant.allowed_market_types.includes(asset.marketType)) {
       throw new RequestError("CLIENT_NOT_ALLOWED", "Client is not permitted to request this investment.");
     }
-    if (input.clientRequestId) {
-      const prior = await db.query<RequestRow>(
-        `SELECT * FROM control_investment_requests
-         WHERE client_id = $1 AND client_request_id = $2`,
-        [principal.clientId, input.clientRequestId],
-      );
-      if (prior.rows.length) {
-        const existing = prior.rows[0];
-        if (existing.asset_id !== input.assetId || amountMicros(existing.amount_usd) !== requestedMicros) {
-          throw new RequestError("IDEMPOTENCY_CONFLICT", "This clientRequestId was used for a different investment intent.");
-        }
-        return normalizeRequest(existing);
+    const prior = await db.query<RequestRow>(
+      `SELECT * FROM control_investment_requests
+       WHERE client_id = $1 AND client_request_id = $2`,
+      [principal.clientId, input.clientRequestId],
+    );
+    if (prior.rows.length) {
+      const existing = prior.rows[0];
+      if (existing.asset_id !== input.assetId || amountMicros(existing.amount_usd) !== requestedMicros) {
+        throw new RequestError("IDEMPOTENCY_CONFLICT", "This clientRequestId was used for a different investment intent.");
       }
+      return normalizeRequest(existing);
     }
     if (grant.max_investment_usd !== null && requestedMicros > amountMicros(grant.max_investment_usd)) {
       throw new RequestError("POLICY_LIMIT", "Amount exceeds the client's per-request limit.");
@@ -258,7 +255,7 @@ export async function createInvestmentRequest(
        VALUES ($1, $2, $3, $4, $5, $6, 'prestocks', 'PRE_IPO', $7, $8, $9, $10, $11, $12,
                now() + interval '15 minutes') RETURNING *`,
       [id, principal.accountId, principal.clientId, asset.id, asset.name, asset.symbol,
-        asset.mintAddress, SOLANA_MAINNET_USDC_MINT, input.amountUsd, input.clientRequestId ?? null,
+        asset.mintAddress, SOLANA_MAINNET_USDC_MINT, input.amountUsd, input.clientRequestId,
         grant.version, grant.max_investment_usd],
     );
     await db.query(

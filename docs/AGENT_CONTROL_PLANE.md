@@ -99,8 +99,10 @@ otherwise show generic endpoint/header guidance.
 Only six tools are in scope: `list_assets`, `get_asset`, `get_portfolio`,
 `request_investment`, `get_request`, `list_requests`. List tools are bounded and
 paginated. Portfolio always reads the account's verified wallet. Request input
-is exactly canonical `assetId` plus decimal `amountUsd`; provider, mint, wallet,
-account, client and policy are resolved server-side. `request_investment` creates
+is canonical `assetId`, decimal `amountUsd`, and a mandatory `clientRequestId`
+(16–128 URL-safe characters, unique per client/intent and stable across retries).
+Provider, mint, wallet, account, client and policy are resolved server-side.
+Reusing an ID with a changed asset or amount is rejected. `request_investment` creates
 `PENDING_APPROVAL` and an audit event, never calls Jupiter or a signer. A client
 can query only its own requests. No execute/sign/send/swap/transfer tool exists.
 

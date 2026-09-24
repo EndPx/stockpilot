@@ -20,6 +20,7 @@ const asset: InvestmentAsset = {
   description: null, imageUrl: null, tokenPriceUsd: null,
 };
 const resolveAsset: AssetResolver = async (id) => ({ asset: id === asset.id ? asset : null, stale: false });
+const intent = (assetId: string, amountUsd: string) => ({ assetId, amountUsd, clientRequestId: crypto.randomUUID() });
 
 async function setup(scopes: ["investments:request"] | ["markets:read"] = ["investments:request"]) {
   const db = await PGlite.create();
@@ -45,7 +46,7 @@ test("agent request is immutable pending intent without transaction material", a
   try {
     fixture = await setup();
     const { db, store, principal } = fixture;
-    const request = await createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "5.25" }, store, resolveAsset);
+    const request = await createInvestmentRequest(principal, intent(asset.id, "5.25"), store, resolveAsset);
     assert.equal(request.status, "PENDING_APPROVAL");
     assert.equal(request.amountUsd, "5.250000");
     assert.equal(request.assetId, asset.id);
@@ -71,16 +72,21 @@ test("per-request, daily, scope, provider, and credential gates fail closed", as
   try {
     fixture = await setup();
     const { db, store, principal } = fixture;
-    await assert.rejects(createInvestmentRequest(principal, { assetId: mint, amountUsd: "1" }, store, resolveAsset));
-    await assert.rejects(createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "11" }, store, resolveAsset));
-    await assert.rejects(createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "1" }, store,
+    await assert.rejects(createInvestmentRequest(principal,
+      { assetId: asset.id, amountUsd: "1" } as Parameters<typeof createInvestmentRequest>[1], store, resolveAsset),
+    /clientRequestId/);
+    await assert.rejects(createInvestmentRequest(principal, { ...intent(asset.id, "1"), clientRequestId: "short" },
+      store, resolveAsset), /clientRequestId/);
+    await assert.rejects(createInvestmentRequest(principal, intent(mint, "1"), store, resolveAsset));
+    await assert.rejects(createInvestmentRequest(principal, intent(asset.id, "11"), store, resolveAsset));
+    await assert.rejects(createInvestmentRequest(principal, intent(asset.id, "1"), store,
       async () => ({ asset, stale: true })));
-    await assert.rejects(createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "1" }, store,
+    await assert.rejects(createInvestmentRequest(principal, intent(asset.id, "1"), store,
       async () => ({ asset: { ...asset, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT" }, stale: false })));
-    await createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "10" }, store, resolveAsset);
-    await assert.rejects(createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "6" }, store, resolveAsset));
+    await createInvestmentRequest(principal, intent(asset.id, "10"), store, resolveAsset);
+    await assert.rejects(createInvestmentRequest(principal, intent(asset.id, "6"), store, resolveAsset));
     await db.query("UPDATE control_credentials SET revoked_at = now() WHERE id = $1", [principal.credentialId]);
-    await assert.rejects(createInvestmentRequest(principal, { assetId: asset.id, amountUsd: "1" }, store, resolveAsset));
+    await assert.rejects(createInvestmentRequest(principal, intent(asset.id, "1"), store, resolveAsset));
     const count = await db.query<{ total: number }>("SELECT count(*)::integer AS total FROM control_investment_requests");
     assert.equal(count.rows[0].total, 1);
   } finally {
@@ -93,7 +99,7 @@ test("per-request, daily, scope, provider, and credential gates fail closed", as
   try {
     noScope = await setup(["markets:read"]);
     await assert.rejects(createInvestmentRequest(noScope.principal,
-      { assetId: asset.id, amountUsd: "1" }, noScope.store, resolveAsset));
+      intent(asset.id, "1"), noScope.store, resolveAsset));
   } finally {
     if (noScope) await noScope.db.close();
     if (oldPepper === undefined) delete process.env.CONTROL_PLANE_KEY_PEPPER;
@@ -124,22 +130,22 @@ test("OAuth requests require a live owner-bound connection and honor explicit un
     };
     await db.query(`UPDATE control_grant_policies SET scopes = ARRAY['investments:request', 'requests:read-own'],
       max_investment_usd = NULL, daily_request_limit_usd = NULL WHERE client_id = $1`, [client.id]);
-    const request = await createInvestmentRequest(oauthPrincipal, { assetId: asset.id, amountUsd: "100" }, store, resolveAsset);
+    const request = await createInvestmentRequest(oauthPrincipal, intent(asset.id, "100"), store, resolveAsset);
     assert.equal(request.status, "PENDING_APPROVAL");
     assert.equal(request.policyMaxInvestmentUsd, null);
     assert.equal((await getClientRequest(oauthPrincipal, request.id, store)).id, request.id);
     assert.equal((await listClientRequests(oauthPrincipal, 5, undefined, store)).requests[0].id, request.id);
     await assert.rejects(createInvestmentRequest({ ...oauthPrincipal, oauthSubject: "attacker" },
-      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset), /not permitted/);
+      intent(asset.id, "1"), store, resolveAsset), /not permitted/);
     await db.query("UPDATE control_oauth_connections SET revoked_at = now() WHERE client_id = $1", [client.id]);
     await assert.rejects(createInvestmentRequest(oauthPrincipal,
-      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset), /not permitted/);
+      intent(asset.id, "1"), store, resolveAsset), /not permitted/);
     await assert.rejects(getClientRequest(oauthPrincipal, request.id, store), /not found/);
     assert.deepEqual((await listClientRequests(oauthPrincipal, 5, undefined, store)).requests, []);
     // A distinct valid API key remains independently controlled by its own credential.
     assert.equal(principal.authMethod, "api_key");
     assert.equal((await createInvestmentRequest(principal,
-      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset)).status, "PENDING_APPROVAL");
+      intent(asset.id, "1"), store, resolveAsset)).status, "PENDING_APPROVAL");
   } finally {
     if (fixture) await fixture.db.close();
     if (oldPepper === undefined) delete process.env.CONTROL_PLANE_KEY_PEPPER;

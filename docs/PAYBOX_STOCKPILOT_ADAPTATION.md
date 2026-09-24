@@ -47,13 +47,15 @@ token expires.
 ## Investment request lifecycle
 
 An agent sends only a canonical investment intent, never a Solana transaction,
-wallet key or arbitrary mint. StockPilot resolves the official asset and USDC
-mint server-side and creates one durable, immutable request. The caller retains
-the request ID and polls its status; retrying a write with the same idempotency
-key returns that same request, while a changed intent requires a new key.
-The current approval-request API still accepts requests without a client key;
-require `clientRequestId` before connecting any approved request to execution,
-because a timeout followed by an unkeyed retry can create a second request.
+wallet key or arbitrary mint. Every `request_investment` call requires a
+`clientRequestId` of 16–128 URL-safe characters, unique per client and intent.
+The caller generates and retains this ID before the first call, then reuses it
+for retries. StockPilot resolves the official asset and USDC mint server-side
+and creates one durable, immutable request. A retry with the same ID and exact
+asset/amount returns that request; reusing it for a changed intent is rejected.
+The caller retains the returned request ID and polls its status. Historical
+rows without a client-generated ID remain readable, but new requests cannot
+omit it. This closes the unkeyed-retry gap; it does not enable execution.
 
 `PENDING_APPROVAL` is distinct from `PENDING_SIGNATURE`, `SUBMITTED`,
 `CONFIRMED`, `REJECTED`, `FAILED` and `AMBIGUOUS`. A human decision binds the

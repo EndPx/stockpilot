@@ -104,9 +104,9 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
     });
 
     server.registerTool("request_investment", {
-      description: "Create a PreStocks investment REQUEST for human approval. Reuse clientRequestId when retrying the same intent. This never prepares, signs or executes a transaction.",
+      description: "Create a PreStocks investment REQUEST for human approval. Supply a unique clientRequestId per intent and reuse it for retries. This never prepares, signs or executes a transaction.",
       inputSchema: z.object({ assetId: z.string().min(1).max(100), amountUsd: z.string().min(1).max(40),
-        clientRequestId: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional() }).strict(),
+        clientRequestId: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/) }).strict(),
     }, async (input) => {
       if (!can("investments:request")) return denied();
       try {

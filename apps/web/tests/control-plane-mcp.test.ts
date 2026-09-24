@@ -12,11 +12,12 @@ const asset: InvestmentAsset = {
   description: null, imageUrl: null, tokenPriceUsd: 100,
 };
 const requestId = "c9780dca-f3a3-4212-9232-3c32fab8e33c";
+const clientRequestId = "stockpilot_mcp_request_0001";
 const saved: InvestmentRequestRecord = {
   id: requestId, clientId: "183fc984-91ea-4c08-9870-d62f3da31614", assetId: asset.id,
   assetName: asset.name, assetSymbol: asset.symbol, provider: "prestocks", marketType: "PRE_IPO",
   canonicalMint: mint, fundingMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  amountUsd: "5.000000", clientRequestId: null, policyVersion: 1, policyMaxInvestmentUsd: "10.000000",
+  amountUsd: "5.000000", clientRequestId, policyVersion: 1, policyMaxInvestmentUsd: "10.000000",
   status: "PENDING_APPROVAL", createdAt: "2026-09-23T00:00:00.000Z",
   expiresAt: "2026-09-23T00:15:00.000Z", decidedAt: null,
 };
@@ -40,7 +41,7 @@ function fixture(scopes = principal.scopes) {
         portfolioValueUsd: 0, positions: [], asOf: "2026-09-23T00:00:00.000Z" };
     },
     createRequest: async (caller, input) => {
-      calls.push(`request:${caller.accountId}:${caller.clientId}:${input.assetId}:${input.amountUsd}`);
+      calls.push(`request:${caller.accountId}:${caller.clientId}:${input.assetId}:${input.amountUsd}:${input.clientRequestId}`);
       return saved;
     },
     getRequest: async (caller) => {
@@ -92,21 +93,24 @@ test("MCP tools bind portfolio and request to server principal; missing scope is
   assert.equal(JSON.parse(detail.result?.content?.[0].text ?? "{}").asset.canonicalMint, mint);
   const portfolio = await call("get_portfolio", {});
   assert.equal(JSON.parse(portfolio.result?.content?.[0].text ?? "{}").availableUsdc, "12");
-  const created = await call("request_investment", { assetId: asset.id, amountUsd: "5" });
+  const missingKey = await call("request_investment", { assetId: asset.id, amountUsd: "5" });
+  assert.equal(missingKey.result?.isError, true);
+  const created = await call("request_investment", { assetId: asset.id, amountUsd: "5", clientRequestId });
   assert.equal(JSON.parse(created.result?.content?.[0].text ?? "{}").status, "PENDING_APPROVAL");
+  assert.equal(JSON.parse(created.result?.content?.[0].text ?? "{}").clientRequestId, clientRequestId);
   assert.equal(JSON.parse(created.result?.content?.[0].text ?? "{}").executionAvailable, false);
   assert.ok((await call("get_request", { requestId })).result?.content?.length);
   assert.ok((await call("list_requests", {})).result?.content?.length);
   assert.deepEqual(calls, [
     `portfolio:${principal.walletAddress}`,
-    `request:${principal.accountId}:${principal.clientId}:${asset.id}:5`,
+    `request:${principal.accountId}:${principal.clientId}:${asset.id}:5:${clientRequestId}`,
     `get:${principal.clientId}`, `list:${principal.clientId}`,
   ]);
   await handler.close();
 
   const restricted = fixture(["markets:read"]);
   const denied = await rpc(restricted.handler, "tools/call", { name: "request_investment",
-    arguments: { assetId: asset.id, amountUsd: "5" } });
+    arguments: { assetId: asset.id, amountUsd: "5", clientRequestId } });
   assert.equal(denied.result?.isError, true);
   assert.deepEqual(restricted.calls, []);
   await restricted.handler.close();

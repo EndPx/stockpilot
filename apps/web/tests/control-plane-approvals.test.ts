@@ -39,7 +39,8 @@ test("only owner decides exact pending request; client only reads its own status
     const ap = await verifyCredential((await issueCredential(alice, a.id, store)).secret, store);
     const bp = await verifyCredential((await issueCredential(bob, b.id, store)).secret, store);
     assert.ok(ap && bp);
-    const request = await createInvestmentRequest(ap, { assetId: asset.id, amountUsd: "5" }, store, resolveAsset);
+    const request = await createInvestmentRequest(ap,
+      { assetId: asset.id, amountUsd: "5", clientRequestId: crypto.randomUUID() }, store, resolveAsset);
     assert.equal((await getClientRequest(ap, request.id, store)).status, "PENDING_APPROVAL");
     assert.deepEqual((await listClientRequests(bp, 10, undefined, store)).requests, []);
     await assert.rejects(getClientRequest(bp, request.id, store));
