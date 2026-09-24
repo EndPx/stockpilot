@@ -8,7 +8,10 @@ import { issueCredential, verifyCredential } from "../lib/control-plane/credenti
 import { createInvestmentRequest, getClientRequest, listClientRequests, type AssetResolver } from "../lib/control-plane/requests";
 import { decideRequest, getOwnerRequest, listOwnerRequests } from "../lib/control-plane/approvals";
 
-const sql = await readFile(new URL("../migrations/0001_agent_control_plane.sql", import.meta.url), "utf8");
+const sql = (await Promise.all([
+  "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
+  "0003_idempotent_investment_requests.sql",
+].map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 const alice = { privyUserId: "did:privy:alice", walletAddress: "11111111111111111111111111111111" };
 const bob = { privyUserId: "did:privy:bob", walletAddress: "22222222222222222222222222222222" };
 const mint = "So11111111111111111111111111111111111111112";

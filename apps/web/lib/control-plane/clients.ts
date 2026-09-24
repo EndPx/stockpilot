@@ -130,6 +130,8 @@ export async function revokeClient(identity: ControlIdentity, clientId: string, 
     if (!result.rows.length) throw new ControlPlaneError("CLIENT_NOT_FOUND", "Client not found or already revoked.");
     await client.query(`UPDATE control_credentials SET revoked_at = now()
       WHERE client_id = $1 AND revoked_at IS NULL`, [clientId]);
+    await client.query(`UPDATE control_oauth_connections SET revoked_at = now()
+      WHERE client_id = $1 AND revoked_at IS NULL`, [clientId]);
     await client.query(`INSERT INTO control_activity_events
       (id, account_id, client_id, event_type, actor_type)
       VALUES ($1, $2, $3, 'CLIENT_REVOKED', 'USER')`, [crypto.randomUUID(), identity.privyUserId, clientId]);

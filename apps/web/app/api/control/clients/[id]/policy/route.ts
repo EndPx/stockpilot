@@ -18,10 +18,13 @@ export async function PATCH(request: Request, context: RouteContext<"/api/contro
     const identity = await requireControlOwner(request, true);
     const { id } = await context.params;
     const body = exactObject(await readJsonBody(request, 2_048),
-      ["scopes", "maxInvestmentUsd", "dailyRequestLimitUsd", "expectedVersion"]);
+      ["scopes", "buyMode", "sellMode", "maxInvestmentUsd", "dailyRequestLimitUsd", "expectedVersion"]);
     const policy = await updatePolicy(identity, id, {
-      scopes: body.scopes as ClientScope[], maxInvestmentUsd: body.maxInvestmentUsd as string,
-      dailyRequestLimitUsd: body.dailyRequestLimitUsd as string, expectedVersion: body.expectedVersion as number,
+      scopes: body.scopes as ClientScope[], maxInvestmentUsd: body.maxInvestmentUsd as string | null,
+      dailyRequestLimitUsd: body.dailyRequestLimitUsd as string | null,
+      buyMode: body.buyMode as "DISABLED" | "APPROVAL" | "AUTO" | undefined,
+      sellMode: body.sellMode as "DISABLED" | "APPROVAL" | "AUTO" | undefined,
+      expectedVersion: body.expectedVersion as number,
     });
     return jsonResponse({ policy });
   } catch (error) { return controlApiError(error); }

@@ -5,7 +5,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { createClient } from "../lib/control-plane/clients";
 import { getPolicy, updatePolicy } from "../lib/control-plane/policies";
 
-const sql = await readFile(new URL("../migrations/0001_agent_control_plane.sql", import.meta.url), "utf8");
+const sql = (await Promise.all([
+  "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
+].map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 const alice = { privyUserId: "did:privy:alice", walletAddress: "11111111111111111111111111111111" };
 const bob = { privyUserId: "did:privy:bob", walletAddress: "22222222222222222222222222222222" };
 
@@ -61,6 +63,46 @@ test("unsupported grants and invalid limits cannot be stored", async () => {
     }, store));
     await assert.rejects(db.query("UPDATE control_grant_policies SET approval_mode = 'AUTO' WHERE client_id = $1", [client.id]));
     await assert.rejects(db.query("UPDATE control_grant_policies SET allowed_providers = ARRAY['xstocks'] WHERE client_id = $1", [client.id]));
+  } finally {
+    await db.close();
+  }
+});
+
+test("owner can explicitly remove approval-request caps, but cannot enable unimplemented trading", async () => {
+  const db = await PGlite.create();
+  await db.exec(sql);
+  const store = {
+    transaction: <T>(work: (client: { query: typeof db.query }) => Promise<T>) => db.transaction((tx) => work({ query: tx.query.bind(tx) })),
+    query: db.query.bind(db),
+  };
+  try {
+    const client = await createClient({
+      identity: alice, name: "Claude", clientType: "CLAUDE_CODE", scopes: ["markets:read", "investments:request"],
+      maxInvestmentUsd: "10", dailyRequestLimitUsd: "50",
+    }, store);
+    const original = await getPolicy(alice, client.id, store);
+    assert.equal(original.buyMode, "APPROVAL");
+    assert.equal(original.sellMode, "DISABLED");
+    assert.equal(original.maxInvestmentUsd, "10.000000");
+    const unlimited = await updatePolicy(alice, client.id, {
+      scopes: original.scopes, buyMode: "APPROVAL", sellMode: "DISABLED",
+      maxInvestmentUsd: null, dailyRequestLimitUsd: null, expectedVersion: original.version,
+    }, store);
+    assert.equal(unlimited.maxInvestmentUsd, null);
+    assert.equal(unlimited.dailyRequestLimitUsd, null);
+    await assert.rejects(updatePolicy(alice, client.id, {
+      scopes: original.scopes, buyMode: "AUTO", sellMode: "DISABLED",
+      maxInvestmentUsd: null, dailyRequestLimitUsd: null, expectedVersion: unlimited.version,
+    }, store), /Automatic trading/);
+    await assert.rejects(updatePolicy(alice, client.id, {
+      scopes: original.scopes, buyMode: "APPROVAL", sellMode: "APPROVAL",
+      maxInvestmentUsd: null, dailyRequestLimitUsd: null, expectedVersion: unlimited.version,
+    }, store), /Automatic trading and selling/);
+    await assert.rejects(updatePolicy(alice, client.id, {
+      scopes: ["markets:read"], buyMode: "APPROVAL", sellMode: "DISABLED",
+      maxInvestmentUsd: null, dailyRequestLimitUsd: null, expectedVersion: unlimited.version,
+    }, store), /must agree/);
+    assert.equal((await getPolicy(alice, client.id, store)).version, unlimited.version);
   } finally {
     await db.close();
   }

@@ -26,7 +26,7 @@ test("MCP bearer authentication and host/origin checks run before SDK dispatch",
   let verified = 0;
   const post = createMcpPost({ securityStore, verify: async () => {
     verified++;
-    return { accountId: "did:privy:alice", walletAddress: "11111111111111111111111111111111",
+    return { authMethod: "api_key", accountId: "did:privy:alice", walletAddress: "11111111111111111111111111111111",
       clientId: "183fc984-91ea-4c08-9870-d62f3da31614",
       credentialId: "c9780dca-f3a3-4212-9232-3c32fab8e33d", scopes: ["markets:read"] };
   } });

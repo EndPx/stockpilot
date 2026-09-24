@@ -16,11 +16,12 @@ const saved: InvestmentRequestRecord = {
   id: requestId, clientId: "183fc984-91ea-4c08-9870-d62f3da31614", assetId: asset.id,
   assetName: asset.name, assetSymbol: asset.symbol, provider: "prestocks", marketType: "PRE_IPO",
   canonicalMint: mint, fundingMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  amountUsd: "5.000000", policyVersion: 1, policyMaxInvestmentUsd: "10.000000",
+  amountUsd: "5.000000", clientRequestId: null, policyVersion: 1, policyMaxInvestmentUsd: "10.000000",
   status: "PENDING_APPROVAL", createdAt: "2026-09-23T00:00:00.000Z",
   expiresAt: "2026-09-23T00:15:00.000Z", decidedAt: null,
 };
 const principal: AgentPrincipal = {
+  authMethod: "api_key",
   accountId: "did:privy:alice", walletAddress: "11111111111111111111111111111111",
   clientId: saved.clientId, credentialId: "c9780dca-f3a3-4212-9232-3c32fab8e33d",
   scopes: ["markets:read", "portfolio:read", "investments:request", "requests:read-own"],

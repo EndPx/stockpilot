@@ -26,8 +26,9 @@ execution color. Financial data is dense but never theatrical.
 
 Primary journeys are: understand the product, browse official PreStocks and xStocks, inspect
 one asset, sign in through Privy, inspect the verified Solana wallet and real
-on-chain portfolio, register an agent client, issue a one-time MCP credential,
-review bounded investment requests, and inspect activity. Human authorization and source clarity
+on-chain portfolio, connect an AI host to StockPilot via browser OAuth when
+configured, review agent access in Settings, review investment requests, and
+inspect activity. Human authorization and source clarity
 remain more important than decorative polish.
 
 Must not have: copied Paybox assets/copy, fake P&L or historical charts, token
@@ -162,14 +163,10 @@ states.
 Agent control plane extension (2026-09-23): retain the compact graphite shell.
 Desktop rail includes Agents, Credentials, Approvals, and Activity as operational
 destinations. Agents lists named clients, their type, active/revoked state, last
-use and policy; creation requires explicit scope and per-request/daily limits.
-Credentials includes the verified Solana wallet section plus agent credential
-summaries. Newly issued bearer credentials appear exactly once in a distinct
-copy panel with a warning to store them securely; revisiting never reveals the
-secret. Rotation and revocation are explicit destructive actions with confirmation.
-Show hosted MCP endpoint and short connection instructions for Claude Code,
-Codex, Cursor, and a custom client, but never place a live key in a URL or
-persist it in browser storage. Approvals separates pending from decided requests;
+use and policy. Credentials includes the verified Solana wallet section plus
+legacy agent credential summaries. Existing bearer credentials appear only as
+masked summaries; rotation and revocation require confirmation. No live key goes
+in a URL or browser storage. Approvals separates pending from decided requests;
 detail shows client, canonical asset/mint, USDC amount, policy snapshot,
 deadline, and clear Approve/Reject. Approve records consent only: no wallet
 signature, order preparation or execution occurs. Activity gives actor, event,
@@ -177,6 +174,49 @@ client, related request and timestamp. All views distinguish loading, empty,
 error, and ready states; mutation controls distinguish idle, busy, success and
 failure. A failed load is never represented as an empty list. Financial execution
 remains off in production until a separately reviewed and accepted gate.
+
+Agent OAuth onboarding revision (2026-09-25): the Agents page is the single
+entry for new AI-host connections. It checks server-reported OAuth readiness
+before showing host-specific instructions and the HTTPS MCP endpoint. When OAuth
+is not configured, show an explicit unavailable state, never a copyable
+"connect now" route or a false connected state. When available, guide ChatGPT,
+Claude and Codex through their host's custom MCP setup: add the StockPilot URL,
+start the host's OAuth flow, authenticate in the browser, then return to that
+host. Copying a URL does not connect an agent. There is no manual New Client form,
+client type selector, limit form, or static bearer issuance in the new connection
+path. The existing client list remains the source of connected/revoked records;
+legacy keys remain manageable in Credentials for compatibility, with no new key
+issuance through the UI. Agents has distinct readiness loading, unavailable,
+ready, copy-success/error, policy-loading/error and revoked states. Connection
+instructions are not a substitute for verified OAuth and do not show a token.
+The connector guide is one reusable panel: a 44px-or-taller host selector, a
+single selected-host instruction region, the server-provided URL in a wrapping
+read-only field, and a labeled copy control. It has idle, selected, copied,
+copy-error, readiness-loading and readiness-unavailable states. Selection uses
+the existing cobalt active surface; copy feedback changes text in place and is
+announced through a status region. No extra animation library is introduced;
+existing 150–240ms color transitions and reduced-motion rules apply.
+
+Agent settings revision (2026-09-25): an authenticated owner may open Settings
+for an existing client. Read scopes are individually selectable; investment
+requests are separately selectable and, while execution is disabled, always
+require human approval. BUY auto-execution and SELL are described as unavailable,
+not rendered as operable toggles. Per-request and 24-hour request limits live in
+Settings, not onboarding. An explicit, separately acknowledged "No limit" choice
+maps to the server's nullable request cap; the UI must not imply it authorizes
+execution. Versioned policy saves show conflict and error responses rather than
+silently overwriting another edit. An existing approval remains consent only:
+there is no wallet signature or execution until a separate reviewed backend gate.
+The policy editor is a reusable panel with read-scope checkboxes, a separate
+request permission, two numeric request caps with explicit unlimited checkboxes,
+and one save action. Controls have default, focus, disabled, busy and error
+states. The current policy version stays visible and read-only. A revoked client
+never shows an editable policy. Permission labels must name outcomes, not only
+technical scope strings, so read-only and approval-required users can understand
+what an agent can actually do.
+Quick choices may select Read only, Request only, or Read + request; the latter
+two mean an approval request, not an executable write. Custom per-scope changes
+remain possible and may leave no quick choice selected.
 
 Control-plane navigation/theme revision (2026-09-23): in Privy mode the desktop
 rail groups Overview, Credentials, Agents, Approvals, Activity before market
@@ -190,9 +230,8 @@ ink `#18212f`, muted `#526174`, faint `#64748b`, line `#dce3ec`, strong line
 `#354ccc`, success `#176a4f`, warning `#80550c`, danger `#b6363e`. Surfaces keep
 the same radius and a low-contrast, broad shadow. Theme control has focused,
 pressed, and announced states, with no decorative page-cover animation. Agents
-starts with three honest MCP-client presets (Claude Code, Codex, Cursor), not
-unimplemented ChatGPT/Grok OAuth. Its active client list precedes the creation
-form, where scopes and limits remain explicit. Approvals keeps pending/decided
+shows only host connection paths supported by the configured OAuth service;
+legacy bearer setup is not offered as a new-client path. Approvals keeps pending/decided
 filters and links to the full request review; an empty list never claims a trade
 occurred. The obsolete Phantom migration paragraph is removed from Credentials.
 

@@ -4,7 +4,9 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { createClient, listClients, revokeClient } from "../lib/control-plane/clients";
 
-const sql = await readFile(new URL("../migrations/0001_agent_control_plane.sql", import.meta.url), "utf8");
+const sql = (await Promise.all([
+  "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
+].map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 const walletA = "11111111111111111111111111111111";
 const walletB = "22222222222222222222222222222222";
 

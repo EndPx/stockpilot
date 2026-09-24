@@ -4,6 +4,7 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 const sql = await readFile(new URL("../migrations/0001_agent_control_plane.sql", import.meta.url), "utf8");
+const grantSql = await readFile(new URL("../migrations/0002_agent_grants_and_oauth_connections.sql", import.meta.url), "utf8");
 
 test("control-plane migration creates constrained durable tables without execution authority", async () => {
   const db = await PGlite.create();
@@ -18,6 +19,45 @@ test("control-plane migration creates constrained durable tables without executi
     ]);
     assert.doesNotMatch(sql, /\b(?:DROP|TRUNCATE)\b/i);
     assert.doesNotMatch(sql, /wallet_sign|execute_transaction|private_key/i);
+  } finally {
+    await db.close();
+  }
+});
+
+test("OAuth connections cannot cross a verified subject, account, wallet, or client binding", async () => {
+  const db = await PGlite.create();
+  try {
+    await db.exec(`${sql}\n${grantSql}`);
+    const alice = "did:privy:alice";
+    const bob = "did:privy:bob";
+    const aliceWallet = "11111111111111111111111111111111";
+    const bobWallet = "22222222222222222222222222222222";
+    const aliceClient = "00000000-0000-4000-8000-000000000011";
+    const bobClient = "00000000-0000-4000-8000-000000000012";
+    const issuer = "https://auth.example.test";
+    await db.query("INSERT INTO control_accounts(id, primary_wallet_address) VALUES ($1, $2), ($3, $4)",
+      [alice, aliceWallet, bob, bobWallet]);
+    await db.query(`INSERT INTO control_clients(id, account_id, name, client_type)
+      VALUES ($1, $2, 'Alice agent', 'CUSTOM'), ($3, $4, 'Bob agent', 'CUSTOM')`,
+      [aliceClient, alice, bobClient, bob]);
+    await assert.rejects(db.query(`INSERT INTO control_oauth_subject_bindings
+      (issuer, subject, account_id, wallet_address) VALUES ($1, 'alice-sub', $2, $3)`,
+      [issuer, alice, bobWallet]));
+    await db.query(`INSERT INTO control_oauth_subject_bindings
+      (issuer, subject, account_id, wallet_address) VALUES ($1, 'alice-sub', $2, $3)`,
+      [issuer, alice, aliceWallet]);
+    await assert.rejects(db.query(`INSERT INTO control_oauth_connections
+      (client_id, account_id, issuer, subject, oauth_client_id)
+      VALUES ($1, $2, $3, 'alice-sub', 'chatgpt')`, [bobClient, bob, issuer]));
+    await assert.rejects(db.query(`INSERT INTO control_oauth_connections
+      (client_id, account_id, issuer, subject, oauth_client_id)
+      VALUES ($1, $2, $3, 'alice-sub', 'chatgpt')`, [aliceClient, bob, issuer]));
+    await db.query(`INSERT INTO control_oauth_connections
+      (client_id, account_id, issuer, subject, oauth_client_id)
+      VALUES ($1, $2, $3, 'alice-sub', 'chatgpt')`, [aliceClient, alice, issuer]);
+    await assert.rejects(db.query(`INSERT INTO control_oauth_connections
+      (client_id, account_id, issuer, subject, oauth_client_id)
+      VALUES ($1, $2, $3, 'alice-sub', 'chatgpt')`, [bobClient, alice, issuer]));
   } finally {
     await db.close();
   }

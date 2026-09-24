@@ -6,18 +6,25 @@ import { enforceRateLimit, trustedClientIp } from "@/lib/auth/rate-limit";
 import { getAuthSecurityStore, type AuthSecurityStore } from "@/lib/auth/store";
 import { verifyCredential } from "@/lib/control-plane/credentials";
 import { createStockPilotMcp } from "@/lib/control-plane/mcp";
+import { getAgentOAuthConfig } from "@/lib/control-plane/oauth-config";
+import { verifyOAuthCredential } from "@/lib/control-plane/oauth-tokens";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function unauthorized(): Response {
+  const oauth = getAgentOAuthConfig();
+  const challenge = oauth
+    ? `Bearer error="invalid_token", resource_metadata="${new URL("/.well-known/oauth-protected-resource", oauth.appOrigin)}"`
+    : "Bearer";
   return jsonResponse({ error: { code: "INVALID_CREDENTIAL", message: "A valid StockPilot client credential is required." } },
-    { status: 401, headers: { "WWW-Authenticate": "Bearer" } });
+    { status: 401, headers: { "WWW-Authenticate": challenge } });
 }
 
 export function createMcpPost(dependencies: {
   securityStore?: AuthSecurityStore;
   verify?: typeof verifyCredential;
+  verifyOAuth?: typeof verifyOAuthCredential;
   createHandler?: typeof createStockPilotMcp;
 } = {}) {
 return async function POST(request: Request): Promise<Response> {
@@ -31,10 +38,15 @@ return async function POST(request: Request): Promise<Response> {
     const security = dependencies.securityStore ?? getAuthSecurityStore(config);
     await enforceRateLimit(security, "ip:mcp", trustedClientIp(request, config), 120);
     const header = request.headers.get("authorization");
-    if (!header || !/^Bearer sp_live_[0-9a-f]{32}_[A-Za-z0-9_-]{43}$/.test(header)) return unauthorized();
-    const principal = await (dependencies.verify ?? verifyCredential)(header.slice(7));
+    if (!header || !/^Bearer [A-Za-z0-9._-]{1,8192}$/.test(header)) return unauthorized();
+    const token = header.slice(7);
+    const oauth = getAgentOAuthConfig();
+    const principal = /^sp_live_[0-9a-f]{32}_[A-Za-z0-9_-]{43}$/.test(token)
+      ? await (dependencies.verify ?? verifyCredential)(token)
+      : oauth ? await (dependencies.verifyOAuth ?? verifyOAuthCredential)(token, oauth) : null;
     if (!principal) return unauthorized();
-    await enforceRateLimit(security, "credential:mcp", principal.credentialId, 60);
+    await enforceRateLimit(security, "credential:mcp", principal.authMethod === "oauth"
+      ? `${principal.oauthIssuer}:${principal.oauthSubject}:${principal.oauthClientId}` : principal.credentialId, 60);
     await enforceRateLimit(security, "account:mcp", principal.accountId, 180);
     const parsedBody = await readJsonBody(request, 65_536);
     const handler = (dependencies.createHandler ?? createStockPilotMcp)(principal);

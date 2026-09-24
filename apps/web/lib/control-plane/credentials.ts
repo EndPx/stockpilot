@@ -15,13 +15,17 @@ export type IssuedCredential = {
   secret: string;
 };
 
-export type AgentPrincipal = {
+type AgentIdentity = {
   accountId: string;
   walletAddress: string;
   clientId: string;
-  credentialId: string;
   scopes: ClientScope[];
 };
+
+export type AgentPrincipal = AgentIdentity & (
+  | { authMethod: "api_key"; credentialId: string }
+  | { authMethod: "oauth"; credentialId: null; oauthIssuer: string; oauthSubject: string; oauthClientId: string }
+);
 
 export type CredentialSummary = {
   id: string;
@@ -159,6 +163,7 @@ export async function verifyCredential(secret: string, store: ControlStore = con
   await store.query("UPDATE control_credentials SET last_used_at = now() WHERE id = $1 AND revoked_at IS NULL", [id]);
   await store.query("UPDATE control_clients SET last_used_at = now() WHERE id = $1 AND status = 'ACTIVE'", [row.rows[0].client_id]);
   return {
+    authMethod: "api_key",
     accountId: row.rows[0].account_id,
     walletAddress: row.rows[0].primary_wallet_address,
     clientId: row.rows[0].client_id,

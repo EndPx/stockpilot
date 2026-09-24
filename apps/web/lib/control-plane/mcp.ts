@@ -104,14 +104,15 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
     });
 
     server.registerTool("request_investment", {
-      description: "Create a PreStocks investment REQUEST for human approval. This never prepares, signs or executes a transaction.",
-      inputSchema: z.object({ assetId: z.string().min(1).max(100), amountUsd: z.string().min(1).max(40) }).strict(),
+      description: "Create a PreStocks investment REQUEST for human approval. Reuse clientRequestId when retrying the same intent. This never prepares, signs or executes a transaction.",
+      inputSchema: z.object({ assetId: z.string().min(1).max(100), amountUsd: z.string().min(1).max(40),
+        clientRequestId: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional() }).strict(),
     }, async (input) => {
       if (!can("investments:request")) return denied();
       try {
         const request = await deps.createRequest(principal, input);
         const approvalUrl = new URL(`/approvals/${request.id}`, deps.appUrl()).toString();
-        return result({ requestId: request.id, status: request.status, assetId: request.assetId,
+        return result({ requestId: request.id, clientRequestId: request.clientRequestId, status: request.status, assetId: request.assetId,
           amountUsd: request.amountUsd, approvalUrl, executionAvailable: false });
       } catch (error) { return failure(error); }
     });

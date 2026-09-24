@@ -208,6 +208,18 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 .agent-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 16px 20px 20px; }
 .agent-presets button { min-height: 48px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--canvas-raised); color: var(--ink); font-size: 13px; font-weight: 700; }
 .agent-presets button:hover, .agent-presets button:focus-visible { border-color: var(--accent-text); background: var(--accent-pale); }
+.agent-presets .agent-preset-active { border-color: var(--accent); background: var(--accent-pale); color: var(--accent-text); }
+.agent-connect-steps { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink); font-size: 13px; line-height: 1.6; }
+.agent-connect-steps li { padding-left: 4px; }
+.agent-endpoint-row { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; }
+.agent-endpoint-row code { min-width: 0; flex: 1 1 320px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 10px; padding: 13px; background: var(--canvas-raised); color: var(--ink); font-size: 12px; }
+.agent-limit-field { display: grid; min-width: 0; align-content: start; gap: 7px; }
+.agent-limit-field > label:first-child { color: var(--ink); font-size: 12px; font-weight: 650; }
+.agent-limit-field input[type="number"] { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 12px; background: var(--canvas-raised); color: var(--ink); font-size: 13px; }
+.agent-limit-field input[type="number"]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.agent-limit-field input[type="number"]:disabled { opacity: .55; }
+.agent-unlimited-option { display: flex !important; min-height: 44px; align-items: center; gap: 8px !important; color: var(--muted) !important; font-weight: 500 !important; }
+.agent-unlimited-option input { width: 16px; height: 16px; accent-color: var(--accent); }
 .control-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0; padding: 8px 20px; }.control-facts div { min-width: 0; border-bottom: 1px solid var(--line); padding: 13px 0; }.control-facts dt { color: var(--muted); font-size: 11px; }.control-facts dd { margin: 5px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }.control-address { overflow-wrap: anywhere; font-family: monospace; }.control-decision { display: grid; gap: 12px; padding: 20px; }.control-decision p { margin: 0; color: var(--warning); font-size: 12px; }
 .market-navigation-pending { position: fixed; z-index: 10; inset: 0 0 0 248px; display: grid; place-items: center; background: var(--canvas); pointer-events: none; }
 @keyframes market-loading-spin { to { transform: rotate(360deg); } }

@@ -7,8 +7,11 @@ export type ClientRecord = {
   lastUsedAt: string | null; scopes: string[];
 };
 export type Policy = {
-  clientId: string; approvalMode: string; scopes: string[]; maxInvestmentUsd: string;
-  dailyRequestLimitUsd: string; allowedProviders: string[]; allowedMarketTypes: string[];
+  clientId: string; approvalMode: string; scopes: string[];
+  buyMode: "DISABLED" | "APPROVAL" | "AUTO";
+  sellMode: "DISABLED" | "APPROVAL" | "AUTO";
+  maxInvestmentUsd: string | null;
+  dailyRequestLimitUsd: string | null; allowedProviders: string[]; allowedMarketTypes: string[];
   version: number; updatedAt: string;
 };
 export type Credential = {
@@ -18,7 +21,7 @@ export type Credential = {
 export type Approval = {
   id: string; clientId: string; clientName: string; assetName: string; assetSymbol: string;
   canonicalMint: string; amountUsd: string; status: string; provider: string;
-  marketType: string; policyVersion: number; policyMaxInvestmentUsd: string;
+  marketType: string; policyVersion: number; policyMaxInvestmentUsd: string | null;
   createdAt: string; expiresAt: string; decidedAt: string | null;
 };
 export type Activity = {

@@ -5,9 +5,13 @@ import { PGlite } from "@electric-sql/pglite";
 import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import { createClient } from "../lib/control-plane/clients";
 import { issueCredential, verifyCredential } from "../lib/control-plane/credentials";
-import { createInvestmentRequest, type AssetResolver } from "../lib/control-plane/requests";
+import { createInvestmentRequest, getClientRequest, listClientRequests, type AssetResolver } from "../lib/control-plane/requests";
+import type { AgentPrincipal } from "../lib/control-plane/credentials";
 
-const sql = await readFile(new URL("../migrations/0001_agent_control_plane.sql", import.meta.url), "utf8");
+const sql = (await Promise.all([
+  "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
+  "0003_idempotent_investment_requests.sql",
+].map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 const identity = { privyUserId: "did:privy:alice", walletAddress: "11111111111111111111111111111111" };
 const mint = "So11111111111111111111111111111111111111112";
 const asset: InvestmentAsset = {
@@ -92,6 +96,81 @@ test("per-request, daily, scope, provider, and credential gates fail closed", as
       { assetId: asset.id, amountUsd: "1" }, noScope.store, resolveAsset));
   } finally {
     if (noScope) await noScope.db.close();
+    if (oldPepper === undefined) delete process.env.CONTROL_PLANE_KEY_PEPPER;
+    else process.env.CONTROL_PLANE_KEY_PEPPER = oldPepper;
+  }
+});
+
+test("OAuth requests require a live owner-bound connection and honor explicit unlimited approval caps", async () => {
+  const oldPepper = process.env.CONTROL_PLANE_KEY_PEPPER;
+  process.env.CONTROL_PLANE_KEY_PEPPER = "local-test-pepper-only-at-least-32-bytes";
+  let fixture: Awaited<ReturnType<typeof setup>> | undefined;
+  try {
+    fixture = await setup();
+    const { db, store, principal, client } = fixture;
+    const issuer = "https://auth.example.test";
+    const subject = "user_123";
+    const oauthClientId = "mcp-client-123";
+    await db.query(`INSERT INTO control_oauth_subject_bindings
+      (issuer, subject, account_id, wallet_address) VALUES ($1, $2, $3, $4)`,
+      [issuer, subject, identity.privyUserId, identity.walletAddress]);
+    await db.query(`INSERT INTO control_oauth_connections
+      (client_id, account_id, issuer, subject, oauth_client_id) VALUES ($1, $2, $3, $4, $5)`,
+      [client.id, identity.privyUserId, issuer, subject, oauthClientId]);
+    const oauthPrincipal: AgentPrincipal = {
+      accountId: identity.privyUserId, walletAddress: identity.walletAddress, clientId: client.id,
+      authMethod: "oauth", credentialId: null, oauthIssuer: issuer, oauthSubject: subject,
+      oauthClientId, scopes: ["investments:request", "requests:read-own"],
+    };
+    await db.query(`UPDATE control_grant_policies SET scopes = ARRAY['investments:request', 'requests:read-own'],
+      max_investment_usd = NULL, daily_request_limit_usd = NULL WHERE client_id = $1`, [client.id]);
+    const request = await createInvestmentRequest(oauthPrincipal, { assetId: asset.id, amountUsd: "100" }, store, resolveAsset);
+    assert.equal(request.status, "PENDING_APPROVAL");
+    assert.equal(request.policyMaxInvestmentUsd, null);
+    assert.equal((await getClientRequest(oauthPrincipal, request.id, store)).id, request.id);
+    assert.equal((await listClientRequests(oauthPrincipal, 5, undefined, store)).requests[0].id, request.id);
+    await assert.rejects(createInvestmentRequest({ ...oauthPrincipal, oauthSubject: "attacker" },
+      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset), /not permitted/);
+    await db.query("UPDATE control_oauth_connections SET revoked_at = now() WHERE client_id = $1", [client.id]);
+    await assert.rejects(createInvestmentRequest(oauthPrincipal,
+      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset), /not permitted/);
+    await assert.rejects(getClientRequest(oauthPrincipal, request.id, store), /not found/);
+    assert.deepEqual((await listClientRequests(oauthPrincipal, 5, undefined, store)).requests, []);
+    // A distinct valid API key remains independently controlled by its own credential.
+    assert.equal(principal.authMethod, "api_key");
+    assert.equal((await createInvestmentRequest(principal,
+      { assetId: asset.id, amountUsd: "1" }, store, resolveAsset)).status, "PENDING_APPROVAL");
+  } finally {
+    if (fixture) await fixture.db.close();
+    if (oldPepper === undefined) delete process.env.CONTROL_PLANE_KEY_PEPPER;
+    else process.env.CONTROL_PLANE_KEY_PEPPER = oldPepper;
+  }
+});
+
+test("clientRequestId makes repeat submissions idempotent and intent-bound", async () => {
+  const oldPepper = process.env.CONTROL_PLANE_KEY_PEPPER;
+  process.env.CONTROL_PLANE_KEY_PEPPER = "local-test-pepper-only-at-least-32-bytes";
+  let fixture: Awaited<ReturnType<typeof setup>> | undefined;
+  try {
+    fixture = await setup();
+    const { db, store, principal } = fixture;
+    const clientRequestId = "stockpilot_retry_0001";
+    const first = await createInvestmentRequest(principal,
+      { assetId: asset.id, amountUsd: "5", clientRequestId }, store, resolveAsset);
+    const repeated = await createInvestmentRequest(principal,
+      { assetId: asset.id, amountUsd: "5.000000", clientRequestId }, store, resolveAsset);
+    assert.equal(repeated.id, first.id);
+    assert.equal(repeated.clientRequestId, clientRequestId);
+    await assert.rejects(createInvestmentRequest(principal,
+      { assetId: asset.id, amountUsd: "6", clientRequestId }, store, resolveAsset),
+    (error: unknown) => error instanceof Error && error.message.includes("different investment intent"));
+    const requests = await db.query<{ total: number }>("SELECT count(*)::integer AS total FROM control_investment_requests");
+    assert.equal(requests.rows[0].total, 1);
+    const events = await db.query<{ total: number }>("SELECT count(*)::integer AS total FROM control_activity_events WHERE event_type = 'INVESTMENT_REQUESTED'");
+    assert.equal(events.rows[0].total, 1);
+    await assert.rejects(db.query("UPDATE control_investment_requests SET client_request_id = 'stockpilot_retry_0002' WHERE id = $1", [first.id]));
+  } finally {
+    if (fixture) await fixture.db.close();
     if (oldPepper === undefined) delete process.env.CONTROL_PLANE_KEY_PEPPER;
     else process.env.CONTROL_PLANE_KEY_PEPPER = oldPepper;
   }
