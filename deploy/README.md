@@ -122,6 +122,18 @@ Migration is an explicit release gate with checksums for applied SQL; do not
 start the new app if it fails. Rehearse it on a separate Neon branch before
 the production rollout, using that branch's own pooled and direct URLs.
 
+If the runtime database connection uses the separate `stockpilot_app` role,
+apply `deploy/grant-runtime-oauth.sql` as the Neon migration owner **after** the
+schema migrations and **before** enabling OAuth. Migration `0002` added the OAuth
+tables after the original runtime grants; without this step, WorkOS can create a
+user but StockPilot cannot bind that user to the verified Privy wallet. Verify
+`SELECT`, `INSERT`, and `UPDATE` privileges on both OAuth tables for
+`stockpilot_app`. The OAuth binding also locks `control_accounts` with
+`SELECT ... FOR UPDATE`, which PostgreSQL requires an `UPDATE` grant to use;
+grant only `UPDATE (updated_at)` there, never wallet-address updates. `DELETE`
+should remain denied. Do not edit the already-applied `0002` file, because the
+migration runner verifies its checksum.
+
 ### Existing NGINX host (the confirmed Hostinger VPS)
 
 Use `stockpilot.endpx.cloud` with A record `76.13.179.205`. Preserve the apex and

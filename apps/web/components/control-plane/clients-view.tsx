@@ -1,29 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ClientRecord, Policy, controlFetch, formatDate, LoadState, PageHeader, useControlList } from "./shared";
 
 type OAuthStatus = { enabled: boolean; mcpUrl: string };
 type Host = "chatgpt" | "claude" | "codex";
 
-const hosts: { id: Host; label: string; steps: string[] }[] = [
-  { id: "chatgpt", label: "ChatGPT", steps: [
+const hosts: { id: Host; label: string; hint: string; steps: string[] }[] = [
+  { id: "chatgpt", label: "ChatGPT", hint: "Custom connector", steps: [
     "In ChatGPT on the web, enable developer mode and add a custom MCP connector.",
     "Paste the StockPilot server URL below and select OAuth when asked for authentication.",
     "Connect the connector. Sign in to StockPilot in the browser when a protected tool requests access, then return to ChatGPT.",
   ] },
-  { id: "claude", label: "Claude", steps: [
+  { id: "claude", label: "Claude", hint: "Connector settings", steps: [
     "Open Claude’s connector settings and add a custom connector.",
     "Paste the StockPilot server URL below and save the connector.",
     "Choose Connect. Complete the StockPilot sign-in and authorization in the browser, then return to Claude.",
   ] },
-  { id: "codex", label: "Codex", steps: [
+  { id: "codex", label: "Codex", hint: "Remote MCP server", steps: [
     "Add a custom remote MCP server in your Codex MCP settings.",
     "Use the StockPilot server URL below and OAuth authentication, not a key in the URL.",
     "Complete browser sign-in when Codex requests authorization, then return to Codex.",
   ] },
 ];
+
+function HostMark({ host }: { host: Host }) {
+  return <span className={`agent-host-mark agent-host-mark-${host}`} aria-hidden="true">
+    {host === "chatgpt" ? <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      {[0, 60, 120, 180, 240, 300].map((angle) => <path key={angle} d="M24 8c6 0 9 4 9 9 0 3-2 6-5 8l-8 5" transform={`rotate(${angle} 24 24)`} stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />)}
+      <circle cx="24" cy="24" r="3" fill="currentColor" />
+    </svg> : host === "claude" ? <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <path d="M24 6v36M6 24h36M11.3 11.3l25.4 25.4m0-25.4L11.3 36.7M17 7l14 34M7 17l34 14M31 7 17 41M41 17 7 31" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" />
+      <circle cx="24" cy="24" r="4.5" fill="currentColor" />
+    </svg> : <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <rect x="7" y="9" width="34" height="30" rx="7" stroke="currentColor" strokeWidth="2.7" />
+      <path d="m17 20 5 4-5 4m10 0h7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>}
+  </span>;
+}
 
 const readScopes = [
   { value: "markets:read", label: "Read markets" },
@@ -44,9 +59,22 @@ function scopesMatch(current: string[], expected: string[]) {
 export function AgentConnectionGuide({ status, error, retry }: {
   status: OAuthStatus | null; error: string; retry: () => void;
 }) {
-  const [host, setHost] = useState<Host>("chatgpt");
+  const [host, setHost] = useState<Host | null>(null);
   const [copyFeedback, setCopyFeedback] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
   const selectedHost = hosts.find((item) => item.id === host) ?? hosts[0];
+
+  function openGuide(selected: Host, trigger: HTMLButtonElement) {
+    triggerRef.current = trigger;
+    setHost(selected);
+    setCopyFeedback("");
+    dialogRef.current?.showModal();
+  }
+
+  function closeGuide() { dialogRef.current?.close(); }
 
   async function copyUrl() {
     if (!status?.enabled) return;
@@ -65,15 +93,22 @@ export function AgentConnectionGuide({ status, error, retry }: {
       : !status.enabled ? <div className="control-state" role="status"><p>OAuth connection setup is pending. New agent connections are not available yet. Existing clients and credentials remain manageable below.</p></div>
       : <>
         <div className="agent-presets" role="group" aria-label="Choose an AI app">
-          {hosts.map((item) => <button aria-pressed={host === item.id} className={host === item.id ? "agent-preset-active" : ""} key={item.id} type="button" onClick={() => { setHost(item.id); setCopyFeedback(""); }}>{item.label}</button>)}
+          {hosts.map((item) => <button aria-haspopup="dialog" aria-expanded={host === item.id} key={item.id} type="button" onClick={(event) => openGuide(item.id, event.currentTarget)}>
+            <HostMark host={item.id} />
+            <span className="agent-preset-copy"><strong>{item.label}</strong><small>{item.hint}</small></span>
+            <span className="agent-preset-arrow" aria-hidden="true">↗</span>
+          </button>)}
         </div>
-        <div className="control-instructions" role="region" aria-label={`${selectedHost.label} connection instructions`}>
-          <p>Set up StockPilot in {selectedHost.label}. Adding the URL does not grant access; the AI app must complete OAuth and receive your authorization.</p>
-          <ol className="agent-connect-steps">{selectedHost.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-          <div className="agent-endpoint-row"><code aria-label="StockPilot MCP server URL">{status.mcpUrl}</code><button type="button" className="secondary-button" onClick={() => void copyUrl()}>Copy server URL</button></div>
-          <p className="control-note">Do not put an API key in the URL. New agents can read markets only; enable portfolio access or BUY requests in Settings after connection. Approval does not sign or execute a trade.</p>
-          {copyFeedback && <p className="control-feedback" role="status">{copyFeedback}</p>}
-        </div>
+        <dialog ref={dialogRef} className="agent-connect-dialog" aria-labelledby={titleId} aria-describedby={descriptionId} onClose={() => { setHost(null); setCopyFeedback(""); triggerRef.current?.focus(); }}>
+          <div className="agent-dialog-body">
+            <button type="button" className="wallet-dialog-close" aria-label="Close agent connection guide" onClick={closeGuide}>×</button>
+            <div className="agent-dialog-heading"><HostMark host={selectedHost.id} /><div><h2 id={titleId}>Connect with {selectedHost.label}</h2><p id={descriptionId}>Complete OAuth in {selectedHost.label} to grant access. Adding the URL alone does not connect an agent.</p></div></div>
+            <ol className="agent-connect-steps">{selectedHost.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+            <div className="agent-endpoint-row"><code aria-label="StockPilot MCP server URL">{status.mcpUrl}</code><button type="button" className="secondary-button" onClick={() => void copyUrl()}>Copy server URL</button></div>
+            {copyFeedback && <p className="control-feedback" role="status">{copyFeedback}</p>}
+            <p className="agent-dialog-note">Do not put an API key in the URL. New agents can read markets only; enable portfolio access or BUY requests in Settings after connection. Approval does not sign or execute a trade.</p>
+          </div>
+        </dialog>
       </>}
   </section>;
 }

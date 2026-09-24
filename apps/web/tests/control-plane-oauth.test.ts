@@ -7,7 +7,7 @@ import { bindOAuthSubject, resolveOAuthPrincipal } from "../lib/control-plane/oa
 import { getAgentOAuthConfig } from "../lib/control-plane/oauth-config";
 import { authorizationServerMetadata, protectedResourceMetadata } from "../lib/control-plane/oauth-metadata";
 import { parseWorkosAccessClaims, verifyOAuthCredential, verifySignedToken } from "../lib/control-plane/oauth-tokens";
-import { completeWorkosExternalAuth, getWorkosUserByExternalId, getWorkosUserById } from "../lib/control-plane/workos-api";
+import { completeWorkosExternalAuth, getWorkosUserByExternalId, getWorkosUserById, WorkosApiStatusError } from "../lib/control-plane/workos-api";
 
 const scripts = await Promise.all([
   "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
@@ -84,6 +84,13 @@ test("WorkOS completion accepts only provider redirect and exact external Privy 
     mockFetch({ id: subject, external_id: privy })), { id: subject, externalId: privy });
   await assert.rejects(getWorkosUserById(subject, config,
     mockFetch({ id: subject, external_id: "did:privy:bob" }, 403)));
+  await assert.rejects(getWorkosUserById(subject, config,
+    mockFetch({ error: "private upstream explanation" }, 429)), (error) => {
+      assert.ok(error instanceof WorkosApiStatusError);
+      assert.equal(error.status, 429);
+      assert.doesNotMatch(error.message, /private upstream explanation/);
+      return true;
+    });
 });
 
 test("JWT claim gate rejects ID/M2M tokens and requires consent and openid", () => {

@@ -7,6 +7,14 @@ export const externalAuthIdPattern = /^[A-Za-z0-9_-]{16,128}$/;
 
 export type WorkosUser = { id: string; externalId: string };
 
+/** Safe diagnostic metadata only; never retain the upstream response body. */
+export class WorkosApiStatusError extends Error {
+  constructor(readonly status: number) {
+    super("WorkOS API request failed");
+    this.name = "WorkosApiStatusError";
+  }
+}
+
 async function requestWorkos(path: string, config: AgentOAuthConfig, init: RequestInit = {}, fetcher: typeof fetch = fetch): Promise<unknown> {
   const response = await fetcher(`${workosApi}${path}`, {
     ...init,
@@ -18,7 +26,7 @@ async function requestWorkos(path: string, config: AgentOAuthConfig, init: Reque
     cache: "no-store",
     signal: AbortSignal.timeout(5_000),
   });
-  if (!response.ok) throw new Error("WorkOS API request failed");
+  if (!response.ok) throw new WorkosApiStatusError(response.status);
   return response.json();
 }
 
