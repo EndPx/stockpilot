@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import type { AgentPrincipal } from "../lib/control-plane/credentials";
-import { createStockPilotMcp } from "../lib/control-plane/mcp";
+import { createStockPilotMcp, resolveMcpAsset } from "../lib/control-plane/mcp";
 import type { InvestmentRequestRecord } from "../lib/control-plane/requests";
 
 const mint = "So11111111111111111111111111111111111111112";
@@ -82,6 +82,31 @@ test("official MCP handler exposes only six non-execution tools", async () => {
   assert.deepEqual(listed.result?.tools?.map((tool) => tool.name).sort(),
     ["get_asset", "get_portfolio", "get_request", "list_assets", "list_requests", "request_investment"]);
   await handler.close();
+});
+
+test("MCP asset detail uses the public-market price reader and rejects mismatched identity", async () => {
+  const publicAsset: InvestmentAsset = { ...asset, id: `xstocks:${mint}`, provider: "xstocks",
+    marketType: "PUBLIC_MARKET_PRODUCT", symbol: "EXx", tokenPriceUsd: 123.45 };
+  const lookedUp: string[] = [];
+  const readers = {
+    readPreStocks: async () => ({ assets: [asset], stale: false }),
+    readXStock: async (requestedMint: string) => {
+      lookedUp.push(requestedMint);
+      return { asset: publicAsset, stale: true };
+    },
+  };
+  const detail = await resolveMcpAsset(publicAsset.id, readers);
+  assert.equal(detail.asset?.tokenPriceUsd, 123.45);
+  assert.equal(detail.stale, true);
+  assert.deepEqual(lookedUp, [mint]);
+  assert.equal((await resolveMcpAsset(asset.id, readers)).asset?.id, asset.id);
+  assert.deepEqual(lookedUp, [mint]);
+  assert.equal((await resolveMcpAsset("xstocks:invalid", readers)).asset, null);
+  assert.deepEqual(lookedUp, [mint]);
+
+  const mismatched = { ...readers, readXStock: async () => ({ asset: { ...publicAsset,
+    mintAddress: "11111111111111111111111111111111" }, stale: false }) };
+  assert.equal((await resolveMcpAsset(publicAsset.id, mismatched)).asset, null);
 });
 
 test("MCP tools bind portfolio and request to server principal; missing scope is denied", async () => {

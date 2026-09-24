@@ -164,6 +164,12 @@ test("JWT diagnostics report fixed categories without recording token material",
   await check(await signed(claims, issuer, "https://other.example/api/mcp"), "jwt_audience");
   await check(await signed(claims, issuer, [resource, "https://other.example/api/mcp"]), "jwt_audience");
   await check(await signed(claims, issuer, resource, "-1h"), "jwt_expired");
+  await check(await signed({ ...claims, sub: undefined }), "jwt_claims_subject_missing");
+  await check(await signed({ ...claims, sub: 123 }), "jwt_claims_subject_missing");
+  await check(await signed({ ...claims, sub: "user_short" }), "jwt_claims_subject_workos_malformed");
+  await check(await signed({ ...claims, sub: "did:privy:example" }), "jwt_claims_subject_privy");
+  await check(await signed({ ...claims, sub: clientId }), "jwt_claims_subject_client");
+  await check(await signed({ ...claims, sub: "opaque-subject-example" }), "jwt_claims_subject_other");
   await check(await signed({ ...claims, sid: undefined }), "jwt_claims_consent");
   await check(await signed({ ...claims, scope: "profile" }), "jwt_claims_scope");
   failures.length = 0;

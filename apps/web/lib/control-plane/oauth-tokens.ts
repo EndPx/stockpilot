@@ -7,7 +7,10 @@ import { getWorkosUserById } from "./workos-api";
 
 type WorkosAccessClaims = { subject: string; clientId: string };
 type JwtFailureReason = "jwt_expired" | "jwt_issuer" | "jwt_audience" | "jwt_algorithm" |
-  "jwt_signature" | "jwt_key_unavailable" | "jwt_claims_subject" | "jwt_claims_client" |
+  "jwt_signature" | "jwt_key_unavailable" |
+  "jwt_claims_subject_missing" | "jwt_claims_subject_workos_malformed" |
+  "jwt_claims_subject_privy" | "jwt_claims_subject_client" | "jwt_claims_subject_other" |
+  "jwt_claims_client" |
   "jwt_claims_consent" | "jwt_claims_id" | "jwt_claims_lifetime" | "jwt_claims_scope" |
   "jwt_unclassified";
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -40,11 +43,20 @@ export function parseWorkosAccessClaims(payload: JWTPayload): WorkosAccessClaims
   return inspectWorkosAccessClaims(payload).claims;
 }
 
+/** Only fixed categories leave this function; never expose an untrusted subject value. */
+function subjectShapeFailure(subject: unknown): JwtFailureReason {
+  if (typeof subject !== "string" || subject.length === 0) return "jwt_claims_subject_missing";
+  if (subject.startsWith("user_")) return "jwt_claims_subject_workos_malformed";
+  if (subject.startsWith("did:privy:")) return "jwt_claims_subject_privy";
+  if (subject.startsWith("client_")) return "jwt_claims_subject_client";
+  return "jwt_claims_subject_other";
+}
+
 function inspectWorkosAccessClaims(payload: JWTPayload): { claims: WorkosAccessClaims | null; reason: JwtFailureReason | null } {
   const subject = payload.sub;
   const clientId = payload.client_id;
   if (typeof subject !== "string" || !/^user_[A-Za-z0-9_-]{8,128}$/.test(subject))
-    return { claims: null, reason: "jwt_claims_subject" };
+    return { claims: null, reason: subjectShapeFailure(subject) };
   if (!validOAuthClientId(clientId)) return { claims: null, reason: "jwt_claims_client" };
   if (typeof payload.sid !== "string" || payload.sid.length < 8 || payload.sid.length > 512 ||
     /[\u0000-\u001f\u007f]/.test(payload.sid)) return { claims: null, reason: "jwt_claims_consent" };

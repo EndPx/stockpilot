@@ -1,8 +1,9 @@
 import "server-only";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
+import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import { getAuthRuntimeConfig } from "@/lib/auth/config";
-import { listMarkets, marketRegistry } from "@/lib/markets";
+import { getPublicMarket, listMarkets, marketRegistry } from "@/lib/markets";
 import { getPortfolio } from "@/lib/portfolio";
 import { createInvestmentRequest, getClientRequest, listClientRequests, RequestError } from "./requests";
 import type { AgentPrincipal } from "./credentials";
@@ -17,14 +18,33 @@ type Dependencies = {
   appUrl: () => URL;
 };
 
+type AssetReaders = {
+  readPreStocks: () => Promise<{ assets: InvestmentAsset[]; stale: boolean }>;
+  readXStock: (mint: string) => Promise<{ asset: InvestmentAsset | null; stale: boolean }>;
+};
+
+/** Use the same cache-backed indicative quote as the public-market detail page. */
+export async function resolveMcpAsset(assetId: string, readers: AssetReaders = {
+  readPreStocks: () => marketRegistry.getSnapshot("prestocks"),
+  readXStock: getPublicMarket,
+}): Promise<{ asset: InvestmentAsset | null; stale: boolean }> {
+  const match = /^(prestocks|xstocks):([1-9A-HJ-NP-Za-km-z]{32,44})$/.exec(assetId);
+  if (!match) return { asset: null, stale: false };
+  const [, provider, mint] = match;
+  if (provider === "xstocks") {
+    const selected = await readers.readXStock(mint);
+    const asset = selected.asset;
+    return { asset: asset?.id === assetId && asset.provider === "xstocks" && asset.mintAddress === mint && asset.canonical
+      ? asset : null, stale: selected.stale };
+  }
+  const snapshot = await readers.readPreStocks();
+  return { asset: snapshot.assets.find((asset) => asset.id === assetId && asset.provider === "prestocks" &&
+    asset.mintAddress === mint && asset.canonical) ?? null, stale: snapshot.stale };
+}
+
 const defaults: Dependencies = {
   listAssets: listMarkets,
-  getAsset: async (assetId) => {
-    const provider = assetId.startsWith("prestocks:") ? "prestocks" : assetId.startsWith("xstocks:") ? "xstocks" : null;
-    if (!provider) return { asset: null, stale: false };
-    const snapshot = await marketRegistry.getSnapshot(provider);
-    return { asset: snapshot.assets.find((asset) => asset.id === assetId) ?? null, stale: snapshot.stale };
-  },
+  getAsset: resolveMcpAsset,
   portfolio: getPortfolio,
   createRequest: createInvestmentRequest,
   getRequest: getClientRequest,
