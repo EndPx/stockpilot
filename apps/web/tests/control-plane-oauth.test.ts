@@ -7,7 +7,7 @@ import { bindOAuthSubject, resolveOAuthPrincipal } from "../lib/control-plane/oa
 import { getAgentOAuthConfig } from "../lib/control-plane/oauth-config";
 import { authorizationServerMetadata, protectedResourceMetadata } from "../lib/control-plane/oauth-metadata";
 import { parseWorkosAccessClaims, verifyOAuthCredential, verifySignedToken } from "../lib/control-plane/oauth-tokens";
-import { completeWorkosExternalAuth, getWorkosUserByExternalId, getWorkosUserById, WorkosApiStatusError } from "../lib/control-plane/workos-api";
+import { completeWorkosExternalAuth, getWorkosUserByExternalId, getWorkosUserById, WorkosApiProtocolError, WorkosApiStatusError } from "../lib/control-plane/workos-api";
 
 const scripts = await Promise.all([
   "0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
@@ -77,7 +77,16 @@ test("WorkOS completion accepts only provider redirect and exact external Privy 
   assert.equal((await completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
     mockFetch({ redirect_uri: redirect }))).toString(), redirect);
   await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
-    mockFetch({ redirect_uri: "https://evil.example/steal" })));
+    mockFetch({ redirect_uri: "https://evil.example/steal" })), (error) => {
+      assert.ok(error instanceof WorkosApiProtocolError);
+      assert.equal(error.code, "untrusted_redirect");
+      assert.doesNotMatch(error.message, /evil\.example/);
+      return true;
+    });
+  await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
+    mockFetch({})), (error) => error instanceof WorkosApiProtocolError && error.code === "missing_redirect");
+  await assert.rejects(completeWorkosExternalAuth(externalAuthId, privy, "alice@example.com", config,
+    mockFetch({ redirect_uri: "%" })), (error) => error instanceof WorkosApiProtocolError && error.code === "malformed_redirect");
   assert.deepEqual(await getWorkosUserById(subject, config,
     mockFetch({ id: subject, external_id: privy })), { id: subject, externalId: privy });
   assert.deepEqual(await getWorkosUserByExternalId(privy, config,

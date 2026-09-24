@@ -8,7 +8,7 @@ import { getAuthSecurityStore, type AuthSecurityStore } from "@/lib/auth/store";
 import { bindOAuthSubject } from "@/lib/control-plane/oauth-binding";
 import { getAgentOAuthConfig } from "@/lib/control-plane/oauth-config";
 import { readPrivyOAuthIdentity } from "@/lib/control-plane/oauth-privy-identity";
-import { completeWorkosExternalAuth, externalAuthIdPattern, getWorkosUserByExternalId, WorkosApiStatusError } from "@/lib/control-plane/workos-api";
+import { completeWorkosExternalAuth, externalAuthIdPattern, getWorkosUserByExternalId, WorkosApiProtocolError, WorkosApiStatusError } from "@/lib/control-plane/workos-api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -74,10 +74,15 @@ return async function GET(request: Request): Promise<Response> {
     return new Response(null, { status: 303, headers });
   } catch (error) {
     const upstreamStatus = error instanceof WorkosApiStatusError ? error.status : undefined;
+    const failureKind = error instanceof WorkosApiStatusError ? "workos_http" :
+      error instanceof WorkosApiProtocolError ? error.code :
+      error instanceof Error && error.name === "TimeoutError" ? "timeout" :
+      error instanceof SyntaxError ? "invalid_json" :
+      error instanceof TypeError ? "transport" : "unexpected";
     const sqlstate = stage === "neon_bind" && error && typeof error === "object" && "code" in error &&
       typeof error.code === "string" && /^[A-Z0-9]{5}$/.test(error.code) ? error.code : undefined;
     // Never log auth IDs, user/email/wallet identifiers, redirect URLs, tokens, or upstream bodies.
-    console.error("[oauth-login] Flow failed", { stage, upstreamStatus, sqlstate });
+    console.error("[oauth-login] Flow failed", { stage, failureKind, upstreamStatus, sqlstate });
     return jsonResponse({ error: { code: "OAUTH_LOGIN_UNAVAILABLE" } }, { status: 503 });
   }
 };

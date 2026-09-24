@@ -15,6 +15,16 @@ export class WorkosApiStatusError extends Error {
   }
 }
 
+export type WorkosProtocolFailure = "invalid_identity" | "missing_redirect" | "malformed_redirect" | "untrusted_redirect";
+
+/** Fixed diagnostic codes only; never carry provider payloads or redirect values. */
+export class WorkosApiProtocolError extends Error {
+  constructor(readonly code: WorkosProtocolFailure) {
+    super("WorkOS protocol validation failed");
+    this.name = "WorkosApiProtocolError";
+  }
+}
+
 async function requestWorkos(path: string, config: AgentOAuthConfig, init: RequestInit = {}, fetcher: typeof fetch = fetch): Promise<unknown> {
   const response = await fetcher(`${workosApi}${path}`, {
     ...init,
@@ -24,7 +34,7 @@ async function requestWorkos(path: string, config: AgentOAuthConfig, init: Reque
       ...init.headers,
     },
     cache: "no-store",
-    signal: AbortSignal.timeout(5_000),
+    signal: init.signal ?? AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new WorkosApiStatusError(response.status);
   return response.json();
@@ -62,17 +72,20 @@ export async function completeWorkosExternalAuth(
 ): Promise<URL> {
   if (!externalAuthIdPattern.test(externalAuthId) || !privyUserId.startsWith("did:privy:") ||
     privyUserId.length > 128 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("Invalid external authentication identity");
+    throw new WorkosApiProtocolError("invalid_identity");
   }
   const value = await requestWorkos("/authkit/oauth2/complete", config, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ external_auth_id: externalAuthId, user: { id: privyUserId, email } }),
+    signal: AbortSignal.timeout(15_000),
   }, fetcher);
   const redirect = value && typeof value === "object" ? (value as { redirect_uri?: unknown }).redirect_uri : null;
-  if (typeof redirect !== "string") throw new Error("WorkOS redirect is invalid");
-  const url = new URL(redirect);
+  if (typeof redirect !== "string") throw new WorkosApiProtocolError("missing_redirect");
+  let url: URL;
+  try { url = new URL(redirect); }
+  catch { throw new WorkosApiProtocolError("malformed_redirect"); }
   if (url.origin !== config.issuer || url.pathname !== "/oauth/authorize/complete" ||
-    url.username || url.password || url.hash) throw new Error("WorkOS redirect is not trusted");
+    url.username || url.password || url.hash) throw new WorkosApiProtocolError("untrusted_redirect");
   return url;
 }
