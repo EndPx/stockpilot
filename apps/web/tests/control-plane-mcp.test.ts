@@ -109,6 +109,33 @@ test("MCP asset detail uses the public-market price reader and rejects mismatche
   assert.equal((await resolveMcpAsset(publicAsset.id, mismatched)).asset, null);
 });
 
+test("MCP list and detail expose indicative prices for both market providers", async () => {
+  const publicAsset: InvestmentAsset = { ...asset, id: `xstocks:${mint}`, provider: "xstocks",
+    marketType: "PUBLIC_MARKET_PRODUCT", symbol: "EXx", tokenPriceUsd: 123.45, markPriceUsd: undefined };
+  const handler = createStockPilotMcp({ ...principal, scopes: ["markets:read"] }, {
+    listAssets: async (filter) => {
+      const selected = filter?.provider === "xstocks" ? publicAsset : asset;
+      return { assets: [selected], total: 1, catalogTotal: 1, offset: 0,
+        nextCursor: null, sources: [], stale: false };
+    },
+    getAsset: async (assetId) => ({ asset: assetId === publicAsset.id ? publicAsset : asset, stale: false }),
+  });
+  const call = async (name: string, args: object) => {
+    const reply = await rpc(handler, "tools/call", { name, arguments: args });
+    assert.equal(reply.result?.isError, undefined);
+    return JSON.parse(reply.result?.content?.[0].text ?? "{}");
+  };
+  const privateList = await call("list_assets", { provider: "prestocks", limit: 2 });
+  assert.equal(privateList.assets[0].provider, "prestocks");
+  assert.equal(privateList.assets[0].tokenPriceUsd, 100);
+  const publicList = await call("list_assets", { provider: "xstocks", limit: 2 });
+  assert.equal(publicList.assets[0].provider, "xstocks");
+  assert.equal(publicList.assets[0].tokenPriceUsd, 123.45);
+  const detail = await call("get_asset", { assetId: publicAsset.id });
+  assert.equal(detail.asset.tokenPriceUsd, 123.45);
+  await handler.close();
+});
+
 test("MCP tools bind portfolio and request to server principal; missing scope is denied", async () => {
   const { handler, calls } = fixture();
   const call = (name: string, args: object) => rpc(handler, "tools/call", { name, arguments: args });
