@@ -26,3 +26,17 @@ test("baseline security headers cover API responses as well as documents", () =>
   assert.equal(headers["Strict-Transport-Security"], "max-age=31536000");
   assert.ok(!baselineSecurityHeaders(false).some(({ key }) => key === "Strict-Transport-Security"));
 });
+
+test("Privy CSP permits only the configured mainnet RPC and subscription origins", () => {
+  const previous = process.env.NEXT_PUBLIC_AUTH_PROVIDER;
+  process.env.NEXT_PUBLIC_AUTH_PROVIDER = "privy";
+  try {
+    const policy = contentSecurityPolicy("test-nonce", false);
+    const connect = policy.split("; ").find((directive) => directive.startsWith("connect-src "));
+    assert.equal(connect, "connect-src 'self' https://auth.privy.io https://api.privy.io https://solana-mainnet.rpc.privy.systems wss://solana-mainnet.rpc.privy.systems");
+    assert.doesNotMatch(connect!, /\*|walletconnect|solana-devnet|\swss:\s/);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_AUTH_PROVIDER;
+    else process.env.NEXT_PUBLIC_AUTH_PROVIDER = previous;
+  }
+});

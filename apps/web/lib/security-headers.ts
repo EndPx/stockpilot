@@ -18,7 +18,7 @@ export function contentSecurityPolicy(nonce: string, development: boolean, oauth
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${privy ? " https://auth.privy.io https://api.privy.io https://solana-mainnet.rpc.privy.systems" : ""}${development ? " ws: wss:" : ""}`,
+    `connect-src 'self'${privy ? " https://auth.privy.io https://api.privy.io https://solana-mainnet.rpc.privy.systems wss://solana-mainnet.rpc.privy.systems" : ""}${development ? " ws: wss:" : ""}`,
     ...(privy ? ["frame-src https://auth.privy.io"] : []),
     "object-src 'none'",
     "base-uri 'none'",
