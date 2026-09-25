@@ -5,9 +5,10 @@ import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
 import type { AgentPrincipal } from "./credentials";
 import type { ControlIdentity } from "./clients";
 import { controlStore, type ControlQuery, type ControlStore } from "./db";
+import { assertAgentExpiryEvidence, type AgentExpiryEvidence } from "../agent-execution/expiry";
 
 export type AgentOperationKind = "BUY" | "SELL" | "TRANSFER_SOL" | "TRANSFER_USDC";
-export type AgentOperationStatus = "RESERVED" | "SIGNING" | "SIGNED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REJECTED";
+export type AgentOperationStatus = "RESERVED" | "SIGNING" | "SIGNED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REJECTED" | "EXPIRED";
 export type AgentOperationLimit = {
   perOperationRaw: string | null;
   dailyRaw: string | null;
@@ -561,11 +562,13 @@ export type AgentOperationReconciliation = {
   outcome: "CONFIRMED" | "FAILED" | "REJECTED";
   evidence: "FINALIZED_SUCCESS" | "FINALIZED_FAILURE" | "RPC_PREFLIGHT_REJECTED";
   actualInputAmountRaw?: string;
-};
+  expiryEvidence?: never;
+} | { outcome: "EXPIRED"; evidence: "EXPIRED_UNLANDED_QUORUM"; expiryEvidence: AgentExpiryEvidence; actualInputAmountRaw?: never };
 async function reconcile(db: ControlQuery, row: OperationRow, input: AgentOperationReconciliation): Promise<AgentOperationRecord> {
   if (!((input.outcome === "CONFIRMED" && input.evidence === "FINALIZED_SUCCESS") ||
     (input.outcome === "FAILED" && input.evidence === "FINALIZED_FAILURE") ||
-    (input.outcome === "REJECTED" && input.evidence === "RPC_PREFLIGHT_REJECTED"))) return fail("INVALID_INPUT");
+    (input.outcome === "REJECTED" && input.evidence === "RPC_PREFLIGHT_REJECTED") ||
+    (input.outcome === "EXPIRED" && input.evidence === "EXPIRED_UNLANDED_QUORUM"))) return fail("INVALID_INPUT");
   const actual = input.outcome === "CONFIRMED" ? raw(input.actualInputAmountRaw) : null;
   if ((actual !== null && BigInt(actual) > BigInt(row.amount_raw)) ||
     (actual === null && input.actualInputAmountRaw !== undefined)) return fail("INVALID_INPUT");
@@ -575,14 +578,19 @@ async function reconcile(db: ControlQuery, row: OperationRow, input: AgentOperat
   }
   if (!row.transaction_signature ||
     (input.outcome === "REJECTED" ? row.status !== "SUBMITTED" : !["SUBMITTED", "UNKNOWN"].includes(row.status))) return fail("INVALID_TRANSITION");
+  if (input.outcome === "EXPIRED") {
+    try { assertAgentExpiryEvidence(normalize(row), input.expiryEvidence); }
+    catch { return fail("INVALID_INPUT"); }
+  }
   const updated = await db.query<OperationRow>(
-    "UPDATE control_agent_operations SET status = $2,actual_input_amount_raw = $3,resolved_at = now(),updated_at = now() WHERE id = $1 RETURNING *",
-    [row.id, input.outcome, actual]);
+    "UPDATE control_agent_operations SET status = $2,actual_input_amount_raw = $3,expiry_evidence = $4::jsonb,resolved_at = now(),updated_at = now() WHERE id = $1 RETURNING *",
+    [row.id, input.outcome, actual, input.outcome === "EXPIRED" ? JSON.stringify(input.expiryEvidence) : null]);
   await event(db, row.id, input.outcome);
   return normalize(updated.rows[0]);
 }
 
-/** Caller must obtain authoritative chain evidence, never infer failure from an absent RPC result. */
+/** Finalized receipts or a separately validated two-provider expiry assessment;
+ * an absent RPC result alone is never failure evidence. */
 export async function reconcileAgentOperation(principal: AgentPrincipal, id: string, input: AgentOperationReconciliation,
   store: ControlStore = controlStore): Promise<AgentOperationRecord> {
   return store.transaction(async (db) => {

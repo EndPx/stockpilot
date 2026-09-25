@@ -18,7 +18,7 @@ import { AGENT_TRADE_ASSETS, AgentOperationError, defaultAgentWalletPolicy, getA
   type AgentOperationIntent, type AgentWalletPolicyInput, type AgentPreparedContext } from "../lib/control-plane/agent-operations";
 
 const sql = (await Promise.all(["0001_agent_control_plane.sql", "0002_agent_grants_and_oauth_connections.sql",
-  "0003_idempotent_investment_requests.sql", "0004_manual_investment_executions.sql", "0005_agent_wallet_operations.sql"]
+  "0003_idempotent_investment_requests.sql", "0004_manual_investment_executions.sql", "0005_agent_wallet_operations.sql", "0006_agent_operation_expiry.sql"]
   .map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 const accountId = "did:privy:agent-operations-test";
 const walletAddress = "11111111111111111111111111111111";
@@ -189,6 +189,40 @@ test("unknown operations never release on timeout; terminal chain evidence is im
     await assert.rejects(reconcileAgentOperation(principal, id, { outcome: "CONFIRMED", evidence: "FINALIZED_SUCCESS", actualInputAmountRaw: "1" }, store), code("INVALID_TRANSITION"));
     assert.equal((await reserveAgentOperation(principal, intent({ clientRequestId: "new-real-intent-01" }), store)).created, true);
   } finally { await db.close(); }
+});
+
+test("two-witness expiry releases SUBMITTED and UNKNOWN once, preserves the ID and audits the evidence", async (t) => {
+  for (const uncertain of [false, true]) {
+    const { db, store } = await setup();
+    try {
+      const id = await submitted(store);
+      if (uncertain) await markAgentOperationUnknown(principal, id, store);
+      const operation = await getAgentOperation(principal, id, store);
+      const now = Date.now() + 120_000;
+      t.mock.method(Date, "now", () => now);
+      const witness = { host: "a.test", genesisHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", finalizedSlot: 200001,
+        finalizedBlockHeight: 100001, rootBlockTime: Math.floor(now / 1000), blockhashContextSlot: 200002,
+        signatureContextSlot: 200002, blockhashValid: false as const, signatureAbsent: true as const, transactionAbsent: true as const,
+        historyAnchorSignature: "4".repeat(88), historyAnchorSlot: 90000, historyAnchorBlockTime: Math.floor((now - 600000) / 1000) };
+      const expiryEvidence = { operationId: id, signature, messageFingerprint: operation.messageFingerprint!, blockhash: walletAddress,
+        lastValidBlockHeight: "99999", observedAt: new Date(now).toISOString(), witnesses: [witness, { ...witness, host: "b.test" }] };
+      const input = { outcome: "EXPIRED" as const, evidence: "EXPIRED_UNLANDED_QUORUM" as const, expiryEvidence };
+      await assert.rejects(reconcileAgentOperation(principal, id, { ...input, expiryEvidence: { ...expiryEvidence, signature: "5".repeat(88) } }, store));
+      await assert.rejects(reconcileAgentOperation(principal, id, { ...input, expiryEvidence: { ...expiryEvidence, witnesses: [witness, witness] } }, store));
+      await assert.rejects(db.query("UPDATE control_agent_operations SET status='EXPIRED',resolved_at=now() WHERE id=$1", [id]));
+      const both = await Promise.all([reconcileAgentOperation(principal, id, input, store), reconcileAgentOperation(principal, id, input, store)]);
+      assert.ok(both.every(op => op.status === "EXPIRED" && op.transactionSignature === signature && op.actualInputAmountRaw === null));
+      const events = await db.query("SELECT * FROM control_agent_operation_events WHERE operation_id=$1 AND status='EXPIRED'", [id]);
+      assert.equal(events.rows.length, 1);
+      const evidence = await db.query<{ expiry_evidence: typeof expiryEvidence }>("SELECT expiry_evidence FROM control_agent_operations WHERE id=$1", [id]);
+      assert.deepEqual(evidence.rows[0].expiry_evidence, expiryEvidence);
+      const repeat = await reserveAgentOperation(principal, intent(), store);
+      assert.equal(repeat.created, false); assert.equal(repeat.operation.status, "EXPIRED");
+      await assert.rejects(db.query("UPDATE control_agent_operations SET expiry_evidence='{}' WHERE id=$1", [id]));
+      await assert.rejects(reconcileAgentOperation(principal, id, { outcome: "FAILED", evidence: "FINALIZED_FAILURE" }, store));
+      assert.equal((await reserveAgentOperation(principal, intent({ clientRequestId: "explicit-new-0001" }), store)).created, true);
+    } finally { t.mock.restoreAll(); await db.close(); }
+  }
 });
 
 test("positive RPC preflight rejection releases reservations but never permits replay", async () => {

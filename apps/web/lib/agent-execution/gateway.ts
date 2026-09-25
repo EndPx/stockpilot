@@ -6,7 +6,7 @@ import {
   rejectAgentOperationBeforeSubmission, cancelOwnedAgentOperationReservation,
   reconcileAgentOperation, getAgentOperation, listAgentOperations,
   AgentOperationError,
-  type AgentOperationRecord, type AgentOperationIntent, type AgentPreparedContext,
+  type AgentOperationRecord, type AgentOperationIntent, type AgentPreparedContext, type AgentOperationReconciliation,
 } from "@/lib/control-plane/agent-operations";
 import { getDelegatedSignerReadiness, signDelegatedTransaction } from "@/lib/privy/delegated-signer";
 import { prepareDemoTrade, parseDemoTradeAmount, demoTradeProductSupported } from "@/lib/investments/demo-trade";
@@ -16,6 +16,7 @@ import { prepareTransfer, assertPreparedTransferTransaction, reconcileTransferOn
 import { executeInvestment, getInvestmentBlockHeight } from "@/lib/investments/service";
 import { reconcileManualBuyOnChain } from "@/lib/investments/reconciliation";
 import { agentExecutionEnabled } from "./config";
+import { readAgentOperationExpiry } from "./expiry";
 
 export class AgentExecutionError extends Error {
   constructor(readonly code: "EXECUTION_DISABLED" | "OWNER_CONSENT_REQUIRED" | "INVALID_OPERATION" |
@@ -42,6 +43,7 @@ type Dependencies = {
   signature: typeof signedInvestmentSignature; blockHeight: typeof getInvestmentBlockHeight;
   execute: typeof executeInvestment; readTrade: typeof reconcileManualBuyOnChain;
   readTransfer: typeof reconcileTransferOnChain;
+  readExpiry: typeof readAgentOperationExpiry;
 };
 const defaults: Dependencies = {
   enabled: agentExecutionEnabled, now: Date.now,
@@ -55,6 +57,7 @@ const defaults: Dependencies = {
   fingerprint: fingerprintTransactionMessage, assertSigned: assertSignedInvestmentTransaction,
   signature: signedInvestmentSignature, blockHeight: getInvestmentBlockHeight,
   execute: executeInvestment, readTrade: reconcileManualBuyOnChain, readTransfer: reconcileTransferOnChain,
+  readExpiry: readAgentOperationExpiry,
 };
 
 /** Deliberate allowlist DTO: never return recovery bytes, authentication, or a signed wire. */
@@ -66,7 +69,8 @@ export function publicAgentOperation(operation: AgentOperationRecord) {
     explorerUrl: operation.transactionSignature ? `https://solscan.io/tx/${operation.transactionSignature}` : null,
     actualInputAmountRaw: operation.actualInputAmountRaw, createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
-    note: ["CONFIRMED", "FAILED", "REJECTED"].includes(operation.status) ? null :
+    note: operation.status === "EXPIRED" ? "Blockhash expired. Two RPCs found no landed transaction with historical coverage. This request is closed and was not retried. A new trade requires a new explicit request and clientRequestId." :
+      ["CONFIRMED", "FAILED", "REJECTED"].includes(operation.status) ? null :
       "Unresolved. Reuse this clientRequestId or call get_operation; do not create a replacement trade or transfer." };
 }
 
@@ -102,18 +106,17 @@ function recoverTransfer(operation: AgentOperationRecord): PreparedTransfer {
     requestId: operation.providerRequestId, messageFingerprint: operation.messageFingerprint };
 }
 
-/** Only this invocation's successful durable claim can sign and submit. Every retry is read-only. */
-export function createAgentExecutionGateway(overrides: Partial<Dependencies> = {}) {
-  const deps = { ...defaults, ...overrides };
-  async function reconcile(principal: AgentPrincipal, operation: AgentOperationRecord): Promise<AgentOperationRecord> {
+/** Shared read-only evidence path for MCP and explicit operator recovery. */
+export async function readAgentOperationResolution(operation: AgentOperationRecord,
+  deps: Pick<Dependencies, "readTrade" | "readTransfer" | "readExpiry"> = defaults): Promise<AgentOperationReconciliation | null> {
     if (!operation.transactionSignature || !operation.preparedContext ||
-      ["CONFIRMED", "FAILED", "REJECTED"].includes(operation.status)) return operation;
+      ["CONFIRMED", "FAILED", "REJECTED", "EXPIRED"].includes(operation.status)) return null;
     const context = operation.preparedContext;
     try {
       let chain: Awaited<ReturnType<typeof reconcileManualBuyOnChain>> | Awaited<ReturnType<typeof reconcileTransferOnChain>>;
       if (operation.kind === "BUY" || operation.kind === "SELL") {
         if (!context.inputMint || !context.outputMint || context.inputDecimals === undefined ||
-          context.outputDecimals === undefined || !context.requiredMinimumOutputRaw) return operation;
+          context.outputDecimals === undefined || !context.requiredMinimumOutputRaw) return null;
         chain = await deps.readTrade({ side: operation.kind, signature: operation.transactionSignature,
           walletAddress: operation.walletAddress, inputMint: context.inputMint, outputMint: context.outputMint,
           inputDecimals: context.inputDecimals, outputDecimals: context.outputDecimals,
@@ -122,12 +125,24 @@ export function createAgentExecutionGateway(overrides: Partial<Dependencies> = {
       } else {
         chain = await deps.readTransfer({ prepared: recoverTransfer(operation), signature: operation.transactionSignature });
       }
-      if (chain.status !== "PENDING") return await deps.reconcile(principal, operation.id, {
+      if (chain.status !== "PENDING") return {
         outcome: chain.status, evidence: chain.status === "CONFIRMED" ? "FINALIZED_SUCCESS" : "FINALIZED_FAILURE",
         ...(chain.status === "CONFIRMED" ? { actualInputAmountRaw: chain.actualInputAmountRaw } : {}),
-      });
+      };
+      const expiryEvidence = await deps.readExpiry(operation);
+      if (expiryEvidence) return { outcome: "EXPIRED", evidence: "EXPIRED_UNLANDED_QUORUM", expiryEvidence };
     } catch { /* Missing/mismatched chain evidence cannot release the reserved budget. */ }
-    return operation;
+    return null;
+}
+
+/** Only this invocation's successful durable claim can sign and submit. Every retry is read-only. */
+export function createAgentExecutionGateway(overrides: Partial<Dependencies> = {}) {
+  const deps = { ...defaults, ...overrides };
+  async function reconcile(principal: AgentPrincipal, operation: AgentOperationRecord): Promise<AgentOperationRecord> {
+    const result = await readAgentOperationResolution(operation, deps);
+    if (!result) return operation;
+    try { return await deps.reconcile(principal, operation.id, result); }
+    catch { return operation; /* Concurrent settlement/revocation cannot authorize a second send. */ }
   }
 
   return {
@@ -136,7 +151,10 @@ export function createAgentExecutionGateway(overrides: Partial<Dependencies> = {
     },
     async list(principal: AgentPrincipal, limit = 25) {
       const operations = await deps.list(principal, { limit });
-      return { operations: operations.map(publicAgentOperation) };
+      // The ledger permits only one unresolved operation per wallet; refreshing
+      // the list can reconcile it too, without any signing or submission.
+      return { operations: await Promise.all(operations.map(async operation =>
+        publicAgentOperation(await reconcile(principal, operation)))) };
     },
     async execute(principal: AgentPrincipal, request: AgentExecutionRequest) {
       if (!deps.enabled()) throw new AgentExecutionError("EXECUTION_DISABLED");

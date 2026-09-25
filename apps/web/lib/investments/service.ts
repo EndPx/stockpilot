@@ -49,12 +49,13 @@ export async function executeInvestment(input: { signedTransaction: string; requ
   if (!/^build:[a-f0-9]{64}$/.test(input.requestId)) return jupiter().execute(input);
   // Jupiter /build is not compatible with /execute. The durable ledger claims
   // the exact signed message before this single RPC submission. Never retry
-  // an ambiguous response; reconciliation reads the signature on chain.
+  // an ambiguous response; reconciliation reads the signature on chain. The
+  // node may forward the SAME signed bytes to leaders up to five more times.
   const response = await fetch(getSolanaRpcUrl(), {
     method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction",
       params: [input.signedTransaction, { encoding: "base64", skipPreflight: false,
-        preflightCommitment: "confirmed", maxRetries: 0 }] }),
+        preflightCommitment: "confirmed", maxRetries: 5 }] }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error("Solana submission was not acknowledged.");

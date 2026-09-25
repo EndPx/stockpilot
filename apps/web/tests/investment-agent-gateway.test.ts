@@ -62,6 +62,7 @@ function fixture(overrides: NonNullable<Parameters<typeof createAgentExecutionGa
     rejectUnsubmitted: async () => { calls.push("reject-unsubmitted"); return update("REJECTED"); },
     unknown: async () => { calls.push("unknown"); return update("UNKNOWN"); },
     readTransfer: async () => { calls.push("read-chain"); return { status: "PENDING" }; },
+    readExpiry: async () => null,
     reconcile: async (_caller, _id, result) => { calls.push("settle"); return update(result.outcome); },
     get: async () => record!, list: async () => record ? [record] : [],
     ...overrides,
@@ -135,6 +136,32 @@ test("RPC preflight rejection is distinguished from timeout and finalized succes
     actualInputAmountRaw: "1000000", actualOutputAmountRaw: "1000000", actualNativeDebitLamportsRaw: "1005000" }) });
   assert.equal((await confirmed.gateway.execute(principal, request)).status, "CONFIRMED");
   assert.doesNotMatch(JSON.stringify(publicAgentOperation(confirmed.getRecord())), /transaction|signer/i);
+});
+
+test("expired operations reconcile without signing or sending a replacement, including list refresh", async () => {
+  let allowExpiry = false;
+  const f = fixture({ readExpiry: async operation => allowExpiry ? {
+    operationId: operation.id, signature, messageFingerprint: prepared.messageFingerprint,
+    blockhash: prepared.blockhash, lastValidBlockHeight: "100", observedAt: new Date(now).toISOString(), witnesses: [],
+  } : null });
+  assert.equal((await f.gateway.execute(principal, request)).status, "SUBMITTED");
+  allowExpiry = true;
+  assert.equal((await f.gateway.list(principal)).operations[0].status, "EXPIRED");
+  const repeated = await f.gateway.execute(principal, request);
+  assert.equal(repeated.status, "EXPIRED");
+  assert.match(repeated.note!, /new explicit request/);
+  assert.equal(f.calls.filter(c => c === "send").length, 1);
+  assert.equal(f.calls.filter(c => c === "sign").length, 1);
+  assert.equal(f.calls.filter(c => c === "settle").length, 1);
+});
+
+test("strict receipt verifier errors cannot fall back to expiry or release funds", async () => {
+  let expiryReads = 0;
+  const f = fixture({ readTransfer: async () => { throw new Error("unexpected transaction effects"); },
+    readExpiry: async () => { expiryReads++; return null; } });
+  assert.equal((await f.gateway.execute(principal, request)).status, "SUBMITTED");
+  assert.equal(expiryReads, 0);
+  assert.equal(f.calls.includes("settle"), false);
 });
 
 test("intent uses exact decimal amounts with no hardcoded test cap and never treats scaled shares as raw units", () => {

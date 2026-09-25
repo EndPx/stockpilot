@@ -6,7 +6,7 @@ const input = { requestId: `build:${"a".repeat(64)}`, signedTransaction: "offlin
   lastValidBlockHeight: "12345" };
 const signature = "1".repeat(88);
 
-test("build submissions send the exact signed bytes once to configured RPC with preflight and no retries", async (t) => {
+test("build submissions use one HTTP call and bounded node forwarding of identical signed bytes", async (t) => {
   const originalUrl = process.env.SOLANA_RPC_URL;
   process.env.SOLANA_RPC_URL = "https://rpc.example.test/";
   t.after(() => { if (originalUrl === undefined) delete process.env.SOLANA_RPC_URL; else process.env.SOLANA_RPC_URL = originalUrl; });
@@ -25,7 +25,7 @@ test("build submissions send the exact signed bytes once to configured RPC with 
   assert.ok(call.signal instanceof AbortSignal);
   assert.deepEqual(call.body, { jsonrpc: "2.0", id: 1, method: "sendTransaction",
     params: [input.signedTransaction, { encoding: "base64", skipPreflight: false,
-      preflightCommitment: "confirmed", maxRetries: 0 }] });
+      preflightCommitment: "confirmed", maxRetries: 5 }] });
   assert.deepEqual(result, { status: "Success", signature, code: null, error: null,
     totalInputAmount: null, totalOutputAmount: null });
 });
