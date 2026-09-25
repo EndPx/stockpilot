@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } 
 import type { AgentPrincipal } from "./credentials";
 import { resolveOAuthPrincipal } from "./oauth-binding";
 import type { AgentOAuthConfig } from "./oauth-config";
-import { getWorkosUserById } from "./workos-api";
+import { getWorkosUserByExternalId, getWorkosUserById } from "./workos-api";
 
 type WorkosAccessClaims = { subject: string; clientId: string };
 type JwtFailureReason = "jwt_expired" | "jwt_issuer" | "jwt_audience" | "jwt_algorithm" |
@@ -14,6 +14,8 @@ type JwtFailureReason = "jwt_expired" | "jwt_issuer" | "jwt_audience" | "jwt_alg
   "jwt_claims_consent" | "jwt_claims_id" | "jwt_claims_lifetime" | "jwt_claims_scope" |
   "jwt_unclassified";
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+const workosSubjectPattern = /^user_[A-Za-z0-9_-]{8,128}$/;
+const privySubjectPattern = /^did:privy:[A-Za-z0-9_-]{1,118}$/;
 
 function validOAuthClientId(value: unknown): value is string {
   if (typeof value !== "string" || value.length < 8 || value.length > 1_024) return false;
@@ -55,7 +57,8 @@ function subjectShapeFailure(subject: unknown): JwtFailureReason {
 function inspectWorkosAccessClaims(payload: JWTPayload): { claims: WorkosAccessClaims | null; reason: JwtFailureReason | null } {
   const subject = payload.sub;
   const clientId = payload.client_id;
-  if (typeof subject !== "string" || !/^user_[A-Za-z0-9_-]{8,128}$/.test(subject))
+  if (typeof subject !== "string" ||
+    (!workosSubjectPattern.test(subject) && !privySubjectPattern.test(subject)))
     return { claims: null, reason: subjectShapeFailure(subject) };
   if (!validOAuthClientId(clientId)) return { claims: null, reason: "jwt_claims_client" };
   if (typeof payload.sid !== "string" || payload.sid.length < 8 || payload.sid.length > 512 ||
@@ -116,6 +119,7 @@ export async function verifyOAuthCredential(
   dependencies: {
     verifyToken?: typeof verifySignedToken;
     readUser?: typeof getWorkosUserById;
+    readUserByExternalId?: typeof getWorkosUserByExternalId;
     resolve?: typeof resolveOAuthPrincipal;
     onFailure?: (reason: "token_shape" | "jwt_rejected" | "identity_mismatch" | "principal_unavailable" | JwtFailureReason) => void;
   } = {},
@@ -134,9 +138,22 @@ export async function verifyOAuthCredential(
   // Local connection revocation is checked on every request below. A WorkOS
   // consent revoked only upstream may leave an already-issued JWT usable until
   // its expiry; CIMD clients do not give us an introspection client secret.
-  const user = await (dependencies.readUser ?? getWorkosUserById)(claims.subject, config);
-  if (user.id !== claims.subject) { dependencies.onFailure?.("identity_mismatch"); return null; }
-  const principal = await (dependencies.resolve ?? resolveOAuthPrincipal)(claims, user.externalId, config);
+  const isPrivySubject = privySubjectPattern.test(claims.subject);
+  if (!isPrivySubject && !workosSubjectPattern.test(claims.subject)) {
+    dependencies.onFailure?.("identity_mismatch");
+    return null;
+  }
+  const user = isPrivySubject
+    ? await (dependencies.readUserByExternalId ?? getWorkosUserByExternalId)(claims.subject, config)
+    : await (dependencies.readUser ?? getWorkosUserById)(claims.subject, config);
+  if (!workosSubjectPattern.test(user.id) || !privySubjectPattern.test(user.externalId) ||
+    (isPrivySubject ? user.externalId !== claims.subject : user.id !== claims.subject)) {
+    dependencies.onFailure?.("identity_mismatch");
+    return null;
+  }
+  // The browser-bound Neon subject is always WorkOS's internal user ID.
+  const principal = await (dependencies.resolve ?? resolveOAuthPrincipal)(
+    { subject: user.id, clientId: claims.clientId }, user.externalId, config);
   if (!principal) dependencies.onFailure?.("principal_unavailable");
   return principal;
 }

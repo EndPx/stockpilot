@@ -103,6 +103,8 @@ test("WorkOS completion accepts only provider redirect and exact external Privy 
     mockFetch({ id: subject, external_id: privy })), { id: subject, externalId: privy });
   assert.deepEqual(await getWorkosUserByExternalId(privy, config,
     mockFetch({ id: subject, external_id: privy })), { id: subject, externalId: privy });
+  await assert.rejects(getWorkosUserByExternalId(privy, config,
+    mockFetch({ id: subject, external_id: "did:privy:bob" })));
   await assert.rejects(getWorkosUserById(subject, config,
     mockFetch({ id: subject, external_id: "did:privy:bob" }, 403)));
   await assert.rejects(getWorkosUserById(subject, config,
@@ -118,9 +120,13 @@ test("JWT claim gate rejects ID/M2M tokens and requires consent and openid", () 
   const valid = { sub: subject, client_id: clientId, sid: "app_consent_01JPXN6KAQW83AMXXY5WX3RHTJ",
     jti: "01JPXN6KFGZQYW3AM2DEVX84YS", iat: 1_800_000_000, exp: 1_800_000_300, scope: "openid profile" };
   assert.deepEqual(parseWorkosAccessClaims(valid), { subject, clientId });
+  assert.deepEqual(parseWorkosAccessClaims({ ...valid, sub: privy }), { subject: privy, clientId });
   assert.deepEqual(parseWorkosAccessClaims({ ...valid, client_id: "https://chatgpt.com/oauth/client-metadata.json",
     sid: "consent-12345678" }), { subject, clientId: "https://chatgpt.com/oauth/client-metadata.json" });
   assert.equal(parseWorkosAccessClaims({ ...valid, sub: clientId }), null);
+  assert.equal(parseWorkosAccessClaims({ ...valid, sub: "did:privy:" }), null);
+  assert.equal(parseWorkosAccessClaims({ ...valid, sub: "did:privy:alice/bob" }), null);
+  assert.equal(parseWorkosAccessClaims({ ...valid, sub: `did:privy:${"a".repeat(119)}` }), null);
   assert.equal(parseWorkosAccessClaims({ ...valid, sid: undefined }), null);
   assert.equal(parseWorkosAccessClaims({ ...valid, scope: "profile" }), null);
 });
@@ -137,6 +143,9 @@ test("JWT signature verifier enforces WorkOS issuer, exact MCP audience, expiry 
       .setIssuer(tokenIssuer).setAudience(audience).setIssuedAt().setExpirationTime(expiresIn).sign(privateKey);
   }
   assert.deepEqual(await verifySignedToken(await signed(issuer, resource), config, keys), { subject, clientId });
+  const privyToken = await new SignJWT({ ...claims, sub: privy }).setProtectedHeader({ alg: "RS256", kid: jwk.kid })
+    .setIssuer(issuer).setAudience(resource).setIssuedAt().setExpirationTime("5m").sign(privateKey);
+  assert.deepEqual(await verifySignedToken(privyToken, config, keys), { subject: privy, clientId });
   assert.equal(await verifySignedToken(await signed(issuer, [resource, "https://other.example/api/mcp"]), config, keys), null);
   assert.equal(await verifySignedToken(await signed(issuer, "https://other.example/api/mcp"), config, keys), null);
   assert.equal(await verifySignedToken(await signed("https://evil.example", resource), config, keys), null);
@@ -167,7 +176,8 @@ test("JWT diagnostics report fixed categories without recording token material",
   await check(await signed({ ...claims, sub: undefined }), "jwt_claims_subject_missing");
   await check(await signed({ ...claims, sub: 123 }), "jwt_claims_subject_missing");
   await check(await signed({ ...claims, sub: "user_short" }), "jwt_claims_subject_workos_malformed");
-  await check(await signed({ ...claims, sub: "did:privy:example" }), "jwt_claims_subject_privy");
+  await check(await signed({ ...claims, sub: "did:privy:" }), "jwt_claims_subject_privy");
+  await check(await signed({ ...claims, sub: "did:privy:bad/id" }), "jwt_claims_subject_privy");
   await check(await signed({ ...claims, sub: clientId }), "jwt_claims_subject_client");
   await check(await signed({ ...claims, sub: "opaque-subject-example" }), "jwt_claims_subject_other");
   await check(await signed({ ...claims, sid: undefined }), "jwt_claims_consent");
@@ -205,6 +215,79 @@ test("OAuth subject requires browser binding; connection defaults to markets-onl
     assert.equal(same?.clientId, principal?.clientId);
     await db.query("UPDATE control_oauth_connections SET revoked_at = now() WHERE client_id = $1", [principal?.clientId]);
     assert.equal(await resolveOAuthPrincipal(claims, privy, config, store), null);
+  } finally { await db.close(); }
+});
+
+test("signed Privy subject resolves through exact WorkOS external ID to an existing internal subject binding", async () => {
+  const { publicKey, privateKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  jwk.kid = "test-workos-key";
+  const keys = createLocalJWKSet({ keys: [jwk] });
+  const sign = (tokenSubject: string) => new SignJWT({ sub: tokenSubject, client_id: clientId,
+    sid: "app_consent_01JPXN6KAQW83AMXXY5WX3RHTJ", jti: "01JPXN6KFGZQYW3AM2DEVX84YS", scope: "openid profile" })
+    .setProtectedHeader({ alg: "RS256", kid: jwk.kid }).setIssuer(issuer).setAudience(resource)
+    .setIssuedAt().setExpirationTime("5m").sign(privateKey);
+  const token = await sign(privy);
+  const db = await PGlite.create();
+  await db.exec(scripts.join("\n"));
+  const store = {
+    transaction: <T>(work: (client: { query: typeof db.query }) => Promise<T>) => db.transaction((tx) => work({ query: tx.query.bind(tx) })),
+    query: db.query.bind(db),
+  };
+  const failures: string[] = [];
+  const externalReads: string[] = [];
+  let internalReads = 0;
+  const dependencies: NonNullable<Parameters<typeof verifyOAuthCredential>[2]> = {
+    verifyToken: (value, oauth, _unused, onFailure) =>
+      verifySignedToken(value, oauth, keys, onFailure),
+    readUser: async () => { internalReads++; throw new Error("Internal lookup must not run for Privy subjects"); },
+    readUserByExternalId: (externalId, oauth) => {
+      externalReads.push(externalId);
+      return getWorkosUserByExternalId(externalId, oauth, mockFetch({ id: subject, external_id: privy }));
+    },
+    resolve: (claims, externalId, oauth) =>
+      resolveOAuthPrincipal(claims, externalId, oauth, store),
+    onFailure: (reason: string) => { failures.push(reason); },
+  };
+  try {
+    assert.equal(await verifyOAuthCredential(token, config, dependencies), null);
+    assert.deepEqual(failures, ["principal_unavailable"]);
+    assert.equal((await db.query("SELECT subject FROM control_oauth_subject_bindings")).rows.length, 0);
+
+    await bindOAuthSubject({ privyUserId: privy, walletAddress: wallet, workosUserId: subject }, config, store);
+    failures.length = 0;
+    const principal = await verifyOAuthCredential(token, config, dependencies);
+    assert.equal(principal?.authMethod, "oauth");
+    if (principal?.authMethod !== "oauth") throw new Error("OAuth principal was not returned");
+    assert.equal(principal.oauthSubject, subject);
+    assert.equal(principal?.accountId, privy);
+    assert.equal(principal?.walletAddress, wallet);
+    assert.equal(principal.oauthClientId, clientId);
+    assert.deepEqual(principal?.scopes, ["markets:read"]);
+    assert.deepEqual(failures, []);
+    assert.deepEqual(externalReads, [privy, privy]);
+    assert.equal(internalReads, 0);
+    const connection = await db.query<{ subject: string; oauth_client_id: string }>(
+      "SELECT subject, oauth_client_id FROM control_oauth_connections");
+    assert.deepEqual(connection.rows, [{ subject, oauth_client_id: clientId }]);
+
+    failures.length = 0;
+    assert.equal(await verifyOAuthCredential(token, config, {
+      ...dependencies,
+      readUserByExternalId: async () => ({ id: subject, externalId: "did:privy:bob" }),
+      resolve: async () => { throw new Error("Mismatched identity reached binding lookup"); },
+    }), null);
+    assert.deepEqual(failures, ["identity_mismatch"]);
+
+    failures.length = 0;
+    assert.equal(await verifyOAuthCredential(await sign("did:privy:bad/id"), config, dependencies), null);
+    assert.deepEqual(failures, ["jwt_claims_subject_privy"]);
+
+    await assert.rejects(verifyOAuthCredential(token, config, {
+      ...dependencies,
+      readUserByExternalId: async () => { throw new WorkosApiStatusError(503); },
+      resolve: async () => { throw new Error("Failed WorkOS lookup reached binding lookup"); },
+    }), (error) => error instanceof WorkosApiStatusError && error.status === 503);
   } finally { await db.close(); }
 });
 
