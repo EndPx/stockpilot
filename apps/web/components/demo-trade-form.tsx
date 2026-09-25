@@ -145,6 +145,8 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
     setBusy("signing");
     let signed = false;
     try {
+      // Release the native top layer so Privy's signing portal can receive input.
+      dialogRef.current?.close();
       const bytes = await sign(decodeBase64Transaction(prepared.transaction));
       signed = true;
       setBusy("submitting");
@@ -233,7 +235,8 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
     {(unknown || execution?.status === "PENDING") && <button type="button" className="secondary-button mt-4"
       disabled={Boolean(busy) || recovering} onClick={() => void checkStatus()}>Check trade status</button>}
     <button type="button" className="button mt-5 w-full" disabled={!attested || !amount || Boolean(busy) || recovering || unknown || execution?.status === "PENDING"}
-      onClick={() => void prepare()}>{recovering ? "Checking trade status…" : busy === "preparing" ? "Preparing quote…" : `Review ${side}`}</button>
+      onClick={() => void prepare()}>{recovering ? "Checking trade status…" : busy === "preparing" ? "Preparing quote…" :
+        busy === "signing" ? "Waiting for wallet approval…" : busy === "submitting" ? "Submitting trade…" : `Review ${side}`}</button>
     <p className="mt-4 text-xs leading-5 text-muted">No order is sent until you review and sign in Privy. A first BUY may create a token account and require extra SOL rent; 0.003 SOL may not cover both products. An unknown result is never retried automatically.</p>
     <dialog ref={dialogRef} className="wallet-dialog" aria-label="Review trade" onCancel={(event) => { if (busy) event.preventDefault(); }}>
       {prepared && <div className="p-6">
