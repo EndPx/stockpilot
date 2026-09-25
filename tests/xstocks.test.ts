@@ -89,6 +89,53 @@ test("public catalog serves a bounded cached snapshot while paginated refresh is
   assert.equal(fresh.assets[0].name, "Refreshed Apple xStock");
 });
 
+test("manual snapshot waits for a shared refresh sooner than the unchanged discovery TTL", async () => {
+  let now = 0;
+  let calls = 0;
+  let finish!: (assets: ReturnType<typeof normalizeXStock>[]) => void;
+  const refresh = new Promise<ReturnType<typeof normalizeXStock>[]>((resolve) => { finish = resolve; });
+  const service = new XStocksService(async () => ++calls === 1 ? [normalizeXStock(row)] : refresh, () => now);
+  const first = await service.getSnapshot();
+  now = 120_000;
+  assert.equal((await service.getSnapshot()).fetchedAt, first.fetchedAt);
+  assert.equal(calls, 1);
+  let settled = false;
+  const strict = service.getSnapshot({ maxAgeMs: 45_000, waitForRefresh: true }).then((value) => { settled = true; return value; });
+  const other = service.getSnapshot({ maxAgeMs: 45_000, waitForRefresh: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(calls, 2);
+  assert.equal((await service.getSnapshot()).fetchedAt, first.fetchedAt);
+  finish([normalizeXStock({ ...row, isTradingHalted: true })]);
+  const [fresh, deduped] = await Promise.all([strict, other]);
+  assert.equal(fresh.stale, false);
+  assert.equal(Date.parse(fresh.fetchedAt), now);
+  assert.equal(fresh.assets[0].metadata?.isTradingHalted, true);
+  assert.equal(deduped.fetchedAt, fresh.fetchedAt);
+  assert.equal((await service.getSnapshot()).fetchedAt, fresh.fetchedAt);
+});
+
+test("failed manual refresh preserves stale age and shares discovery's cooldown", async () => {
+  let now = 0;
+  let calls = 0;
+  const service = new XStocksService(async () => {
+    if (++calls > 1) throw new Error("issuer unavailable");
+    return [normalizeXStock(row)];
+  }, () => now);
+  const first = await service.getSnapshot();
+  now = 120_000;
+  const strict = { maxAgeMs: 45_000, waitForRefresh: true };
+  const stale = await service.getSnapshot(strict);
+  assert.equal(stale.stale, true);
+  assert.equal(stale.fetchedAt, first.fetchedAt);
+  assert.equal((await service.getSnapshot(strict)).stale, true);
+  assert.equal(calls, 2);
+  now += 15_000;
+  assert.equal((await service.getSnapshot(strict)).stale, true);
+  assert.equal(calls, 3);
+  for (const maxAgeMs of [-1, Number.NaN, 300_001]) await assert.rejects(service.getSnapshot({ maxAgeMs }));
+});
+
 test("issuer-verified private exposure is excluded without hiding the rest of the catalog", async () => {
   const privateFund = { ...row, id: "3b5de927-b421-48ec-81b1-74c8eec4925f", symbol: "RENAMED", deployments: [{ network: "Solana", address: "Xs7UsqobM3EJgMeHwdAbmDBCZH1G5WTCjatpeYcCr8x" }] };
   const catalog = await fetchXStocksCatalog(fetchPages([page([row, privateFund])]).fetcher);

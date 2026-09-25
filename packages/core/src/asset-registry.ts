@@ -7,12 +7,12 @@ import {
   type MarketType,
 } from "@stockpilot/integrations/asset-domain";
 import { AssetService } from "@stockpilot/core/assets";
-import { XStocksService } from "@stockpilot/integrations/xstocks";
+import { XStocksService, type XStocksSnapshotReadOptions } from "@stockpilot/integrations/xstocks";
 
 export type { InvestmentAsset, MarketType, AssetProvider, AssetAvailability, ExecutionStatus } from "@stockpilot/integrations/asset-domain";
 
 export type ProviderSnapshot = { assets: InvestmentAsset[]; fetchedAt: string; stale: boolean };
-export type AssetRegistryProvider = MarketClassification & { getSnapshot(): Promise<ProviderSnapshot> };
+export type AssetRegistryProvider = MarketClassification & { getSnapshot(options?: XStocksSnapshotReadOptions): Promise<ProviderSnapshot> };
 export type RegistryFilter = { query?: string; marketType?: MarketType; provider?: AssetProvider };
 export type RegistryPageFilter = RegistryFilter & { group?: "all" | "private" | "public"; limit?: number; cursor?: string };
 export class RegistryQueryError extends Error {}
@@ -23,7 +23,7 @@ export function createPreStocksProvider(service = new AssetService()): AssetRegi
 }
 
 export function createXStocksProvider(service = new XStocksService()): AssetRegistryProvider {
-  return { provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT", getSnapshot: () => service.getSnapshot() };
+  return { provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT", getSnapshot: (options) => service.getSnapshot(options) };
 }
 
 export class InvestmentAssetRegistry {
@@ -40,9 +40,9 @@ export class InvestmentAssetRegistry {
     });
   }
 
-  async getSnapshot(provider?: AssetProvider) {
+  async getSnapshot(provider?: AssetProvider, options?: XStocksSnapshotReadOptions) {
     const snapshots = await Promise.all(this.providers.filter((adapter) => !provider || adapter.provider === provider).map(async (adapter) => {
-      const snapshot = await adapter.getSnapshot();
+      const snapshot = await adapter.getSnapshot(options);
       if (!Number.isFinite(Date.parse(snapshot.fetchedAt))) throw new Error("Invalid provider freshness metadata.");
       for (const asset of snapshot.assets) {
         assertAssetIdentity(asset);

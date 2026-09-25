@@ -65,7 +65,7 @@ export async function resolveDemoAsset(provider: DemoTradeRequest["provider"], m
   if (!demoTradeProductSupported(provider, mintAddress)) {
     throw new InvestmentApiError("ASSET_NOT_ALLOWED", 403);
   }
-  const snapshot = await marketRegistry.getSnapshot(provider);
+  const snapshot = await marketRegistry.getSnapshot(provider, { maxAgeMs: 45_000, waitForRefresh: true });
   const source = snapshot.sources.filter((item) => item.provider === provider);
   const fetchedAt = source.length === 1 ? Date.parse(source[0].fetchedAt) : Number.NaN;
   if (snapshot.stale || source.length !== 1 || source[0].stale || !Number.isFinite(fetchedAt) ||

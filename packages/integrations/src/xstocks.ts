@@ -119,21 +119,32 @@ export async function fetchXStocks(fetcher: typeof fetch = fetch): Promise<Inves
   return (await fetchXStocksCatalog(fetcher)).assets;
 }
 
+export type XStocksSnapshotReadOptions = {
+  /** A stricter freshness window for callers preparing a transaction. */
+  maxAgeMs?: number;
+  /** Await the shared refresh rather than serving discovery's stale snapshot. */
+  waitForRefresh?: boolean;
+};
+
 export class XStocksService {
   private cache?: { assets: InvestmentAsset[]; fetchedAt: number };
   private pending?: Promise<void>;
   private failure?: { error: unknown; retryAt: number };
   constructor(private readonly load = fetchXStocks, private readonly now = Date.now) {}
-  async getSnapshot() {
+  async getSnapshot(options: XStocksSnapshotReadOptions = {}) {
+    const maxAgeMs = options.maxAgeMs ?? 300_000;
+    if (!Number.isFinite(maxAgeMs) || maxAgeMs < 0 || maxAgeMs > 300_000) {
+      throw new Error("Invalid issuer snapshot freshness requirement.");
+    }
     const age = this.cache ? this.now() - this.cache.fetchedAt : Number.POSITIVE_INFINITY;
-    if (this.cache && age < 300_000) {
+    if (this.cache && age >= 0 && age < maxAgeMs) {
       return this.snapshot(false);
     }
     if (this.failure && this.now() < this.failure.retryAt) {
       return this.fallback(this.failure.error);
     }
     this.pending ??= this.refresh().finally(() => { this.pending = undefined; });
-    if (this.cache && age < 1_800_000) {
+    if (!options.waitForRefresh && this.cache && age < 1_800_000) {
       // Discovery can use a bounded verified snapshot while a slow paginated
       // issuer refresh runs. The stale flag keeps it out of eligibility checks.
       void this.pending.catch(() => {});

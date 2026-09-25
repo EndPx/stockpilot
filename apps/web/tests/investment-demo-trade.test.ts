@@ -1,10 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { demoTradeProductSupported, demoWalletAllowed, parseDemoTradeAmount, parseDemoTradeRequest } from "../lib/investments/demo-trade";
+import { demoTradeProductSupported, demoWalletAllowed, parseDemoTradeAmount, parseDemoTradeRequest, resolveDemoAsset } from "../lib/investments/demo-trade";
+import { marketRegistry } from "../lib/markets";
 
 const wallet = "6EuMFHPtiyoFtsBTy1hiJpNgupP7qkZfZm9ErQ58ipsC";
 const pre = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
 const stock = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
+
+test("manual asset checks request blocking fresh snapshots and still reject stale issuer data", async (context) => {
+  const asset = { id: `xstocks:${stock}`, provider: "xstocks" as const, marketType: "PUBLIC_EQUITY" as const,
+    canonical: true, executionStatus: "UNKNOWN" as const, mintAddress: stock, symbol: "AAPLx", name: "Apple xStock",
+    description: null, imageUrl: null, tokenPriceUsd: null, metadata: { isTradingHalted: false } };
+  let age = 0;
+  let stale = false;
+  let read: unknown[] = [];
+  context.mock.method(marketRegistry, "getSnapshot", async (...args: unknown[]) => {
+    read = args;
+    return { assets: [asset], sources: [{ provider: "xstocks", fetchedAt: new Date(Date.now() - age).toISOString(), stale }], stale };
+  });
+  assert.equal((await resolveDemoAsset("xstocks", stock)).mintAddress, stock);
+  assert.deepEqual(read, ["xstocks", { maxAgeMs: 45_000, waitForRefresh: true }]);
+  age = 120_000;
+  await assert.rejects(resolveDemoAsset("xstocks", stock), /fresh issuer catalog/i);
+  age = 0;
+  stale = true;
+  await assert.rejects(resolveDemoAsset("xstocks", stock), /fresh issuer catalog/i);
+});
 
 test("manual amounts are user-defined, not capped at the $0.10 test amount", () => {
   assert.equal(parseDemoTradeAmount("0.1", 6), 100_000n);

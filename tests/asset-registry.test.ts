@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InvestmentAssetRegistry, createPreStocksProvider, type AssetRegistryProvider, type InvestmentAsset } from "@stockpilot/core/asset-registry";
+import { InvestmentAssetRegistry, createPreStocksProvider, createXStocksProvider, type AssetRegistryProvider, type InvestmentAsset } from "@stockpilot/core/asset-registry";
+import { XStocksService } from "@stockpilot/integrations/xstocks";
 import { AssetService } from "@stockpilot/core/assets";
 import { normalizePreStocks } from "@stockpilot/integrations/prestocks";
 
@@ -19,6 +20,22 @@ function publicProvider(assets: InvestmentAsset[] = [publicAsset], stale = false
   return { provider: "xstocks", marketType: "PUBLIC_EQUITY", getSnapshot: async () => ({ assets, fetchedAt: "2026-09-23T00:00:00Z", stale }) };
 }
 const privateProvider = () => createPreStocksProvider(new AssetService(async () => privateAssets));
+
+test("registry forwards stricter manual freshness to the same issuer cache used by discovery", async () => {
+  let now = 0;
+  let loads = 0;
+  const service = new XStocksService(async () => { loads++; return [publicAsset]; }, () => now);
+  const registry = new InvestmentAssetRegistry([createXStocksProvider(service)]);
+  await registry.getSnapshot("xstocks");
+  now = 120_000;
+  assert.equal(Date.parse((await registry.getSnapshot("xstocks")).sources[0].fetchedAt), 0);
+  assert.equal(loads, 1);
+  const fresh = await registry.getSnapshot("xstocks", { maxAgeMs: 45_000, waitForRefresh: true });
+  assert.equal(Date.parse(fresh.sources[0].fetchedAt), now);
+  assert.equal(loads, 2);
+  assert.equal((await registry.getSnapshot("xstocks")).sources[0].fetchedAt, fresh.sources[0].fetchedAt);
+  assert.equal(loads, 2);
+});
 
 test("registry preserves PreStocks while filtering and resolving colliding tickers by ID", async () => {
   const registry = new InvestmentAssetRegistry([privateProvider(), publicProvider()]);
