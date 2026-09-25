@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   normalizeNativeBalance,
   normalizeTokenAccounts,
+  isVerifiedScaledUiMint,
   SolanaBalanceReadError,
   SolanaRpcReadAdapter,
   type SolanaPortfolioRpc,
@@ -16,7 +17,7 @@ const wallet = "11111111111111111111111111111111";
 const legacyMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const token2022Mint = "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh";
 
-function parsedAccount(mint: string, amount: string, decimals: number) {
+function parsedAccount(mint: string, amount: string, decimals: number, uiAmountString = "ignored") {
   return {
     account: {
       data: {
@@ -24,7 +25,7 @@ function parsedAccount(mint: string, amount: string, decimals: number) {
           type: "account",
           info: {
             mint,
-            tokenAmount: { amount, decimals, uiAmount: null, uiAmountString: "ignored" },
+            tokenAmount: { amount, decimals, uiAmount: null, uiAmountString },
           },
         },
       },
@@ -32,10 +33,23 @@ function parsedAccount(mint: string, amount: string, decimals: number) {
   };
 }
 
+function parsedScaledMint(decimals = 9) {
+  return {
+    owner: TOKEN_2022_PROGRAM_ADDRESS,
+    data: { program: "spl-token-2022", parsed: { type: "mint", info: {
+      decimals, isInitialized: true,
+      extensions: [{ extension: "scaledUiAmountConfig", state: {
+        multiplier: "2", newMultiplier: "2", newMultiplierEffectiveTimestamp: 0,
+      } }],
+    } } },
+  };
+}
+
 function rpc(overrides: Partial<SolanaPortfolioRpc> = {}): SolanaPortfolioRpc {
   return {
     getBalance() { return { async send() { return { value: 420_000_000n }; } }; },
     getTokenAccountsByOwner() { return { async send() { return { value: [] }; } }; },
+    getAccountInfo() { return { async send() { return { context: { slot: 100n }, value: parsedScaledMint() }; } }; },
     getTokenSupply() { return { async send() { return { value: { decimals: 9 } }; } }; },
     getBlockHeight() { return { async send() { return 123n; } }; },
     ...overrides,
@@ -61,6 +75,56 @@ test("normalizes legacy and Token-2022 parsed accounts from raw amounts", () => 
     amount: "0.4",
     program: "token-2022",
   }]);
+});
+
+test("retains a same-context Token-2022 RPC UI string without treating it as raw units", () => {
+  const [balance] = normalizeTokenAccounts([parsedAccount(token2022Mint, "1000000000", 9, "2")], "token-2022", 100n);
+  assert.equal(balance.amount, "1");
+  assert.equal(balance.rawAmount, "1000000000");
+  assert.equal(balance.rpcUiAmountString, "2");
+  assert.equal(balance.contextSlot, 100n);
+  assert.equal(normalizeTokenAccounts([parsedAccount(token2022Mint, "1000000000", 9, "2")], "token-2022")[0].rpcUiAmountString, undefined);
+});
+
+test("recognizes only a parsed Token-2022 mint with Scaled UI extension and matching decimals", () => {
+  const mint = parsedScaledMint();
+  assert.equal(isVerifiedScaledUiMint(mint, 9), true);
+  assert.equal(isVerifiedScaledUiMint(mint, 6), false);
+  assert.equal(isVerifiedScaledUiMint({ ...mint, owner: SPL_TOKEN_PROGRAM_ADDRESS }, 9), false);
+  assert.equal(isVerifiedScaledUiMint({ ...mint, data: { ...mint.data, parsed: { ...mint.data.parsed,
+    info: { ...mint.data.parsed.info, extensions: [] } } } }, 9), false);
+});
+
+test("rejects malformed Scaled UI multipliers and effective timestamps", () => {
+  const mint = parsedScaledMint(8);
+  const withState = (state: Record<string, unknown>) => ({
+    ...mint, data: { ...mint.data, parsed: { ...mint.data.parsed, info: {
+      ...mint.data.parsed.info,
+      extensions: [{ extension: "scaledUiAmountConfig", state }],
+    } } },
+  });
+  assert.equal(isVerifiedScaledUiMint(withState({ multiplier: "1.0026642075893797",
+    newMultiplier: "1.0032690125398187", newMultiplierEffectiveTimestamp: 1_786_149_000 }), 8), true);
+  for (const state of [
+    { multiplier: "0", newMultiplier: "1", newMultiplierEffectiveTimestamp: 0 },
+    { multiplier: "NaN", newMultiplier: "1", newMultiplierEffectiveTimestamp: 0 },
+    { multiplier: "1", newMultiplier: "Infinity", newMultiplierEffectiveTimestamp: 0 },
+    { multiplier: "1", newMultiplier: "1", newMultiplierEffectiveTimestamp: "not-a-timestamp" },
+    { multiplier: "1", newMultiplier: "1", newMultiplierEffectiveTimestamp: "9223372036854775808" },
+  ]) {
+    assert.equal(isVerifiedScaledUiMint(withState(state), 8), false);
+  }
+});
+
+test("mint verification requires an RPC slot at or after the token-account snapshot", async () => {
+  const adapter = new SolanaRpcReadAdapter(rpc({
+    getAccountInfo(_mint, config) {
+      assert.equal(config.minContextSlot, 100n);
+      return { async send() { return { context: { slot: 99n }, value: parsedScaledMint() }; } };
+    },
+  }));
+  assert.equal(await adapter.verifyScaledUiMint(token2022Mint, 9, 100n), false);
+  assert.equal(await new SolanaRpcReadAdapter(rpc()).verifyScaledUiMint(token2022Mint, 9, 100n), true);
 });
 
 test("normalizes native lamports with bigint-safe SOL formatting", () => {

@@ -25,7 +25,11 @@ export type SolanaPortfolioRpc = {
     owner: unknown,
     filter: { programId: unknown },
     config: { commitment: "confirmed"; encoding: "jsonParsed" },
-  ): RpcRequest<{ value: unknown }>;
+  ): RpcRequest<{ context?: { slot: bigint }; value: unknown }>;
+  getAccountInfo(
+    mint: unknown,
+    config: { commitment: "confirmed"; encoding: "jsonParsed"; minContextSlot: bigint },
+  ): RpcRequest<{ context?: { slot: bigint }; value: unknown }>;
   getTokenSupply(
     mint: unknown,
     config: { commitment: "confirmed" },
@@ -53,7 +57,30 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function readParsedTokenAccount(value: unknown, program: TokenProgram): TokenBalance {
+function contextSlot(value: unknown): bigint | null {
+  if (typeof value === "bigint" && value >= 0n) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+  return null;
+}
+
+function positiveMultiplier(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value) && value > 0;
+  if (typeof value !== "string" || value.length > 96 ||
+      !/^\d+(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(value)) return false;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+}
+
+function validI64Timestamp(value: unknown): boolean {
+  let timestamp: bigint;
+  if (typeof value === "bigint") timestamp = value;
+  else if (typeof value === "number" && Number.isSafeInteger(value)) timestamp = BigInt(value);
+  else if (typeof value === "string" && /^-?\d{1,19}$/.test(value)) timestamp = BigInt(value);
+  else return false;
+  return timestamp >= -(1n << 63n) && timestamp <= (1n << 63n) - 1n;
+}
+
+function readParsedTokenAccount(value: unknown, program: TokenProgram, slot: bigint | null): TokenBalance {
   const account = record(record(value)?.account);
   const data = record(account?.data);
   const parsed = record(data?.parsed);
@@ -79,14 +106,34 @@ function readParsedTokenAccount(value: unknown, program: TokenProgram): TokenBal
   } catch (cause) {
     throw new SolanaBalanceReadError({ cause });
   }
-  return { mintAddress, rawAmount, decimals, amount, program };
+  const rpcUiAmountString = tokenAmount?.uiAmountString;
+  return {
+    mintAddress, rawAmount, decimals, amount, program,
+    ...(program === "token-2022" && slot !== null && typeof rpcUiAmountString === "string"
+      ? { rpcUiAmountString, contextSlot: slot } : {}),
+  };
 }
 
-export function normalizeTokenAccounts(value: unknown, program: TokenProgram): TokenBalance[] {
+export function normalizeTokenAccounts(value: unknown, program: TokenProgram, slot: bigint | null = null): TokenBalance[] {
   if (!Array.isArray(value)) {
     throw new SolanaBalanceReadError({ cause: new Error("Malformed token-account collection.") });
   }
-  return value.map((account) => readParsedTokenAccount(account, program));
+  return value.map((account) => readParsedTokenAccount(account, program, slot));
+}
+
+/** A parsed balance is trusted for display only after its held mint is independently verified. */
+export function isVerifiedScaledUiMint(value: unknown, expectedDecimals: number): boolean {
+  const account = record(value);
+  const data = record(account?.data);
+  const parsed = record(data?.parsed);
+  const info = record(parsed?.info);
+  if (account?.owner !== TOKEN_2022_PROGRAM_ADDRESS || data?.program !== "spl-token-2022" ||
+      parsed?.type !== "mint" || info?.decimals !== expectedDecimals || info?.isInitialized !== true ||
+      !Array.isArray(info.extensions)) return false;
+  const scaled = info.extensions.filter((entry: unknown) => record(entry)?.extension === "scaledUiAmountConfig");
+  const state = scaled.length === 1 ? record(record(scaled[0])?.state) : null;
+  return state !== null && positiveMultiplier(state.multiplier) && positiveMultiplier(state.newMultiplier) &&
+    validI64Timestamp(state.newMultiplierEffectiveTimestamp);
 }
 
 export function normalizeNativeBalance(value: unknown): NativeBalance {
@@ -134,12 +181,26 @@ export class SolanaRpcReadAdapter implements SolanaReadAdapter {
             { commitment: "confirmed", encoding: "jsonParsed" },
           )
           .send({ abortSignal: AbortSignal.timeout(10_000) });
-        return normalizeTokenAccounts(response.value, program);
+        return normalizeTokenAccounts(response.value, program, contextSlot(response.context?.slot));
       });
       return (await Promise.all(requests)).flat();
     } catch (cause) {
       if (cause instanceof SolanaBalanceReadError) throw cause;
       throw new SolanaBalanceReadError({ cause });
+    }
+  }
+
+  async verifyScaledUiMint(mintAddress: string, decimals: number, minContextSlot: bigint): Promise<boolean> {
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255 || minContextSlot < 0n) return false;
+    try {
+      const response = await this.rpc.getAccountInfo(address(mintAddress), {
+        commitment: "confirmed", encoding: "jsonParsed", minContextSlot,
+      }).send({ abortSignal: AbortSignal.timeout(10_000) });
+      const slot = contextSlot(response.context?.slot);
+      return slot !== null && slot >= minContextSlot && isVerifiedScaledUiMint(response.value, decimals);
+    } catch {
+      // A missing mint, unsupported RPC parser, or failed read must not invent a displayed position.
+      return false;
     }
   }
 

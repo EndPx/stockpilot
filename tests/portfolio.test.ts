@@ -56,6 +56,8 @@ function token(
   rawAmount: string,
   decimals: number,
   program: TokenBalance["program"] = "token-2022",
+  rpcUiAmountString?: string,
+  contextSlot: bigint = 100n,
 ): TokenBalance {
   return {
     mintAddress,
@@ -63,13 +65,15 @@ function token(
     decimals,
     amount: formatRawTokenAmount(rawAmount, decimals),
     program,
+    ...(rpcUiAmountString === undefined ? {} : { rpcUiAmountString, contextSlot }),
   };
 }
 
 function createService(
   tokenBalances: TokenBalance[],
   options: { assets?: InvestmentAsset[]; assetError?: Error; rpcError?: Error;
-    prices?: Map<string, number | null>; priceError?: Error; catalogStale?: boolean } = {},
+    prices?: Map<string, number | null>; priceError?: Error; catalogStale?: boolean;
+    mintVerified?: boolean; mintError?: Error } = {},
 ) {
   const calls: string[] = [];
   const assetReader = {
@@ -94,6 +98,11 @@ function createService(
       calls.push(`tokens:${walletAddress}`);
       if (options.rpcError) throw options.rpcError;
       return tokenBalances;
+    },
+    async verifyScaledUiMint(mintAddress, decimals, minContextSlot) {
+      calls.push(`mint:${mintAddress}:${decimals}:${minContextSlot}`);
+      if (options.mintError) throw options.mintError;
+      return options.mintVerified ?? false;
     },
   };
   return { service: new PortfolioService(assetReader, solana, () => 1_700_000_000_000), calls };
@@ -197,6 +206,83 @@ test("canonical xStocks holding is reported from on-chain raw amount but never v
   assert.equal(portfolio.portfolioValueUsd, null);
   assert.equal(portfolio.valuationScope, "INVESTMENT_POSITIONS_ONLY");
   assert.equal(portfolio.unrecognizedTokenMintCount, 0);
+});
+
+test("verified xStock uses RPC scaled quantity once but remains unvalued until price units are known", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null, tokenPriceUsd: null,
+  };
+  const { service, calls } = createService([
+    token(unrelatedMint, "1000000000", 9, "token-2022", "2"),
+  ], { assets: [stock], prices: new Map([[unrelatedMint, 200]]), mintVerified: true });
+  const portfolio = await service.getPortfolio("session-wallet");
+  assert.equal(portfolio.positions[0].rawTokenAmount, "1000000000");
+  assert.equal(portfolio.positions[0].quantity, "2");
+  assert.equal(portfolio.positions[0].displayStatus, "RPC_SCALED");
+  assert.equal(portfolio.positions[0].tokenPriceUsd, 200);
+  assert.equal(portfolio.positions[0].estimatedValueUsd, null);
+  assert.equal(portfolio.portfolioValueUsd, null);
+  assert.ok(calls.includes(`mint:${unrelatedMint}:9:100`));
+});
+
+test("aggregates multiple scaled account strings exactly without Number precision loss", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null, tokenPriceUsd: null,
+  };
+  const { service } = createService([
+    token(unrelatedMint, "9007199254740993", 9, "token-2022", "18014398.509481986"),
+    token(unrelatedMint, "7", 9, "token-2022", "0.000000014"),
+  ], { assets: [stock], mintVerified: true });
+  const portfolio = await service.getPortfolio("session-wallet");
+  assert.equal(portfolio.positions[0].rawTokenAmount, "9007199254741000");
+  assert.equal(portfolio.positions[0].quantity, "18014398.509482");
+  assert.equal(portfolio.positions[0].estimatedValueUsd, null);
+});
+
+test("sums long Scaled UI decimals exactly before truncating to mint display precision", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null, tokenPriceUsd: null,
+  };
+  const { service } = createService([
+    token(unrelatedMint, "100000000", 8, "token-2022", "1.0032690125398187"),
+    token(unrelatedMint, "100000000", 8, "token-2022", "1.0032690125398187"),
+  ], { assets: [stock], mintVerified: true });
+  assert.equal((await service.getPortfolio("session-wallet")).positions[0].quantity, "2.00653802");
+
+  const tiny = createService([
+    token(unrelatedMint, "1", 8, "token-2022", "0.000000009"),
+    token(unrelatedMint, "1", 8, "token-2022", "0.000000009"),
+  ], { assets: [stock], mintVerified: true });
+  assert.equal((await tiny.service.getPortfolio("session-wallet")).positions[0].quantity, "0.00000001");
+});
+
+test("missing, malformed, mixed-context, or unverified Scaled UI observations stay hidden", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null, tokenPriceUsd: null,
+  };
+  for (const balances of [
+    [token(unrelatedMint, "1000000000", 9)],
+    [token(unrelatedMint, "1000000000", 9, "token-2022", "bad")],
+    [token(unrelatedMint, "1000000000", 9, "token-2022", "2", 100n),
+      token(unrelatedMint, "1000000000", 9, "token-2022", "2", 101n)],
+    [token(unrelatedMint, "1000000000", 9, "spl-token", "2")],
+  ]) {
+    const { service } = createService(balances, { assets: [stock], mintVerified: true });
+    const position = (await service.getPortfolio("session-wallet")).positions[0];
+    assert.equal(position.quantity, null);
+    assert.equal(position.displayStatus, "MULTIPLIER_UNVERIFIED");
+  }
+  const unavailable = createService([token(unrelatedMint, "1000000000", 9, "token-2022", "2")],
+    { assets: [stock], mintError: new Error("mint RPC unavailable") });
+  assert.equal((await unavailable.service.getPortfolio("session-wallet")).positions[0].quantity, null);
 });
 
 test("issuer quote failure leaves xStocks unvalued without hiding verified token holdings", async () => {

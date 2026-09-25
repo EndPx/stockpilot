@@ -13,6 +13,10 @@ export type TokenBalance = {
   decimals: number;
   amount: string;
   program: TokenProgram;
+  /** Parsed RPC display amount. Token-2022 may already apply Scaled UI. Never use for transactions. */
+  rpcUiAmountString?: string;
+  /** Context slot of the token-account observation, required before trusting its UI amount. */
+  contextSlot?: bigint;
 };
 
 export type NativeBalance = {
@@ -23,6 +27,8 @@ export type NativeBalance = {
 export interface SolanaReadAdapter {
   getNativeBalance(walletAddress: string): Promise<NativeBalance>;
   getTokenBalances(walletAddress: string): Promise<TokenBalance[]>;
+  /** Verify a canonical held mint has the Token-2022 Scaled UI extension at or after the balance slot. */
+  verifyScaledUiMint?(mintAddress: string, decimals: number, minContextSlot: bigint): Promise<boolean>;
 }
 
 export type PortfolioPosition = {
@@ -37,7 +43,7 @@ export type PortfolioPosition = {
   /** On-chain base units, never an equity-adjusted display quantity. */
   rawTokenAmount?: string;
   decimals?: number;
-  displayStatus?: "RAW_DECIMALS" | "MULTIPLIER_UNVERIFIED";
+  displayStatus?: "RAW_DECIMALS" | "MULTIPLIER_UNVERIFIED" | "RPC_SCALED";
   tokenPriceUsd: number | null;
   priceSource?: "prestocks_issuer" | "xstocks_issuer" | null;
   priceAsOf?: string | null;
@@ -87,6 +93,9 @@ export type WalletBalance = {
 type AggregatedBalance = {
   rawAmount: bigint;
   decimals: number;
+  token2022Only: boolean;
+  scaledUiDecimal: { units: bigint; places: number } | null;
+  contextSlot: bigint | null;
 };
 
 function assertDecimals(decimals: number): void {
@@ -100,6 +109,28 @@ function parseRawAmount(rawAmount: string): bigint {
     throw new Error("Token balance contains an invalid raw amount.");
   }
   return BigInt(rawAmount);
+}
+
+/** Parses a bounded RPC decimal string without floating-point rounding. */
+function parseUiDecimal(value: string | undefined): { units: bigint; places: number } | null {
+  if (typeof value !== "string" || value.length > 256) return null;
+  const match = /^(0|[1-9]\d*)(?:\.(\d+))?$/.exec(value);
+  if (!match || (match[2]?.length ?? 0) > 64) return null;
+  return { units: BigInt(match[1] + (match[2] ?? "")), places: match[2]?.length ?? 0 };
+}
+
+function sumUiDecimal(left: { units: bigint; places: number }, right: { units: bigint; places: number }) {
+  const places = Math.max(left.places, right.places);
+  return { units: left.units * 10n ** BigInt(places - left.places) +
+    right.units * 10n ** BigInt(places - right.places), places };
+}
+
+/** Truncates only after exact aggregation of every token account for the mint. */
+function formatUiDecimal(value: { units: bigint; places: number }, decimals: number): string {
+  const baseUnits = value.places > decimals
+    ? value.units / 10n ** BigInt(value.places - decimals)
+    : value.units * 10n ** BigInt(decimals - value.places);
+  return formatRawTokenAmount(baseUnits, decimals);
 }
 
 /** Formats integer base units without routing a raw u64 through Number. */
@@ -131,9 +162,16 @@ function aggregateBalances(balances: TokenBalance[]): Map<string, AggregatedBala
     if (existing && existing.decimals !== balance.decimals) {
       throw new Error("Token accounts for one mint disagree on decimals.");
     }
+    const observedUi = balance.program === "token-2022" && typeof balance.contextSlot === "bigint" && balance.contextSlot >= 0n
+      ? parseUiDecimal(balance.rpcUiAmountString) : null;
+    const sameContext = !existing || existing.contextSlot === balance.contextSlot;
     byMint.set(balance.mintAddress, {
       decimals: balance.decimals,
       rawAmount: (existing?.rawAmount ?? 0n) + rawAmount,
+      token2022Only: balance.program === "token-2022" && (existing?.token2022Only ?? true),
+      scaledUiDecimal: observedUi === null || !sameContext || existing?.scaledUiDecimal === null
+        ? null : existing?.scaledUiDecimal ? sumUiDecimal(existing.scaledUiDecimal, observedUi) : observedUi,
+      contextSlot: sameContext && typeof balance.contextSlot === "bigint" ? balance.contextSlot : null,
     });
   }
   return byMint;
@@ -147,12 +185,12 @@ function estimatedValue(quantity: string, price: number | null): number | null {
 }
 
 function positionFor(asset: InvestmentAsset, balance: AggregatedBalance, tokenPriceUsd: number | null,
-  priceAsOf: string | null, priceStale: boolean): PortfolioPosition | null {
+  priceAsOf: string | null, priceStale: boolean, verifiedScaledQuantity: string | null): PortfolioPosition | null {
   if (balance.rawAmount === 0n) return null;
-  // xStocks on Solana use Token-2022 Scaled UI Amount. A raw SPL balance is
-  // not the equity-adjusted display quantity, so never value it by raw units.
+  // xStocks display units require both the RPC's already-scaled UI amount and
+  // verification of the canonical mint extension. Never multiply it again.
   const needsScale = asset.provider === "xstocks";
-  const quantity = needsScale ? null : formatRawTokenAmount(balance.rawAmount, balance.decimals);
+  const quantity = needsScale ? verifiedScaledQuantity : formatRawTokenAmount(balance.rawAmount, balance.decimals);
   return {
     provider: asset.provider,
     assetId: asset.id,
@@ -163,12 +201,14 @@ function positionFor(asset: InvestmentAsset, balance: AggregatedBalance, tokenPr
     quantity,
     rawTokenAmount: balance.rawAmount.toString(),
     decimals: balance.decimals,
-    displayStatus: needsScale ? "MULTIPLIER_UNVERIFIED" : "RAW_DECIMALS",
+    displayStatus: needsScale ? quantity === null ? "MULTIPLIER_UNVERIFIED" : "RPC_SCALED" : "RAW_DECIMALS",
     tokenPriceUsd,
     priceSource: tokenPriceUsd === null ? null : asset.provider === "xstocks" ? "xstocks_issuer" : "prestocks_issuer",
     priceAsOf,
     priceStale,
-    estimatedValueUsd: quantity === null ? null : estimatedValue(quantity, tokenPriceUsd),
+    // The issuer's public `quote` does not specify raw-vs-scaled price units.
+    // A verified display quantity alone is not enough for a USD valuation.
+    estimatedValueUsd: needsScale || quantity === null ? null : estimatedValue(quantity, tokenPriceUsd),
     imageUrl: asset.imageUrl,
   };
 }
@@ -190,6 +230,9 @@ export class PortfolioService {
     const usdc = byMint.get(SOLANA_MAINNET_USDC_MINT) ?? {
       rawAmount: 0n,
       decimals: SOLANA_MAINNET_USDC_DECIMALS,
+      token2022Only: false,
+      scaledUiDecimal: null,
+      contextSlot: null,
     };
     if (usdc.decimals !== SOLANA_MAINNET_USDC_DECIMALS) {
       throw new Error("Canonical USDC balance has unexpected decimals.");
@@ -233,6 +276,17 @@ export class PortfolioService {
       seen.add(asset.mintAddress);
     }
     const held = assets.filter((asset) => (byMint.get(asset.mintAddress)?.rawAmount ?? 0n) > 0n);
+    const verifiedScaled = new Map<string, string>();
+    await Promise.all(held.filter((asset) => asset.provider === "xstocks").map(async (asset) => {
+      const balance = byMint.get(asset.mintAddress)!;
+      if (!balance.token2022Only || balance.scaledUiDecimal === null || balance.contextSlot === null ||
+          !this.solana.verifyScaledUiMint) return;
+      try {
+        if (await this.solana.verifyScaledUiMint(asset.mintAddress, balance.decimals, balance.contextSlot)) {
+          verifiedScaled.set(asset.mintAddress, formatUiDecimal(balance.scaledUiDecimal, balance.decimals));
+        }
+      } catch { /* Unavailable mint verification leaves display quantity unknown. */ }
+    }));
     let indicativePrices = new Map<string, { quote: number | null; fetchedAt: string | null; stale: boolean }>();
     if (this.assets.getHeldIndicativePrices) {
       try { indicativePrices = await this.assets.getHeldIndicativePrices(held); }
@@ -249,7 +303,8 @@ export class PortfolioService {
       if (price !== null && (!Number.isFinite(price) || price <= 0)) {
         throw new Error("Portfolio contains an invalid indicative price.");
       }
-      return positionFor(asset, byMint.get(asset.mintAddress)!, price, priceAsOf, priceStale)!;
+      return positionFor(asset, byMint.get(asset.mintAddress)!, price, priceAsOf, priceStale,
+        verifiedScaled.get(asset.mintAddress) ?? null)!;
     });
     const values = positions.map((position) => position.estimatedValueUsd);
     const portfolioValueUsd = values.some((value) => value === null)
