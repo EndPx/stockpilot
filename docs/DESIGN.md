@@ -197,6 +197,14 @@ remains off in production until a separately reviewed and accepted gate.
 Overview primitives (2026-09-25): the Activity preview has loading, seven-day
 empty, ready, and retryable error states. The exact UTC count is backed by an
 owner-scoped database aggregate; bars have an accessible daily text equivalent.
+Each day in a nonempty week is an inspectable, full-height target, including
+zero-count days. Hover or keyboard focus previews its exact UTC date, total,
+Activity count, and Approvals count in a stable in-card readout; tap/click pins
+that day until another day is chosen. Each target's accessible name contains
+the same counts, and focus remains visible. The readout does not invent event
+details or trigger a new request. It stays within the clipped surface rather
+than relying on an overflow-prone floating tooltip. Below 440px, the seven-day
+plot becomes seven compact day rows so every tap target remains at least 44px.
 The Agents preview has loading, no-connected-agent, ready and retryable error
 states and links each real client to its detail page. The Wallet preview repeats
 only the verified public Solana address and truthful estimate, with loading and

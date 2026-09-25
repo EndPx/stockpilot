@@ -300,11 +300,13 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 .activity-preview-state, .agents-preview-state { display: grid; min-height: 260px; align-content: center; justify-items: center; gap: 10px; padding: 24px; color: var(--muted); font-size: 13px; text-align: center; }
 .activity-preview-state p, .agents-preview-state p { margin: 0; }
 .activity-week { display: grid; gap: 16px; padding: 20px; }
+.activity-week-head { display: flex; min-height: 56px; align-items: start; justify-content: space-between; gap: 12px; }
 .activity-week-empty { display: grid; min-height: 176px; place-items: center; margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
 .activity-week-count { display: grid; gap: 2px; margin: 0; }.activity-week-count strong { color: var(--ink); font-size: 26px; font-weight: 670; line-height: 1.15; font-variant-numeric: tabular-nums; }.activity-week-count span { color: var(--muted); font-size: 12px; }
+.activity-week-inspect { display: grid; min-width: 0; min-height: 54px; align-content: start; justify-items: end; gap: 2px; text-align: right; font-variant-numeric: tabular-nums; }.activity-week-inspect span, .activity-week-inspect small { color: var(--muted); font-size: 11px; line-height: 1.3; }.activity-week-inspect strong { color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1.3; }
 .activity-week-bars { display: grid; height: 176px; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
-.activity-week-bars li { display: grid; min-width: 0; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; text-align: center; }.activity-week-track { display: flex; min-height: 0; align-items: end; justify-content: center; }.activity-week-bar { display: flex; width: min(100%, 40px); min-height: 8px; flex-direction: column; overflow: hidden; border-radius: 8px 8px 3px 3px; }.activity-week-general, .activity-week-approvals { display: block; min-height: 0; flex-basis: 0; }.activity-week-general { background: var(--accent); }.activity-week-approvals { background: var(--warning); }
-.activity-week-day { color: var(--muted); font-size: 11px; }.activity-week-bars li:last-child .activity-week-day { color: var(--ink); font-weight: 700; }
+.activity-week-bars li { min-width: 0; }.activity-week-hit { display: grid; width: 100%; height: 100%; min-width: 0; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; border: 1px solid transparent; border-radius: 10px; padding: 4px 2px 0; background: transparent; color: inherit; text-align: center; cursor: pointer; transition: background .18s ease, border-color .18s ease; }.activity-week-hit:hover, .activity-week-hit.is-active { border-color: var(--line); background: var(--accent-pale); }.activity-week-hit:focus-visible { outline-offset: 2px; }.activity-week-track { display: flex; min-height: 0; align-items: end; justify-content: center; }.activity-week-bar { display: flex; width: min(100%, 40px); min-height: 8px; flex-direction: column; overflow: hidden; border-radius: 8px 8px 3px 3px; }.activity-week-general, .activity-week-approvals { display: block; min-height: 0; flex-basis: 0; }.activity-week-general { background: var(--accent); }.activity-week-approvals { background: var(--warning); }
+.activity-week-day { color: var(--muted); font-size: 11px; }.activity-week-bars li:last-child .activity-week-day { color: var(--ink); font-weight: 700; }.activity-week-mobile-count { display: none; }
 .activity-week-legend { display: flex; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--line); padding-top: 12px; color: var(--muted); font-size: 11px; }.activity-week-legend span { display: inline-flex; align-items: center; gap: 6px; }.activity-week-legend i { width: 7px; height: 7px; border-radius: 50%; }.activity-legend-general { background: var(--accent); }.activity-legend-approvals { background: var(--warning); }
 .agents-preview-content { padding: 16px 20px 20px; }.agents-preview-count { margin: 0 0 10px; color: var(--muted); font-size: 12px; }.agents-preview-content ul { margin: 0; padding: 0; list-style: none; }.agents-preview-content li + li { border-top: 1px solid var(--line); }.agents-preview-content li a { display: flex; min-width: 0; min-height: 70px; align-items: center; gap: 12px; padding: 10px 0; }.agents-preview-content li a:hover strong { color: var(--accent-text); }.agents-preview-content .agent-host-mark { width: 38px; height: 38px; flex-basis: 38px; }.agents-preview-identity { display: grid; min-width: 0; flex: 1; gap: 4px; }.agents-preview-identity strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.agents-preview-identity small { color: var(--muted); font-size: 11px; line-height: 1.45; }.agents-preview-arrow { color: var(--muted); }
 .wallet-overview-value { display: grid; justify-items: start; gap: 4px; padding: 20px; }.wallet-overview-value strong { font-size: 28px; font-weight: 670; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }.wallet-overview-value span { color: var(--muted); font-size: 12px; }.wallet-overview-value .secondary-button { margin-top: 8px; }
@@ -608,6 +610,15 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 
 .portfolio-summary-grid .metric-block .metric-value-network { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: clamp(1rem, 1.7vw, 1.5rem); overflow-wrap: normal; }
 .metric-value-network span { white-space: nowrap; }
+
+@media (max-width: 440px) {
+  .activity-week-bars { height: auto; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .activity-week-hit { min-height: 44px; grid-template-columns: 44px minmax(0, 1fr) 20px; grid-template-rows: minmax(0, 1fr); align-items: center; gap: 10px; padding: 3px 8px; text-align: left; }
+  .activity-week-track { height: 36px; }
+  .activity-week-bar { width: 20px; }
+  .activity-week-day, .activity-week-mobile-count { font-size: 12px; }
+  .activity-week-mobile-count { display: block; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

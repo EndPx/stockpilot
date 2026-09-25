@@ -26,7 +26,7 @@ test("theme control starts from the documented dark default with an accessible a
   assert.match(html, /Light mode/);
 });
 
-test("overview activity visualizes real seven-day counts with a text equivalent", () => {
+test("overview activity exposes each UTC day for hover, focus, and tap inspection", () => {
   const week = Array.from({ length: 7 }, (_, index) => ({
     date: `2026-09-${String(19 + index).padStart(2, "0")}`,
     activityCount: index === 6 ? 2 : 0,
@@ -35,7 +35,12 @@ test("overview activity visualizes real seven-day counts with a text equivalent"
   const html = renderToStaticMarkup(createElement(ActivityWeekChart, { week }));
   assert.match(html, /3<\/strong>/);
   assert.match(html, /events in the last 7 days/);
-  assert.match(html, /2026-09-25: 2 other events, 1 approval events/);
+  assert.match(html, /Daily breakdown/);
+  assert.match(html, /Hover, focus, or tap a day/);
+  assert.match(html, /aria-label="2026-09-25 UTC: 3 events; Activity 2; Approvals 1"/);
+  assert.match(html, /aria-label="2026-09-19 UTC: 0 events; Activity 0; Approvals 0"/);
+  assert.equal((html.match(/class="activity-week-hit"/g) ?? []).length, 7);
+  assert.equal((html.match(/aria-pressed="false"/g) ?? []).length, 7);
   assert.equal((html.match(/class="activity-week-track"/g) ?? []).length, 7);
   assert.doesNotMatch(html, /price|investment performance/i);
 });
