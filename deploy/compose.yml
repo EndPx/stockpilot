@@ -41,6 +41,7 @@ services:
       # Safe only with loopback access and the supplied proxy's X-Real-IP overwrite.
       TRUST_PROXY: "true"
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
+      SOLANA_EXPIRY_WITNESS_RPC_URL: ${SOLANA_EXPIRY_WITNESS_RPC_URL:-}
       CONTROL_PLANE_DATABASE_URL: ${CONTROL_PLANE_DATABASE_URL:?Set the protected Neon runtime connection URL}
       CONTROL_PLANE_KEY_PEPPER: ${CONTROL_PLANE_KEY_PEPPER:?Set a distinct random control-plane credential pepper}
       # WorkOS Connect is opt-in; issuer/key remain server-only runtime secrets.
