@@ -85,7 +85,7 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
         {investmentsEnabled() ? (isPrivyMode()
           ? <PrivyInvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
           : <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />) : (
-          <aside className="surface p-6"><p className="eyebrow">Read-only release</p><h2 className="mt-3">Investments are not enabled</h2><p className="mt-4 text-muted">Explore official market data and verified wallet holdings. This deployment cannot prepare or submit investment transactions.</p></aside>
+          <aside className="surface p-6"><p className="eyebrow">Read-only release</p><h2 className="mt-3">Investments are not enabled</h2><div className="investment-disclosure" role="note"><strong>Not for U.S. persons</strong><p>Pre-IPO tokens are not available to U.S. persons or other ineligible investors and carry risk of total loss.</p></div><p className="mt-4 text-muted">Explore official market data and verified wallet holdings. This deployment cannot prepare or submit investment transactions.</p></aside>
         )}
       </div>
 

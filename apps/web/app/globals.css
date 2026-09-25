@@ -297,6 +297,10 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 .wallet-option { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--surface); text-align: left; font-size: 13px; font-weight: 720; }.wallet-option:hover { border-color: #a5b0ff; background: var(--accent-pale); }
 .wallet-option-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: var(--canvas); color: var(--muted); font-size: 11px; }
 .wallet-error, .investment-error { margin-top: 16px; border-radius: 10px; padding: 12px 14px; background: #331e25; color: #ffaba7; font-size: 13px; line-height: 1.55; }
+.investment-status { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--accent-pale); color: var(--ink); font-size: 13px; line-height: 1.55; }
+.investment-disclosure { margin-top: 16px; border-left: 2px solid var(--warning); padding: 4px 0 4px 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.investment-disclosure strong { display: block; color: var(--ink); font-size: 12px; }
+.investment-disclosure p { margin: 3px 0 0; }
 .wallet-auth-panel { margin-top: 24px; border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: var(--canvas-raised); }.auth-dot { width: 9px; height: 9px; border-radius: 50%; background: #8a98ad; }.auth-dot-active { background: var(--success); }
 
 /* Portfolio and overview */
