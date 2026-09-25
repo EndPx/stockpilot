@@ -5,7 +5,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   PortfolioErrorState,
+  PortfolioInvestments,
   PortfolioLoading,
+  PortfolioSummary,
   PortfolioView,
 } from "../components/portfolio-overview";
 
@@ -69,6 +71,27 @@ test("investment position links to its existing Market detail and labels estimat
   assert.match(html, /Estimated Value/);
   assert.match(html, /not executable liquidation quotes/);
   assert.doesNotMatch(html, /Buy|Sell|Swap|Profit|Loss/);
+});
+
+test("wallet can render balances and investments independently from the overview summary", () => {
+  const value = portfolio({
+    positions: [{
+      provider: "prestocks",
+      name: "SpaceX PreStocks",
+      symbol: "SPACEX",
+      mintAddress: "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh",
+      quantity: "0.4",
+      tokenPriceUsd: 100,
+      estimatedValueUsd: 40,
+      imageUrl: null,
+    }],
+  });
+  const summary = renderToStaticMarkup(createElement(PortfolioSummary, { portfolio: value }));
+  const investments = renderToStaticMarkup(createElement(PortfolioInvestments, { portfolio: value }));
+  assert.match(summary, /Portfolio Estimate|Available to Invest|Network Balance/);
+  assert.doesNotMatch(summary, /Investments|SPACEX/);
+  assert.match(investments, /Investments|SPACEX|Estimated Value/);
+  assert.doesNotMatch(investments, /Network Balance/);
 });
 
 test("loading layout is intentional and error states preserve failure semantics", () => {

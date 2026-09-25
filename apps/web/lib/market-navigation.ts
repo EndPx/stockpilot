@@ -2,7 +2,7 @@ export const marketSectionLabels = { private: "Pre-IPO", public: "Stocks" } as c
 
 export function activeNavigationSection(pathname: string, group: string | null): string | null {
   if (pathname === "/app") return "overview";
-  if (pathname === "/app/credentials" || pathname === "/credentials") return "credentials";
+  if (pathname === "/wallet" || pathname === "/app/credentials" || pathname === "/credentials") return "wallet";
   if (pathname.startsWith("/clients")) return "clients";
   if (pathname.startsWith("/approvals")) return "approvals";
   if (pathname.startsWith("/activity")) return "activity";

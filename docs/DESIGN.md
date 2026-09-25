@@ -16,6 +16,10 @@
   series, or features that StockPilot does not yet have.
 - Mechanism references: StyleGallery `cover`, `fixed-sidenav-shell`, `page-grid`,
   `reel`, and `supporting-pane`; BeUI button and tabs state mechanics.
+- 2026-09-25 Overview revision: the supplied PayBox screenshot informs the
+  two-up Activity/Agents summary and full-width wallet summary. StockPilot keeps
+  its original graphite/cobalt system, its one verified Solana wallet, and only
+  source-backed balances and server-recorded events.
 
 ## 1. Product and visual direction
 
@@ -120,16 +124,21 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 - App mobile: compact top bar plus fixed bottom navigation. The document still owns
   scrolling and receives safe bottom padding; no nested page scrollers. Bottom
   navigation has Overview, Pre-IPO, Stocks, Agents, and a More disclosure for
-  Credentials, Approvals, and Activity in Privy mode; legacy mode keeps its three
+  Wallet, Approvals, and Activity in Privy mode; legacy mode keeps its three
   destinations. Every target is at least 44px. The account disclosure opens below the mobile header, never
   underneath the fixed navigation.
-- Overview control-plane revision (2026-09-23): use a two-column page-grid at
-  roomy widths: a minmax(0, 1.7fr) wallet/portfolio column and a minmax(280px,
-  1fr) Activity column. The document alone scrolls. The left column shows the
-  public Solana address, Portfolio Estimate, Available to Invest, Network Balance,
-  then positions; Activity shows the latest server-recorded events with a View all
-  destination. At constrained widths the columns stack, with Activity after the
-  portfolio. Loading and failure are distinct from an empty event history.
+- Overview and Wallet revision (2026-09-25): the document alone scrolls. A
+  roomy page-grid places a wider seven-day Activity panel beside a narrower
+  connected-Agents panel, followed by a full-width Wallet summary. At constrained
+  widths the panels stack in that source order. Activity bars use exact UTC daily
+  server counts; approval events are a separate segment and each day has a text
+  equivalent. No activity, provider failure, and loading are different states.
+  Agents lists only real active clients with truthful connection/last-use labels.
+  The Wallet summary shows the server-verified primary Solana address and real
+  portfolio estimate when available; an RPC/provider failure never becomes $0.
+  The full address, Portfolio Estimate, Available to Invest, Network Balance, and
+  Investments/positions live together on the dedicated Wallet page. No fake EVM
+  wallet or "New credential" control is inferred from the PayBox screenshot.
 - Markets: page-grid/list on desktop, compact market rows on mobile, with an
   optional horizontal reel for source-backed highlights.
 - Asset: supporting-pane layout. Market facts and About are primary; the investment
@@ -143,9 +152,9 @@ Google primary action and email fallback using the Privy modal. The email field
 prefills the real Privy flow, not a parallel StockPilot password form. Buttons
 retain 44px targets and idle, busy, disabled and error states. If Privy is not
 configured, show a truthful unavailable state rather than a dead submit button.
-In Privy mode, direct visits and client navigation to Overview, Credentials,
+In Privy mode, direct visits and client navigation to Overview, Wallet,
 Pre-IPO, Stocks and asset details require an active server
-session. Unauthenticated or expired sessions redirect to `/sign-in` with a
+  session. Unauthenticated or expired sessions redirect to `/sign-in` with a
 validated same-site return path. Landing and sign-in remain public; read-only
 market APIs retain their separate public contract. A temporary session-store
 failure fails closed with an unavailable response, not a misleading login loop.
@@ -154,16 +163,16 @@ new and separate from any previous Phantom address. No transfer, agent grant or
 transaction is triggered by signing in. Keep manual/agent trading disabled until
 their separate migration and acceptance gates pass.
 
-Privy account and credentials revision (2026-09-23): the rail-bottom capsule
+Privy account and wallet revision (2026-09-25): the rail-bottom capsule
 uses the user's actual Google/email identity with a compact initial tile and
 chevron. Its disclosure states the full signed-in identity, links to the
-Credentials view, and offers Sign out; there is no nonfunctional “Sign in on
+Wallet view, and offers Sign out; there is no nonfunctional “Sign in on
 mobile” action. The same account control is compact in the mobile header.
-The wallet section of Credentials is a read-only wallet identity, not a vault: one server-verified
+The Wallet page is a read-only wallet identity and portfolio, not a vault: one server-verified
 primary Solana wallet, its full public address, copy action, mainnet label, and
-explorer link. Never provide reveal/export private key, agent grant, funding
-claim, or a fake EVM wallet. Overview repeats the same wallet identity before
-portfolio metrics, including when RPC balances are unavailable. The wallet
+explorer link, real balance metrics, and investments. Never provide reveal/export
+private key, agent grant, funding claim, or a fake EVM wallet. Overview repeats
+the same wallet identity and estimate, including when RPC balances are unavailable. The wallet
 address is taken from the StockPilot server session, not from client-supplied
 identity. Copy feedback is announced to assistive technology. The disclosure
 has closed/open, focus, long-email, mobile and signing-out states; wallet
@@ -171,11 +180,11 @@ identity has loading, authenticated, unavailable, copied and copy-failure
 states.
 
 Agent control plane extension (2026-09-23): retain the compact graphite shell.
-Desktop rail includes Agents, Credentials, Approvals, and Activity as operational
+Desktop rail includes Agents, Wallet, Approvals, and Activity as operational
 destinations. Agents lists named clients, their type, active/revoked state, last
-use and policy. Credentials includes the verified Solana wallet section plus
-legacy agent credential summaries. Existing bearer credentials appear only as
-masked summaries; rotation and revocation require confirmation. No live key goes
+use and policy. Existing bearer credentials belong to Agents, not Wallet; they
+appear only as masked summaries, and rotation/revocation require confirmation.
+No live key goes
 in a URL or browser storage. Approvals separates pending from decided requests;
 detail shows client, canonical asset/mint, USDC amount, policy snapshot,
 deadline, and clear Approve/Reject. Approve records consent only: no wallet
@@ -184,6 +193,17 @@ client, related request and timestamp. All views distinguish loading, empty,
 error, and ready states; mutation controls distinguish idle, busy, success and
 failure. A failed load is never represented as an empty list. Financial execution
 remains off in production until a separately reviewed and accepted gate.
+
+Overview primitives (2026-09-25): the Activity preview has loading, seven-day
+empty, ready, and retryable error states. The exact UTC count is backed by an
+owner-scoped database aggregate; bars have an accessible daily text equivalent.
+The Agents preview has loading, no-connected-agent, ready and retryable error
+states and links each real client to its detail page. The Wallet preview repeats
+only the verified public Solana address and truthful estimate, with loading and
+retryable balance-error states; it never repeats investment positions or agent
+keys. Wallet itself contains the address, balance summary, and Investments with
+independent RPC/provider failure handling. Existing bearer keys remain rotatable
+and revocable under Agents, never shown on Wallet.
 
 Agent OAuth onboarding revision (2026-09-25): the Agents page is the single
 entry for new AI-host connections. It checks server-reported OAuth readiness
@@ -195,7 +215,7 @@ start the host's OAuth flow, authenticate in the browser, then return to that
 host. Copying a URL does not connect an agent. There is no manual New Client form,
 client type selector, limit form, or static bearer issuance in the new connection
 path. The existing client list remains the source of connected/revoked records;
-legacy keys remain manageable in Credentials for compatibility, with no new key
+legacy keys remain manageable in Agents for compatibility, with no new key
 issuance through the UI. Agents has distinct readiness loading, unavailable,
 ready, copy-success/error, policy-loading/error and revoked states. Connection
 instructions are not a substitute for verified OAuth and do not show a token.
@@ -263,7 +283,7 @@ client-level `NULL` expiry as a non-expiring OAuth token. The detail page stacks
 cleanly at mobile widths with 44px action targets and no internal page scroll.
 
 Control-plane navigation/theme revision (2026-09-23): in Privy mode the desktop
-rail groups Overview, Credentials, Agents, Approvals, Activity before market
+rail groups Overview, Wallet, Agents, Approvals, Activity before market
 discovery. The app has a two-state Light/Dark theme control in the rail and
 mobile header. Dark remains the default; a user's explicit choice persists in
 local storage and applies before first paint on later visits. The theme only
@@ -280,7 +300,7 @@ light app preference is saved. Agents shows only host connection paths supported
 by the configured OAuth service;
 legacy bearer setup is not offered as a new-client path. Approvals keeps pending/decided
 filters and links to the full request review; an empty list never claims a trade
-occurred. The obsolete Phantom migration paragraph is removed from Credentials.
+occurred. The obsolete Phantom migration paragraph is removed from Wallet.
 
 During first Google sign-in, “authenticated” can precede automatic embedded
 Solana wallet provisioning. Show a truthful finishing state while a bounded

@@ -68,17 +68,24 @@ class PortfolioLoadError extends Error {
   }
 }
 
+export function PortfolioSummaryLoading() {
+  return (
+    <div className="surface portfolio-summary-grid" role="status" aria-label="Loading portfolio balances">
+      {["Portfolio Estimate", "Available to Invest", "Network Balance"].map((label) => (
+        <div key={label} className="metric-block">
+          <p className="text-sm font-medium text-muted">{label}</p>
+          <span className="skeleton-value" aria-hidden="true" />
+        </div>
+      ))}
+      <span className="sr-only">Loading wallet balances.</span>
+    </div>
+  );
+}
+
 export function PortfolioLoading() {
   return (
     <div role="status" aria-label="Loading portfolio" className="dashboard-stack">
-      <div className="surface portfolio-summary-grid">
-        {["Portfolio Estimate", "Available to Invest", "Network Balance"].map((label) => (
-          <div key={label} className="metric-block">
-            <p className="text-sm font-medium text-muted">{label}</p>
-            <span className="skeleton-value" aria-hidden="true" />
-          </div>
-        ))}
-      </div>
+      <PortfolioSummaryLoading />
       <div className="surface p-6">
         <p className="text-sm font-medium text-muted">Investments</p>
         <span className="skeleton-row" aria-hidden="true" />
@@ -120,32 +127,36 @@ export function PortfolioErrorState({
   );
 }
 
-export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
+export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
+  return (
+    <div className="surface portfolio-summary-grid">
+      <div className="metric-block metric-block-primary">
+        <p className="text-sm font-medium text-muted">Portfolio Estimate</p>
+        <p className="metric-value">{formatUsd(portfolio.portfolioValueUsd)}</p>
+        <p className="mt-2 text-xs text-muted">Estimated from current PreStocks token prices</p>
+      </div>
+      <div className="metric-block">
+        <p className="text-sm font-medium text-muted">Available to Invest</p>
+        <p className="metric-value">{formatUsd(portfolio.funding.usdc.amountUsd)}</p>
+        <p className="mt-2 text-xs text-muted">{portfolio.funding.usdc.amount} USDC</p>
+      </div>
+      <div className="metric-block">
+        <p className="text-sm font-medium text-muted">Network Balance</p>
+        <p className="metric-value metric-value-network"><span>{portfolio.funding.sol.amount}</span> <span>SOL</span></p>
+        <p className="mt-2 text-xs text-muted">For Solana network activity</p>
+      </div>
+    </div>
+  );
+}
+
+export function PortfolioInvestments({ portfolio }: { portfolio: Portfolio }) {
   const hasAvailableUsdc = portfolio.funding.usdc.amountUsd > 0;
   return (
     <>
-      <div className="surface portfolio-summary-grid">
-        <div className="metric-block metric-block-primary">
-          <p className="text-sm font-medium text-muted">Portfolio Estimate</p>
-          <p className="metric-value">{formatUsd(portfolio.portfolioValueUsd)}</p>
-          <p className="mt-2 text-xs text-muted">Estimated from current PreStocks token prices</p>
-        </div>
-        <div className="metric-block">
-          <p className="text-sm font-medium text-muted">Available to Invest</p>
-          <p className="metric-value">{formatUsd(portfolio.funding.usdc.amountUsd)}</p>
-          <p className="mt-2 text-xs text-muted">{portfolio.funding.usdc.amount} USDC</p>
-        </div>
-        <div className="metric-block">
-          <p className="text-sm font-medium text-muted">Network Balance</p>
-          <p className="metric-value metric-value-network"><span>{portfolio.funding.sol.amount}</span> <span>SOL</span></p>
-          <p className="mt-2 text-xs text-muted">For Solana network activity</p>
-        </div>
-      </div>
-
       <section className="surface investment-list" aria-labelledby="investments-heading">
         <div className="surface-header">
           <h2 id="investments-heading" className="text-lg font-semibold">Investments</h2>
-          <Link href="/markets" className="text-sm font-semibold text-accent hover:underline">Explore Markets</Link>
+          <Link href="/markets" className="text-link">Explore Markets</Link>
         </div>
         {portfolio.positions.length ? (
           <ul className="divide-y divide-line">
@@ -185,6 +196,10 @@ export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
       </p>
     </>
   );
+}
+
+export function PortfolioView({ portfolio }: { portfolio: Portfolio }) {
+  return <><PortfolioSummary portfolio={portfolio} /><PortfolioInvestments portfolio={portfolio} /></>;
 }
 
 function AuthPrompt({ connected, onSignIn, busy, errorMessage }: {

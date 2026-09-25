@@ -14,6 +14,48 @@ export type ActivityRecord = {
   createdAt: string;
 };
 
+export type ActivityDay = {
+  date: string;
+  activityCount: number;
+  approvalCount: number;
+};
+
+export async function getActivityWeek(identity: ControlIdentity, store: ControlStore = controlStore): Promise<ActivityDay[]> {
+  const account = await store.query<{ primary_wallet_address: string }>(
+    "SELECT primary_wallet_address FROM control_accounts WHERE id = $1", [identity.privyUserId],
+  );
+  if (account.rows.length && account.rows[0].primary_wallet_address !== identity.walletAddress) {
+    throw new ControlPlaneError("WALLET_BINDING_MISMATCH", "Verified wallet does not match this StockPilot account.");
+  }
+
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const firstDay = new Date(today);
+  firstDay.setUTCDate(firstDay.getUTCDate() - 6);
+  const nextDay = new Date(today);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const counts = new Map<string, { activity_count: number; approval_count: number }>();
+  if (account.rows.length) {
+    const rows = await store.query<{ date: string; activity_count: number; approval_count: number }>(
+      `SELECT to_char(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+       count(*) FILTER (WHERE e.event_type NOT LIKE 'APPROVAL_%')::int AS activity_count,
+       count(*) FILTER (WHERE e.event_type LIKE 'APPROVAL_%')::int AS approval_count
+     FROM control_activity_events e
+     WHERE e.account_id = $1 AND e.created_at >= $2 AND e.created_at < $3
+     GROUP BY 1 ORDER BY 1`,
+      [identity.privyUserId, firstDay, nextDay],
+    );
+    rows.rows.forEach((row) => counts.set(row.date, row));
+  }
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(firstDay);
+    day.setUTCDate(day.getUTCDate() + index);
+    const date = day.toISOString().slice(0, 10);
+    const row = counts.get(date);
+    return { date, activityCount: row?.activity_count ?? 0, approvalCount: row?.approval_count ?? 0 };
+  });
+}
+
 export async function listActivity(identity: ControlIdentity, limit = 50, store: ControlStore = controlStore, clientId?: string): Promise<ActivityRecord[]> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new ControlPlaneError("INVALID_CLIENT", "Invalid activity page size.");

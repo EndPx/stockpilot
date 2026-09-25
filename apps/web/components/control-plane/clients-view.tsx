@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { ClientRecord, formatDate, LoadState, PageHeader, useControlList } from "./shared";
 import { agentConnectionLabel } from "./agent-labels";
+import { LegacyAgentKeys } from "./legacy-agent-keys";
 
 type OAuthStatus = { enabled: boolean; mcpUrl: string };
 type Host = "chatgpt" | "claude" | "codex";
@@ -76,7 +77,7 @@ export function AgentConnectionGuide({ status, error, retry }: {
     <div className="surface-header"><h2>Connect an agent</h2></div>
     {error ? <div className="control-state" role="alert"><p>Could not check OAuth availability: {error}</p><button type="button" className="secondary-button" onClick={retry}>Try again</button></div>
       : !status ? <div className="control-state" role="status">Checking secure connection availability…</div>
-      : !status.enabled ? <div className="control-state" role="status"><p>OAuth connection setup is pending. New agent connections are not available yet. Existing clients and credentials remain manageable below.</p></div>
+      : !status.enabled ? <div className="control-state" role="status"><p>OAuth connection setup is pending. New agent connections are not available yet. Existing agents and legacy keys remain manageable below.</p></div>
       : <>
         <div className="agent-presets" role="group" aria-label="Choose an AI app">
           {hosts.map((item) => <button aria-haspopup="dialog" aria-expanded={host === item.id} key={item.id} type="button" onClick={(event) => openGuide(item.id, event.currentTarget)}>
@@ -121,7 +122,7 @@ export function ClientsView() {
   }, [oauthRevision]);
 
   return <div className="dashboard-stack">
-    <PageHeader title="Agents" description="Connect an AI app with browser authorization, then review what its client can access." action={<Link className="secondary-button" href="/credentials">Credentials</Link>} />
+    <PageHeader title="Agents" description="Connect an AI app with browser authorization, then review what its client can access." action={<Link className="secondary-button" href="/wallet">Wallet</Link>} />
     <AgentConnectionGuide status={oauthStatus} error={oauthError} retry={() => setOauthRevision((value) => value + 1)} />
     <section className="surface control-panel"><div className="surface-header"><h2>Your agents</h2><div className="control-row-actions"><span className="control-muted">{items?.length ?? "—"} clients</span><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div></div>
       <LoadState items={items} error={error} retry={reload} empty="No agent has made an authorized tool request yet. After browser authorization, ask your AI app to list StockPilot markets, then refresh." />
@@ -132,5 +133,6 @@ export function ClientsView() {
         <Link className="secondary-button" href={`/clients/${client.id}`}>View details</Link>
       </article>)}</div>}
     </section>
+    <LegacyAgentKeys />
   </div>;
 }

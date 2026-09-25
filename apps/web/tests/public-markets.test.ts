@@ -34,6 +34,8 @@ test("market navigation keeps query/filter while resetting cursors", () => {
   assert.equal(activeNavigationSection("/markets/POLYMARKET", null), "private");
   assert.equal(activeNavigationSection("/markets/xstocks/canonical-mint", null), "public");
   assert.equal(activeNavigationSection("/app", null), "overview");
+  assert.equal(activeNavigationSection("/wallet", null), "wallet");
+  assert.equal(activeNavigationSection("/credentials", null), "wallet");
 });
 
 test("the Markets asset API remains public without an authentication cookie", async () => {

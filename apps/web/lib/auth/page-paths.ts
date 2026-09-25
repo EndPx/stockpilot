@@ -1,7 +1,7 @@
 export function isProtectedPage(pathname: string): boolean {
   return pathname === "/connect" || pathname === "/app" || pathname.startsWith("/app/") ||
     pathname === "/markets" || pathname.startsWith("/markets/") ||
-    ["/clients", "/credentials", "/approvals", "/activity"].some(
+    ["/clients", "/wallet", "/credentials", "/approvals", "/activity"].some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     );
 }

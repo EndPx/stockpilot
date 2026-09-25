@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { CredentialsView } from "@/components/control-plane/credentials-view";
+import { notFound, redirect } from "next/navigation";
 import { isPrivyMode } from "@/lib/privy/config";
 
-export const metadata: Metadata = { title: "Credentials" };
-export default function CredentialsPage() { if (!isPrivyMode()) notFound(); return <CredentialsView />; }
+export default function CredentialsPage() {
+  if (!isPrivyMode()) notFound();
+  redirect("/wallet");
+}

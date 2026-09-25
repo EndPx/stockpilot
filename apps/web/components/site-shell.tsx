@@ -18,7 +18,7 @@ const navigation = [
   { href: "/markets?group=private", label: marketSectionLabels.private, icon: PrivateMarketsIcon, section: "private" },
   { href: "/markets?group=public", label: marketSectionLabels.public, icon: MarketsIcon, section: "public" },
 ];
-const credentialsNavigation = { href: "/credentials", label: "Credentials", icon: WalletIcon, section: "credentials" };
+const walletNavigation = { href: "/wallet", label: "Wallet", icon: WalletIcon, section: "wallet" };
 const clientNavigation = { href: "/clients", label: "Agents", icon: AgentIcon, section: "clients" };
 const approvalsNavigation = { href: "/approvals", label: "Approvals", icon: CheckIcon, section: "approvals" };
 const activityNavigation = { href: "/activity", label: "Activity", icon: ActivityIcon, section: "activity" };
@@ -47,7 +47,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const landing = pathname === "/";
   if (pathname === "/sign-in" || pathname === "/connect") return <>{children}</>;
   const privy = isPrivyMode();
-  const appNavigation = privy ? [navigation[0], credentialsNavigation, clientNavigation, approvalsNavigation, activityNavigation, ...navigation.slice(1)] : navigation;
+  const appNavigation = privy ? [navigation[0], walletNavigation, clientNavigation, approvalsNavigation, activityNavigation, ...navigation.slice(1)] : navigation;
   const mobileNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation] : navigation;
   const activeSection = activeNavigationSection(pathname, searchParams.get("group"));
 
@@ -115,9 +115,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
           );
         })}
         {privy && <details className="mobile-nav-more">
-          <summary className={activeSection === "credentials" || activeSection === "approvals" || activeSection === "activity" ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"} aria-label="More pages"><MoreIcon className="nav-icon" /><span>More</span></summary>
+          <summary className={activeSection === "wallet" || activeSection === "approvals" || activeSection === "activity" ? "mobile-nav-link mobile-nav-link-active" : "mobile-nav-link"} aria-label="More pages"><MoreIcon className="nav-icon" /><span>More</span></summary>
           <div className="mobile-nav-menu">
-            {[credentialsNavigation, approvalsNavigation, activityNavigation].map(({ href, label }) => <Link key={href} href={href}>{label}</Link>)}
+            {[walletNavigation, approvalsNavigation, activityNavigation].map(({ href, label }) => <Link key={href} href={href}>{label}</Link>)}
           </div>
         </details>}
       </nav>
