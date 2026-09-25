@@ -30,7 +30,7 @@ function fixture(override: Override = (_m, _p, _u, value) => value) {
     const { id, method, params } = JSON.parse(String(init?.body));
     calls.push(method);
     const values: Record<string, unknown> = {
-      getGenesisHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      getGenesisHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
       getSlot: 200, getBlockTime: Math.floor(now / 1000), getBlockHeight: 110,
       isBlockhashValid: { context: { slot: 201 }, value: false },
       getSignatureStatuses: { context: { slot: 201 }, value: [null] },

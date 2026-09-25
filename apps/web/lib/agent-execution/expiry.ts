@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { getCompiledTransactionMessageDecoder, getTransactionDecoder } from "@solana/kit";
 import { getSolanaRpcUrl } from "@/lib/solana/read-adapter";
 
-const MAINNET = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
+const MAINNET = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 const SIGNATURE = /^[1-9A-HJ-NP-Za-km-z]{80,88}$/;
 export type ExpiryCandidate = {
   id: string; status: string; walletAddress: string; createdAt: string; submittedAt: string | null;

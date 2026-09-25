@@ -200,7 +200,7 @@ test("two-witness expiry releases SUBMITTED and UNKNOWN once, preserves the ID a
       const operation = await getAgentOperation(principal, id, store);
       const now = Date.now() + 120_000;
       t.mock.method(Date, "now", () => now);
-      const witness = { host: "a.test", genesisHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", finalizedSlot: 200001,
+      const witness = { host: "a.test", genesisHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d", finalizedSlot: 200001,
         finalizedBlockHeight: 100001, rootBlockTime: Math.floor(now / 1000), blockhashContextSlot: 200002,
         signatureContextSlot: 200002, blockhashValid: false as const, signatureAbsent: true as const, transactionAbsent: true as const,
         historyAnchorSignature: "4".repeat(88), historyAnchorSlot: 90000, historyAnchorBlockTime: Math.floor((now - 600000) / 1000) };
