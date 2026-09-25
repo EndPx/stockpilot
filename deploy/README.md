@@ -193,6 +193,74 @@ releasing; use reviewed digests if reproducible base images are required. Test
 updates before using them on this VPS. Recreating the one app container may cause
 a short interruption and requires a browser reload for already-open pages.
 
+### Pull a reviewed commit directly from GitHub
+
+For subsequent app-only releases, use `deploy/git-release.sh` on the VPS instead
+of uploading a source archive. A maintainer must first review/test the release
+and push the **full commit SHA** to `EndPx/stockpilot` `main`. The script fetches
+that branch over HTTPS, requires the fetched tip to equal the supplied SHA,
+checks that it descends from the running image commit, then creates a detached
+release worktree under `/opt/stockpilot/releases/<sha>`. This is a pinned fetch,
+not an unbounded `git pull` in the live app directory.
+
+One-time bootstrap on the existing VPS, after independently recording the
+reviewed SHA, can use a separate controller checkout. Verify its commit **before
+executing the script**; do not run a script from an unexpected branch tip:
+
+```sh
+git clone --single-branch --branch main https://github.com/EndPx/stockpilot.git /opt/stockpilot/deploy-controller
+: "${REVIEWED_SHA:?Set REVIEWED_SHA to the reviewed full commit SHA}"
+if [ "$(git -C /opt/stockpilot/deploy-controller rev-parse HEAD)" = "$REVIEWED_SHA" ]; then
+  sh /opt/stockpilot/deploy-controller/deploy/git-release.sh "$REVIEWED_SHA"
+else
+  echo 'Controller checkout differs from reviewed SHA; stop and review the new commit.' >&2
+fi
+```
+
+The controller checkout can stay pinned for ordinary releases: its script
+fetches current `origin/main` into a separate bare repository and runs the
+target release's Compose file. Update the controller script only as another
+reviewed change, checking its SHA again before execution. Do not put credentials
+in the Git URL, repository, command line, or controller checkout. The public
+source repository requires no deploy key. `runtime.env` remains in
+`/etc/stockpilot`; the script reads its public auth-provider setting but never
+sources, changes, copies, or prints its secret values.
+
+The script builds `stockpilot:release-<full-sha>` with an OCI revision label,
+reuses that image only if the label matches, validates Compose without showing
+expanded secrets, and replaces only the `stockpilot` app service. It leaves
+Redis and its volume running, does not run migrations, and verifies the local
+health endpoint plus disabled trading/agent-execution flags. Save the previous
+image name printed by the script. Then check the public HTTPS site and relevant
+browser flows; local health alone does not prove OAuth, Neon, or RPC behavior.
+
+If any file in `apps/web/migrations` or the migration runner changed since the
+running image, the script stops before building. Such a release needs the
+separate Neon migration gate **and the established manual app deployment**;
+running a migration first does not make this script accept that commit. If
+`origin/main` advances after review, inspect the new commit and
+invoke the script with its new exact SHA rather than bypassing the pin.
+
+On a failed app-only release, inspect the new app logs and roll back using the
+**retained previous image and its matching release Compose file**. Use the exact
+previous release directory and image printed by the script; legacy archive
+releases used short directory names:
+
+```sh
+: "${PREVIOUS_RELEASE_DIR:?Set PREVIOUS_RELEASE_DIR from the release script output}"
+: "${PREVIOUS_IMAGE:?Set PREVIOUS_IMAGE from the release script output}"
+cd "$PREVIOUS_RELEASE_DIR"
+STOCKPILOT_IMAGE="$PREVIOUS_IMAGE" \
+  docker compose --project-name stockpilot --env-file /etc/stockpilot/runtime.env -f deploy/compose.yml \
+  up -d --no-deps --no-build --wait app
+curl --fail http://127.0.0.1:3100/api/health
+```
+
+This override does not change `runtime.env`. Do not rebuild the previous tag,
+remove Redis, or roll back to code incompatible with the current data. The
+general rollback procedure below remains available for deployments that do
+not use this Git workflow.
+
 To roll back the app, change only `STOCKPILOT_IMAGE` in the protected env file to
 the retained previous image tag, then run:
 

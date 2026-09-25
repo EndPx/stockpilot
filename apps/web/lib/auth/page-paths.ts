@@ -1,5 +1,5 @@
 export function isProtectedPage(pathname: string): boolean {
-  return pathname === "/app" || pathname.startsWith("/app/") ||
+  return pathname === "/connect" || pathname === "/app" || pathname.startsWith("/app/") ||
     pathname === "/markets" || pathname.startsWith("/markets/") ||
     ["/clients", "/credentials", "/approvals", "/activity"].some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -8,7 +8,7 @@ export function isProtectedPage(pathname: string): boolean {
 
 function isOAuthContinuation(url: URL): boolean {
   const id = url.searchParams.get("external_auth_id");
-  return url.pathname === "/api/oauth/authorize" &&
+  return (url.pathname === "/api/oauth/authorize" || url.pathname === "/connect") &&
     url.searchParams.size === 1 &&
     typeof id === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(id);
 }
@@ -22,6 +22,7 @@ export function safeReturnPath(candidate: unknown): string {
   try {
     const url = new URL(candidate, "https://stockpilot.invalid");
     if (url.origin !== "https://stockpilot.invalid" ||
+      (url.pathname === "/connect" && !isOAuthContinuation(url)) ||
       (!isProtectedPage(url.pathname) && !isOAuthContinuation(url))) return "/app";
     return `${url.pathname}${url.search}`;
   } catch {

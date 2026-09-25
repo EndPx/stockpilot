@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { SiteShell } from "@/components/site-shell";
 import { SolanaProvider } from "@/providers/solana-provider";
 import { PrivyProvider } from "@/providers/privy-provider";
+import { DevReactTools } from "@/components/dev-react-tools";
 import { isPrivyMode } from "@/lib/privy/config";
 import "./globals.css";
 
@@ -20,6 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning>
       <head><script nonce={nonce} src="/theme-init.js" /></head>
       <body className="font-sans antialiased">
+        {process.env.NODE_ENV === "development" && <DevReactTools />}
         {isPrivyMode() ? (
           <PrivyProvider><SiteShell>{children}</SiteShell></PrivyProvider>
         ) : (

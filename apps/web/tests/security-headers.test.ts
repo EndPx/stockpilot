@@ -10,6 +10,10 @@ test("production CSP restricts scripts to fresh nonces and denies framing", () =
   assert.match(policy, /frame-ancestors 'none'/);
   assert.match(policy, /connect-src 'self';/);
   assert.match(policy, /form-action 'self'/);
+  assert.match(contentSecurityPolicy("test-nonce", false, "https://stockpilot-test.authkit.app"),
+    /form-action 'self' https:\/\/stockpilot-test\.authkit\.app;/);
+  assert.match(contentSecurityPolicy("test-nonce", false, "https://evil.example/path?injected=1"),
+    /form-action 'self';/);
   assert.match(policy, /base-uri 'none'/);
   assert.match(contentSecurityPolicy("development", true), /unsafe-eval/);
 });

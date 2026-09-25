@@ -1,5 +1,15 @@
-export function contentSecurityPolicy(nonce: string, development: boolean): string {
+function safeOAuthFormOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !!url.hostname && !url.username && !url.password &&
+      !url.search && !url.hash && (url.pathname === "/" || url.pathname === "") ? url.origin : null;
+  } catch { return null; }
+}
+
+export function contentSecurityPolicy(nonce: string, development: boolean, oauthFormIssuer?: string): string {
   const privy = process.env.NEXT_PUBLIC_AUTH_PROVIDER === "privy";
+  const oauthFormOrigin = safeOAuthFormOrigin(oauthFormIssuer);
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
@@ -12,7 +22,7 @@ export function contentSecurityPolicy(nonce: string, development: boolean): stri
     ...(privy ? ["frame-src https://auth.privy.io"] : []),
     "object-src 'none'",
     "base-uri 'none'",
-    "form-action 'self'",
+    `form-action 'self'${oauthFormOrigin ? ` ${oauthFormOrigin}` : ""}`,
     "frame-ancestors 'none'",
     ...(development ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");

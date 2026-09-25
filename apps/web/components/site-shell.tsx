@@ -45,7 +45,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const landing = pathname === "/";
-  if (pathname === "/sign-in") return <>{children}</>;
+  if (pathname === "/sign-in" || pathname === "/connect") return <>{children}</>;
   const privy = isPrivyMode();
   const appNavigation = privy ? [navigation[0], credentialsNavigation, clientNavigation, approvalsNavigation, activityNavigation, ...navigation.slice(1)] : navigation;
   const mobileNavigation = privy ? [navigation[0], ...navigation.slice(1), clientNavigation] : navigation;

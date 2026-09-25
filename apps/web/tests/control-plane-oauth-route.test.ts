@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createOAuthAuthorizeGet } from "../app/api/oauth/authorize/route";
+import { createOAuthAuthorizeGet, createOAuthAuthorizePost } from "../app/api/oauth/authorize/route";
 import { createMcpPost } from "../app/api/mcp/route";
 import { getAuthRuntimeConfig } from "../lib/auth/config";
 import { safeReturnPath } from "../lib/auth/page-paths";
 import { createAuthSession, encodeAuthSession, registerAuthSession } from "../lib/auth/session";
 import { MemoryAuthSecurityStore } from "../lib/auth/store";
+import { createOAuthHandoffProof, verifyOAuthHandoffProof } from "../lib/control-plane/oauth-handoff";
 
 const settings = {
   AGENT_OAUTH_ENABLED: "true", NEXT_PUBLIC_AUTH_PROVIDER: "privy", PRIVY_APP_SECRET: "test-privy-secret",
@@ -33,12 +34,20 @@ function loginRequest(cookie?: string, query = `?external_auth_id=${externalAuth
   });
 }
 
-test("Standalone login URI redirects guests to Privy sign-in and binds only a verified active session", async () => {
+function connectRequest(cookie?: string, body = "", origin = settings.APP_URL) {
+  return new Request(`${settings.APP_URL}/api/oauth/authorize`, {
+    method: "POST", headers: { host: "stockpilot.endpx.cloud", origin,
+      "content-type": "application/x-www-form-urlencoded",
+      ...(cookie ? { cookie: `stockpilot-session=${encodeURIComponent(cookie)}` } : {}) }, body,
+  });
+}
+
+test("Standalone login URI shows a StockPilot handoff before WorkOS consent and binds only on same-origin owner submit", async () => {
   await withOAuthEnvironment(async () => {
     const store = new MemoryAuthSecurityStore();
     let completed = 0;
     let bound = 0;
-    const get = createOAuthAuthorizeGet({
+    const dependencies = {
       securityStore: store,
       readIdentity: async () => ({ email: "alice@example.com" }),
       complete: async (id, privyUserId, email) => {
@@ -54,13 +63,17 @@ test("Standalone login URI redirects guests to Privy sign-in and binds only a ve
         assert.equal(identity.privyUserId, "did:privy:alice");
         bound++;
       },
-    });
+    } satisfies NonNullable<Parameters<typeof createOAuthAuthorizePost>[0]>;
+    const get = createOAuthAuthorizeGet(dependencies);
+    const post = createOAuthAuthorizePost(dependencies);
     const guest = await get(loginRequest());
     assert.equal(guest.status, 303);
     const signIn = new URL(guest.headers.get("location")!);
     assert.equal(signIn.pathname, "/sign-in");
     assert.equal(signIn.searchParams.get("next"), `/api/oauth/authorize?external_auth_id=${externalAuthId}`);
     assert.equal(safeReturnPath(signIn.searchParams.get("next")), `/api/oauth/authorize?external_auth_id=${externalAuthId}`);
+    assert.equal(safeReturnPath(`/connect?external_auth_id=${externalAuthId}`), `/connect?external_auth_id=${externalAuthId}`);
+    assert.equal(safeReturnPath("/connect?external_auth_id=bad"), "/app");
     assert.equal(safeReturnPath("/api/oauth/authorize?external_auth_id=bad"), "/app");
     assert.equal(completed, 0);
 
@@ -70,7 +83,36 @@ test("Standalone login URI redirects guests to Privy sign-in and binds only a ve
     const session = createAuthSession(wallet, Date.now(), "did:privy:alice", Date.now() + 10 * 60_000);
     await registerAuthSession(session, auth, store);
     const token = await encodeAuthSession(session, auth.sessionSecret);
-    const success = await get(loginRequest(token));
+    const handoff = await get(loginRequest(token));
+    assert.equal(handoff.status, 303);
+    assert.equal(handoff.headers.get("location"), `${settings.APP_URL}/connect?external_auth_id=${externalAuthId}`);
+    assert.equal(handoff.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(completed, 0);
+    assert.equal(bound, 0);
+    const proof = await createOAuthHandoffProof(externalAuthId, session, auth.sessionSecret);
+    const form = new URLSearchParams({ external_auth_id: externalAuthId, handoff: proof }).toString();
+
+    assert.equal((await post(connectRequest(token, form, "https://untrusted.example"))).status, 403);
+    assert.equal((await post(connectRequest(token, `${form}&scope=write`))).status, 400);
+    assert.equal((await post(connectRequest(token, "x".repeat(2_049)))).status, 400);
+    assert.equal((await post(connectRequest(token, new URLSearchParams({ external_auth_id: externalAuthId }).toString()))).status, 400);
+    const tamperedProof = `${proof.slice(0, -1)}${proof.endsWith("A") ? "B" : "A"}`;
+    const tampered = new URLSearchParams({ external_auth_id: externalAuthId, handoff: tamperedProof }).toString();
+    const tamperedResponse = await post(connectRequest(token, tampered));
+    assert.equal(tamperedResponse.status, 303);
+    assert.equal(new URL(tamperedResponse.headers.get("location")!).pathname, "/connect");
+    assert.equal(await verifyOAuthHandoffProof(proof, `${externalAuthId}x`, session, auth.sessionSecret), false);
+    const switchedSession = createAuthSession(wallet, Date.now(), "did:privy:alice", Date.now() + 10 * 60_000);
+    await registerAuthSession(switchedSession, auth, store);
+    const switchedToken = await encodeAuthSession(switchedSession, auth.sessionSecret);
+    assert.equal(new URL((await post(connectRequest(switchedToken, form))).headers.get("location")!).pathname, "/connect");
+    assert.equal(await verifyOAuthHandoffProof(proof, externalAuthId, session, auth.sessionSecret, Date.now() + 6 * 60_000), false);
+    assert.equal(completed, 0);
+    const signedOut = await post(connectRequest(undefined, form));
+    assert.equal(new URL(signedOut.headers.get("location")!).pathname, "/sign-in");
+    assert.equal(completed, 0);
+
+    const success = await post(connectRequest(token, form));
     assert.equal(success.status, 303);
     assert.equal(success.headers.get("location"), "https://stockpilot-test.authkit.app/oauth/authorize/complete?state=opaque");
     assert.equal(success.headers.get("referrer-policy"), "no-referrer");

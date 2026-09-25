@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AgentConnectionGuide } from "../components/control-plane/clients-view";
+import { OAuthConnectContent } from "../components/oauth-connect-summary";
 
 test("Agent onboarding does not offer a URL or a false connection before OAuth is available", () => {
   const html = renderToStaticMarkup(createElement(AgentConnectionGuide, {
@@ -45,4 +46,21 @@ test("Agent onboarding reports status failures with a retry action", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /temporary outage/);
   assert.match(html, /Try again/);
+});
+
+test("OAuth handoff shows only the verified wallet and real read-only starting scope", () => {
+  const html = renderToStaticMarkup(createElement(OAuthConnectContent, {
+    externalAuthId: "ext_auth_01J3X4Y5Z6A7B8C9D0E1F2G3H4",
+    walletAddress: "11111111111111111111111111111111",
+    handoffProof: "test-signed-proof",
+  }));
+  assert.match(html, /Connect an AI app/);
+  assert.match(html, /11111111111111111111111111111111/);
+  assert.match(html, /New agents start with market read access/);
+  assert.match(html, /Existing permissions may carry over/);
+  assert.doesNotMatch(html, /Starts read-only|does not grant spending access/);
+  assert.match(html, /Continue with WorkOS/);
+  assert.match(html, /action="\/api\/oauth\/authorize" method="post"/);
+  assert.match(html, /name="handoff" value="test-signed-proof"/);
+  assert.doesNotMatch(html, /Full access|Buy stocks|Sell stocks|30 days|90 days/);
 });

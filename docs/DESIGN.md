@@ -86,6 +86,16 @@ Labels are sentence case; uppercase is reserved for short system kickers.
   creates a nested scrollbar. The PayBox reference informs composition only,
   never photography, logo, or copy.
 
+- OAuth connection handoff (2026-09-25): use a standalone document-scrolling
+  `/connect` page, not the operational sidebar. The original StockPilot brand
+  sits in a quiet top bar above a centered, at-most-600px consent summary.
+  The user's PayBox screenshot informs the clear wallet/access hierarchy and
+  single primary action, not its white palette, logo, copy, or unsupported
+  controls. On mobile, the same summary occupies the page width with 20px
+  gutters and no nested scrolling. The client name is not asserted until
+  WorkOS displays its verified OAuth consent; the temporary auth ID never
+  appears as visible page copy.
+
 - Landing: document-scroll cover. The hero occupies at least one viewport and
   contains original orbital artwork, not an artificial product screenshot. Desktop
   copy occupies the left 55%, artwork the right; on mobile artwork sits below copy.
@@ -196,6 +206,23 @@ copy-error, readiness-loading and readiness-unavailable states. Selection uses
 the existing cobalt active surface; copy feedback changes text in place and is
 announced through a status region. No extra animation library is introduced;
 existing 150–240ms color transitions and reduced-motion rules apply.
+
+OAuth handoff page revision (2026-09-25): after the WorkOS Login URI verifies
+the active Privy session, it redirects to `/connect` before completing external
+authentication. The page shows only the server-session primary Solana wallet,
+states that *new* agents start with market-read access, warns that an existing
+client's previously elevated policy survives reconnection, and has one
+`Continue with WorkOS` action. It must not expose a wallet selector, editable scope, spending limit,
+or expiry options until those choices are enforced by signed OAuth claims and
+durable owner-scoped policy. WorkOS retains its own consent screen and the final
+PKCE/loopback callback. The page has ready, invalid/expired request, signed-out,
+and unavailable states; submission is same-origin, short-lived, session-bound,
+and bounded. Its CSP allows only the configured AuthKit origin for the ensuing
+form redirect; other pages retain `form-action 'self'`.
+Focus and hover follow existing cobalt 150–240ms transitions; reduced-motion
+removes nonessential transforms. This is an authorization handoff, not a grant
+on its own, and it must never claim an agent is connected before a verified
+MCP token reaches the control plane.
 
 Agent settings revision (2026-09-25): an authenticated owner may open Settings
 for an existing client. Read scopes are individually selectable; investment
