@@ -162,7 +162,9 @@ export function PortfolioInvestments({ portfolio }: { portfolio: Portfolio }) {
           <ul className="divide-y divide-line">
             {portfolio.positions.map((position) => (
               <li key={position.mintAddress}>
-                <Link href={`/markets/${encodeURIComponent(position.symbol)}`} className="position-row">
+                <Link href={position.provider === "xstocks"
+                  ? `/markets/xstocks/${encodeURIComponent(position.mintAddress)}`
+                  : `/markets/${encodeURIComponent(position.symbol)}`} className="position-row">
                   <span className="flex min-w-0 items-center gap-3">
                     <AssetLogo imageUrl={position.imageUrl} symbol={position.symbol} />
                     <span className="min-w-0">

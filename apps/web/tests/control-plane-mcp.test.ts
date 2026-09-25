@@ -230,6 +230,8 @@ test("MCP tools bind portfolio and request to server principal; missing scope is
   assert.equal(holdings.publicPositions[0].displayStatus, "MULTIPLIER_UNVERIFIED");
   assert.equal(holdings.publicPositions[0].estimatedValueUsd, null);
   assert.equal(holdings.portfolioValueUsd, null);
+  assert.equal(holdings.priceProvenance, "per_position");
+  assert.equal("priceSource" in holdings, false);
   const missingKey = await call("request_investment", { assetId: asset.id, amountUsd: "5" });
   assert.equal(missingKey.result?.isError, true);
   const created = await call("request_investment", { assetId: asset.id, amountUsd: "5", clientRequestId });

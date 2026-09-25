@@ -182,7 +182,7 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
           privatePositions: portfolio.positions.filter((position) => position.provider === "prestocks"),
           publicPositions: portfolio.positions.filter((position) => position.provider === "xstocks"),
           unrecognizedTokenMintCount: portfolio.unrecognizedTokenMintCount ?? 0,
-          balanceSource: "solana_rpc", priceSource: "issuer_api", executableQuote: false });
+          balanceSource: "solana_rpc", priceProvenance: "per_position", executableQuote: false });
       } catch (error) { return failure(error); }
     });
 

@@ -73,6 +73,19 @@ test("investment position links to its existing Market detail and labels estimat
   assert.doesNotMatch(html, /Buy|Sell|Swap|Profit|Loss/);
 });
 
+test("xStocks holdings link to the canonical mint detail without inventing a display quantity", () => {
+  const mintAddress = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
+  const html = renderToStaticMarkup(createElement(PortfolioInvestments, { portfolio: portfolio({
+    portfolioValueUsd: null,
+    positions: [{ provider: "xstocks", name: "Example xStock", symbol: "EXx", mintAddress,
+      quantity: null, rawTokenAmount: "1000000", decimals: 6, displayStatus: "MULTIPLIER_UNVERIFIED",
+      tokenPriceUsd: 12, estimatedValueUsd: null, imageUrl: null }],
+  }) }));
+  assert.match(html, new RegExp(`href="/markets/xstocks/${mintAddress}"`));
+  assert.match(html, /display quantity unavailable/);
+  assert.doesNotMatch(html, /href="\/markets\/EXx"/);
+});
+
 test("wallet can render balances and investments independently from the overview summary", () => {
   const value = portfolio({
     positions: [{
