@@ -4,13 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./agent-trade-policy": "./src/agent-trade-policy.ts",
     "./execution-eligibility": "./src/execution-eligibility.ts",
     "./token-amounts": "./src/token-amounts.ts",
     "./asset-registry": "./src/asset-registry.ts",
     "./assets": "./src/assets.ts",
     "./investments": "./src/investments.ts",
+    "./manual-sell": "./src/manual-sell.ts",
+    "./xstocks-manual-buy": "./src/xstocks-manual-buy.ts",
     "./portfolio": "./src/portfolio.ts",
     "./solana": "./src/solana.ts"
   },
-  "dependencies": { "@stockpilot/integrations": "workspace:*" }
+  "dependencies": {
+    "@solana/kit": "^8.3.0",
+    "@stockpilot/integrations": "workspace:*"
+  }
 }
