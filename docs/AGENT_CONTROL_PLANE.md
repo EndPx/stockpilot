@@ -1,5 +1,16 @@
 # Agent control plane and MCP foundation
 
+> **Superseding status — 25 September 2026:** release `483f73d` adds separately
+> owner-authorized BUY/SELL and SOL/USDC transfers, wallet delegation, per-agent
+> execution policy, and a durable single-send/finality ledger. Deployment is in
+> progress at this checkpoint; live health and a real finalized transaction are
+> not yet verified here. See [current wallet execution handoff](AGENT_WALLET_EXECUTION.md)
+> for the operative scope and acceptance requirements. The material below is
+> preserved as the earlier request/approval-only foundation; its global
+> execution-disabled statements are historical, not the current code boundary.
+
+## Historical foundation checkpoint
+
 Current status (2026-09-25): this document began as the September 23 control-plane
 foundation and retains its original design/acceptance checklist below. The
 current code uses PostgreSQL for durable control-plane state and supports

@@ -1,5 +1,17 @@
 # Manual BUY release boundary
 
+> **Superseding status — 25 September 2026:** the current implementation supports
+> owner-signed manual BUY and SELL for the configured demo wallet on both
+> Polymarket PreStocks and AAPLx. Release `483f73d` additionally includes separate
+> owner-delegated agent execution and is being deployed; this checkpoint does
+> not yet confirm its live image/health. No real finalized trade has been verified
+> in the current acceptance record. See [current execution boundary and owner test
+> handoff](AGENT_WALLET_EXECUTION.md). The original readiness decisions, probes,
+> disabled-production observations, and former blockers below are retained as
+> historical evidence, not a statement of the present source implementation.
+
+## Historical readiness checkpoint
+
 Decision (2026-09-25): Pre-IPO (official PreStocks) and Stocks (official
 xStocks) must become executable in the **same** release. A foundation for one
 market may be implemented or tested first, but neither market is to be exposed

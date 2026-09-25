@@ -19,7 +19,6 @@ signer_file=$signer_directory/server.env
 [ -f "$runtime" ] && [ ! -L "$runtime" ] || fail 'protected runtime missing'
 [ ! -L "$signer_directory" ] && [ ! -L "$signer_file" ] || fail 'signer configuration must not be symlinked'
 grep -qx 'NEXT_PUBLIC_AUTH_PROVIDER=privy' "$runtime" || fail 'Privy runtime required'
-[ -x /usr/lib/postgresql/16/bin/psql ] || fail 'VPS PostgreSQL 16 client required'
 [ ! -L "$base/.git-release.lock" ] || fail 'release lock must not be symlinked'
 exec 9>"$base/.git-release.lock"
 flock -n 9 || fail 'another release is running'
@@ -54,13 +53,12 @@ docker build --build-arg NEXT_PUBLIC_AUTH_PROVIDER=privy \
   export CONTROL_PLANE_DATABASE_URL
   docker run --rm --network stockpilot_egress --memory 384m --cpus 0.5 \
     --env CONTROL_PLANE_DATABASE_URL "$migration_image"
-  # Bypass Debian pg_wrapper (it misinterprets PGDATABASE URLs). Secrets are
-  # passed through environment to the real client, never via process argv.
-  PGDATABASE="$CONTROL_PLANE_MIGRATION_URL" PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 \
-    /usr/lib/postgresql/16/bin/psql -X -w -v ON_ERROR_STOP=1 -f "$release/deploy/grant-runtime-agent-operations.sql"
-  privileges=$(PGDATABASE="$runtime_database" PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 \
-    /usr/lib/postgresql/16/bin/psql -X -w -Atqc "SELECT has_table_privilege(current_user,'control_agent_operations','SELECT') AND has_table_privilege(current_user,'control_agent_operations','INSERT') AND has_table_privilege(current_user,'control_agent_operations','UPDATE') AND has_table_privilege(current_user,'control_agent_wallet_policies','SELECT') AND has_table_privilege(current_user,'control_agent_wallet_policies','INSERT') AND has_table_privilege(current_user,'control_agent_wallet_policies','UPDATE') AND has_table_privilege(current_user,'control_agent_operation_events','SELECT') AND has_table_privilege(current_user,'control_agent_operation_events','INSERT') AND has_table_privilege(current_user,'control_wallet_operation_locks','SELECT') AND has_table_privilege(current_user,'control_wallet_operation_locks','INSERT') AND has_table_privilege(current_user,'control_wallet_operation_locks','UPDATE') AND NOT has_table_privilege(current_user,'control_agent_operations','DELETE') AND NOT has_table_privilege(current_user,'control_agent_operation_events','UPDATE,DELETE')")
-  [ "$privileges" = t ] || fail 'unexpected runtime privileges'
+  # Use the same pg URL parser as the migration; pass secrets by named environment only.
+  CONTROL_PLANE_DATABASE_URL=$runtime_database
+  export CONTROL_PLANE_DATABASE_URL
+  docker run --rm --network stockpilot_egress --memory 384m --cpus 0.5 \
+    --env CONTROL_PLANE_DATABASE_URL --env CONTROL_PLANE_MIGRATION_URL \
+    "$migration_image" node apps/web/scripts/grant-agent-runtime.mjs
   # Positive u64 representability ceilings only. User's per-agent limits are
   # enforced atomically by StockPilot; no hidden $0.10 demo spending cap.
   if [ ! -e "$signer_file" ]; then

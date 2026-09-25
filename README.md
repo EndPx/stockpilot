@@ -1,57 +1,85 @@
 # StockPilot
 
-StockPilot is building an agent-native tokenized-stock investing experience on Solana. Official PreStocks power private markets; the official xStocks Solana catalog powers public-market discovery. Human wallet authorization remains the execution boundary.
+StockPilot is an agent-native tokenized-stock application on Solana. It separates
+Stocks (official xStocks) from Pre-IPO (official PreStocks), reads real wallet
+balances, and provides owner-signed manual trades plus explicitly delegated
+agent wallet actions. Signing in or connecting an MCP client does not grant
+spending authority.
 
 ## Current status
 
-- Phase 1: live PreStocks mint discovery and USDC-to-PreStocks Jupiter quote validation complete.
-- Phase 2: shared asset architecture, Next.js application, live markets, and asset detail pages complete.
-- Phase 3: Wallet Standard connection, reconnect state, connected identity, and disconnect complete.
-- Phase 4: Sign In With Solana authentication and wallet-bound server sessions complete.
-- Phase 5: authenticated, read-only USDC, SOL, and official PreStocks portfolio discovery complete.
-- Human BUY implementation exists; real mainnet investment acceptance remains outstanding.
-- Public discovery: paginated canonical xStocks ingestion, evidence-backed classification, bounded Markets search and read-only public detail are enabled. Known private-exposure products are excluded (currently VCXx). Agent features and xStocks investment execution are **not enabled**.
-- Lazy execution eligibility is read-only and fail-closed, with expiring technical results separate from discovery. No production xStocks product-review clearance is configured.
+As of 25 September 2026, the repository implements:
+
+- Privy sign-in, a verified embedded Solana wallet, SOL/USDC balances, and
+  canonical Stocks/Pre-IPO holdings with source-labeled indicative valuation.
+- Separate MCP market tools, portfolio/balance reads, WorkOS OAuth connections,
+  owner-managed agents, and durable request/approval/activity records in Neon.
+- Manual BUY and SELL for **Polymarket PreStocks and AAPLx only**, for the
+  configured demo wallet. The owner chooses the amount and signs each trade.
+- Agent BUY, SELL, SOL transfer, and USDC transfer behind separate owner opt-ins,
+  per-agent limits, explicit wallet delegation, and durable single-send recovery.
+
+Release `483f73d` is being deployed; this documentation checkpoint does **not**
+yet confirm its live health or enabled capabilities. No real finalized BUY,
+SELL, or agent transfer has been verified in the current acceptance record.
+Passing tests, a quote, or an enabled health flag is not evidence of a completed
+mainnet transaction. See [current wallet-execution boundary and test handoff](docs/AGENT_WALLET_EXECUTION.md)
+for the exact opt-ins, supported assets, six-day server authorization, and
+remaining acceptance work.
 
 The web application reads live provider data. Prices and the available asset registry can change between requests.
 
 ## Product boundary
 
-Today the operational investment universe is official PreStocks only. Discovery also supports `PUBLIC_EQUITY`, `ETF` and unclassified `PUBLIC_MARKET_PRODUCT` from xStocks, never arbitrary SPL tokens. **All pre-IPO/private-company exposure must remain exclusively PreStocks.** Canonicality, classification and execution eligibility are separate; a listed fund does not override that invariant.
+Discovery supports official PreStocks plus `PUBLIC_EQUITY`, `ETF`, and
+unclassified `PUBLIC_MARKET_PRODUCT` from the canonical xStocks catalog, never
+arbitrary SPL tokens. **All pre-IPO/private-company exposure remains exclusively
+PreStocks.** The executable demo is a narrower, two-product allowlist; listing a
+product does not make it tradable or establish investor eligibility.
 
-The current human-authorized investment path remains intentionally narrow:
+The manual investment path is:
 
 ```text
-User investment intent
+Owner chooses BUY or SELL and an exact amount
     ↓
-USDC funding
+StockPilot resolves the supported issuer mint and wallet balances
     ↓
-StockPilot resolves an official PreStocks asset and mint
+Jupiter builds a route; StockPilot verifies its transaction effects
     ↓
-Jupiter supplies execution infrastructure
+Owner reviews and signs with the matching Privy wallet
     ↓
-Solana wallet approval
+One submission attempt → finalized Solana reconciliation
 ```
 
-Users do not need to already own a PreStocks token. USDC remains the only investment funding asset. Public-stock execution requires a separately validated canonical registry, eligibility controls and scaled-amount handling before activation.
+BUY spends canonical mainnet USDC; SELL spends the selected token and receives
+USDC. There is no hidden $0.10 application cap: balances, representable exact
+amounts, route availability, fees/rent, and transaction verification still apply.
+Agent execution additionally needs an owner-saved execution policy and a live
+Privy wallet delegation. Legacy approval requests remain consent records, not a
+signing or execution mechanism.
 
 Jupiter is infrastructure behind an investment-specific experience; StockPilot is not a generic DEX or Jupiter interface. Non-PreStocks pre-IPO tokens and custom StockPilot-wrapped assets are outside the product scope. Meteora may appear as a venue chosen inside a Jupiter route.
 
 ## Architecture
 
 ```text
-PreStocks API
+Official PreStocks and xStocks catalogs
     ↓
-packages/integrations  — fetches and normalizes the remote registry
+packages/integrations  — fetches and normalizes issuer registries and routes
     ↓
 packages/core          — canonical assets, bounded cache, and portfolio domain service
     ↓
-apps/web               — Next.js UI, authenticated APIs, and Solana balance adapter
+apps/web               — Next.js UI, authenticated APIs/MCP, and Solana adapter
 
 src                    — Phase 1 Solana and Jupiter validation path
 ```
 
-The web application and the Phase 1 validation script use the same PreStocks integration. The server cache is fresh for 45 seconds and may serve a successful response for up to five minutes if a later provider refresh fails; stale responses are identified in response metadata and the UI.
+The web application and the Phase 1 validator share provider integrations.
+Discovery caches identify stale results; execution requests a fresh issuer
+snapshot and refuses data older than its independent 60-second bound. Redis
+stores revocable sessions and transient state; Neon/PostgreSQL stores agent
+policies, approvals, and manual/agent execution ledgers. Privy provides owner
+authentication and wallet signing; WorkOS provides managed MCP OAuth.
 
 The new `InvestmentAssetRegistry` is a provider-aware foundation with namespaced
 mint-based IDs, runtime classification checks and availability review metadata.
@@ -77,14 +105,21 @@ not used by `pnpm dev`. The default public Solana mainnet RPC works for
 development; set the server-only `SOLANA_RPC_URL` when using a dedicated
 endpoint. Never expose it as a `NEXT_PUBLIC_` variable.
 
-Open `http://localhost:3000`, then use **Open the app** or visit `/markets`
-directly. Markets remain public. Connect and sign in with a wallet before
-opening `/app` to load its private portfolio.
+The environment example retains legacy SIWS/read-only defaults. To reproduce
+the current Privy UI, configure `NEXT_PUBLIC_AUTH_PROVIDER=privy`,
+`AUTH_ENABLED=true`, and the appropriate server-side Privy, Redis, and Neon
+settings. Do not copy production secrets into examples or source control.
+Open `http://localhost:3000` and use **Open the app**. In Privy mode, application
+pages require sign-in; public read-only market APIs have a separate contract.
+Keep trading flags off until the execution configuration and migrations are
+deliberately prepared; the [execution handoff](docs/AGENT_WALLET_EXECUTION.md)
+distinguishes operator readiness from owner authorization.
 
 Restart `pnpm dev` after pulling provider/domain changes: per-process provider
 singletons survive hot reload and can retain old normalizer implementations.
 
-Use **Connect Wallet** to choose an installed Wallet Standard compatible Solana wallet. Compatible wallets such as Phantom, Solflare, and Backpack are discovered by capability rather than hardcoded by vendor.
+The legacy SIWS mode discovers compatible installed Wallet Standard wallets.
+It is not the Privy manual/agent execution path described above.
 
 `PRESTOCKS_API_URL` can override the live registry for local testing.
 `SESSION_SECRET` is required for authentication. Portfolio balance calls are
@@ -107,29 +142,36 @@ Neither command signs or submits a transaction.
 
 The xStocks validator ingests the full current catalog, reports exclusions, then
 sequentially inspects AAPLx, NVDAx and TSLAx using mint reads and GET quotes only.
-Scaled quantities preserve raw u64 strings; local decimal scale calculations are
-explicit estimates, not guarantees of Token-2022 binary-float equivalence. xStocks
-portfolio admission is postponed until same-context RPC display and price units
-are validated. The existing PreStocks portfolio path is unchanged.
+Scaled quantities preserve raw u64 strings. The portfolio admits supported
+xStocks only after its RPC/Scaled UI checks; unknown display multipliers remain
+unvalued. Local decimal scale calculations are estimates, not guarantees of
+Token-2022 binary-float equivalence. SELL amounts and limits use base token units,
+not scaled display shares.
 
 Wallet connection alone does not prove ownership. Signing in creates a
-wallet-bound HttpOnly session; it does not grant transaction authority.
+wallet-bound HttpOnly session; neither it nor MCP OAuth grants automatic
+transaction authority. Owner delegation and per-agent execution policy are
+separate controls.
 
 ## Application routes
 
 - `/` — StockPilot landing; current versus planned capabilities explicitly labeled
-- `/app` — authenticated read-only portfolio overview
-- `/markets` — bounded, searchable public/private directory; All / Private / Public filters
-- `/markets/[symbol]` — live asset detail and verified Solana mint
-- `/markets/xstocks/[mint]` — canonical public product detail, discovery only
+- `/app` — authenticated Activity, Agents, and Wallet overview
+- `/wallet` — verified wallet identity, SOL/USDC balances, and investment holdings
+- `/markets?group=private` and `/markets?group=public` — Pre-IPO and Stocks directories
+- `/markets/[symbol]` and `/markets/xstocks/[mint]` — issuer detail; manual controls only for supported products and eligible configured sessions
+- `/clients` and `/clients/[id]` — OAuth connections, read/request policy, wallet delegation, and agent execution policy
+- `/approvals` and `/activity` — consent requests and account-scoped audit history
 - `/api/markets` — public GET discovery with query/provider/marketType/group/limit/cursor filters
 - `/api/assets?q=...` — validated asset list/search API
 - `/api/assets/[symbol]` — validated exact-symbol asset API
-- `/api/auth/*` — SIWS challenge, verification, session, and logout APIs
-- `/api/portfolio` — session-bound USDC, SOL, and official PreStocks balances
+- `/api/auth/*` — authentication, session, and logout APIs
+- `/api/portfolio` — session-bound SOL, USDC, and supported issuer holdings
+- `/api/mcp` — authenticated market/wallet reads and separately authorized agent actions
 
 ## Documentation
 
+- [Current manual and agent wallet execution boundary](docs/AGENT_WALLET_EXECUTION.md)
 - [Tokenized market discovery closeout (25-point report)](docs/TOKENIZED_MARKET_DISCOVERY_REPORT.md)
 - [xStocks product and token evidence](docs/XSTOCKS_PRODUCT_EVIDENCE.md)
 - [Architecture correction closeout](docs/ARCHITECTURE_CORRECTION_REPORT.md)
