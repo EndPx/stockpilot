@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MarketHistory } from "@stockpilot/integrations/market-history-types";
 import { chartGeometry, chartPrice, isChartHistory, nearestCandle } from "../lib/market-chart";
-import { MarketChart, MarketChartMessage, PriceHistory } from "../components/market-chart";
+import { candleIndexForKey, MarketChart, MarketChartMessage, PriceHistory } from "../components/market-chart";
 
 const mint = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
 const pool = "CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y";
@@ -59,13 +59,27 @@ test("historical chart has keyboard inspection, equivalent table, timezone and h
   const html = renderToStaticMarkup(createElement(PriceHistory, { history: history(), symbol: "AAPLx" }));
   assert.match(html, /\+\$2 \(\+2\.00%\)/);
   assert.match(html, /1D DEX pool move/);
-  assert.match(html, /type="range"/);
+  assert.doesNotMatch(html, /type="range"|Inspect a candle|market-chart-inspect/);
+  assert.match(html, /<svg[^>]*role="slider"[^>]*tabindex="0"/);
+  assert.match(html, /aria-valuemin="0" aria-valuemax="2"/);
+  assert.match(html, /Use arrow keys, Home or End/);
   assert.match(html, /aria-valuetext=/);
   assert.match(html, /<table>/);
   assert.match(html, /Candle ended \(UTC\)/);
   assert.match(html, /missing trading intervals/);
   assert.match(html, /not your investment return/);
   assert.doesNotMatch(html, /Buy|Sell|Sign transaction/);
+});
+
+test("plot keyboard inspection traverses real candles and keeps endpoints bounded without a range bar", () => {
+  assert.equal(candleIndexForKey("ArrowLeft", 2, 3), 1);
+  assert.equal(candleIndexForKey("ArrowDown", 0, 3), 0);
+  assert.equal(candleIndexForKey("ArrowRight", 2, 3), 2);
+  assert.equal(candleIndexForKey("ArrowUp", 1, 3), 2);
+  assert.equal(candleIndexForKey("Home", 2, 3), 0);
+  assert.equal(candleIndexForKey("End", 0, 3), 2);
+  assert.equal(candleIndexForKey("ArrowRight", 0, 1), 0);
+  assert.equal(candleIndexForKey("Tab", 1, 3), null);
 });
 
 test("a falling pool series labels its negative move without implying stock performance", () => {

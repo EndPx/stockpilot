@@ -11,6 +11,14 @@ const ranges: { value: MarketHistoryRange; label: string; name: string }[] = [
   { value: "1m", label: "1M", name: "Last 30 days" },
 ];
 
+export function candleIndexForKey(key: string, current: number, count: number): number | null {
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  if (key === "ArrowLeft" || key === "ArrowDown") return Math.max(0, current - 1);
+  if (key === "ArrowRight" || key === "ArrowUp") return Math.min(count - 1, current + 1);
+  return null;
+}
+
 export function MarketChartMessage({ state }: { state: "loading" | "empty" | "error" }) {
   return <div className="market-chart-message" role="status">
     <strong>{state === "loading" ? "Loading price history…" : state === "empty" ? "No chart data for this period" : "Price history is temporarily unavailable"}</strong>
@@ -22,7 +30,6 @@ export function MarketChartMessage({ state }: { state: "loading" | "empty" | "er
 
 export function PriceHistory({ history, symbol }: { history: MarketHistory; symbol: string }) {
   const [selectedIndex, setSelectedIndex] = useState(history.candles.length - 1);
-  const sliderId = useId();
   const selected = history.candles[Math.max(0, Math.min(selectedIndex, history.candles.length - 1))];
   const geometry = chartGeometry(history);
   const first = history.candles[0];
@@ -34,6 +41,12 @@ export function PriceHistory({ history, symbol }: { history: MarketHistory; symb
   const hasGaps = history.candles.some((candle, index) => index > 0 && candle.time - history.candles[index - 1].time > history.intervalSeconds);
   const intervalLabel = history.intervalSeconds < 3600 ? `${history.intervalSeconds / 60}-minute` : `${history.intervalSeconds / 3600}-hour`;
   const selectedDescription = `${chartPrice(selected.close)} · ${chartTime(selected.time + history.intervalSeconds)} UTC`;
+  function inspectAt(clientX: number, plot: SVGSVGElement) {
+    const bounds = plot.getBoundingClientRect();
+    if (bounds.width <= 0) return;
+    const plotX = ((clientX - bounds.left) / bounds.width) * CHART_WIDTH;
+    setSelectedIndex(nearestCandle(history, (plotX - 12) / (CHART_WIDTH - 24)));
+  }
   return <>
     <div className="market-chart-reading">
       <div><strong>{chartPrice(selected.close)}</strong><span>Candle closed {chartTime(selected.time + history.intervalSeconds)} UTC</span></div>
@@ -41,13 +54,23 @@ export function PriceHistory({ history, symbol }: { history: MarketHistory; symb
     </div>
     <div className="market-chart-plot">
       <div className="market-chart-axis" aria-hidden="true">{geometry.ticks.map((tick, index) => <span key={index}>{chartPrice(tick)}</span>)}</div>
-      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" role="img"
-        aria-label={`${symbol} provider-reported token close prices in USD. ${history.candles.length} completed ${intervalLabel} candles. Units are not normalized to issuer or wallet display units. Use the candle selector or data table below to inspect prices.`}
+      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" role="slider" tabIndex={0}
+        aria-roledescription="price chart" aria-valuemin={0} aria-valuemax={history.candles.length - 1}
+        aria-valuenow={selectedIndex} aria-valuetext={selectedDescription}
+        aria-label={`${symbol} provider-reported token close prices in USD. ${history.candles.length} completed ${intervalLabel} candles. Units are not normalized to issuer or wallet display units. Use arrow keys, Home or End, or the data table below to inspect prices.`}
+        onKeyDown={(event) => {
+          const next = candleIndexForKey(event.key, selectedIndex, history.candles.length);
+          if (next === null) return;
+          event.preventDefault();
+          setSelectedIndex(next);
+        }}
+        onPointerDown={(event) => {
+          inspectAt(event.clientX, event.currentTarget);
+          event.currentTarget.focus();
+        }}
         onPointerMove={(event) => {
           if (event.pointerType !== "mouse") return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const plotX = ((event.clientX - bounds.left) / bounds.width) * CHART_WIDTH;
-          setSelectedIndex(nearestCandle(history, (plotX - 12) / (CHART_WIDTH - 24)));
+          inspectAt(event.clientX, event.currentTarget);
         }}>
         {geometry.ticks.map((tick, index) => <line key={index} className="market-chart-grid" x1="12" x2={CHART_WIDTH - 12} y1={geometry.y(tick)} y2={geometry.y(tick)} vectorEffect="non-scaling-stroke" />)}
         {geometry.segments.map((path, index) => <path key={index} d={path} className="market-chart-line" vectorEffect="non-scaling-stroke" />)}
@@ -57,12 +80,6 @@ export function PriceHistory({ history, symbol }: { history: MarketHistory; symb
       </svg>
     </div>
     <div className="market-chart-dates" aria-hidden="true"><span>{chartTime(history.windowStart, history.range !== "1d")}</span><span>{chartTime(history.windowEnd, history.range !== "1d")}</span></div>
-    <div className="market-chart-inspect">
-      <label htmlFor={sliderId}>Inspect a candle <span>{intervalLabel} intervals · UTC</span></label>
-      <input id={sliderId} type="range" min="0" max={history.candles.length - 1} step="1" value={selectedIndex}
-        disabled={history.candles.length < 2} aria-valuetext={selectedDescription}
-        onChange={(event) => setSelectedIndex(Number(event.target.value))} />
-    </div>
     <div className="market-chart-context">
       <p>{hasGaps ? "Gaps indicate missing trading intervals; no prices are filled in. " : ""}Change compares the first and last available closes, not your investment return. {history.range === "1m" ? "1M covers 30 days. " : ""}{history.omittedCandles > 0 ? "Ambiguous or invalid candles were omitted. " : ""}Last trade candle ended {chartTime(last.time + history.intervalSeconds)} UTC.</p>
       <details className="market-chart-data"><summary>View price data ({history.candles.length} candles)</summary>

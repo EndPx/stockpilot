@@ -385,8 +385,8 @@ Use a straight SVG close-price line, no curve smoothing, fill, glow or animation
 Time is proportional on the horizontal axis; missing intervals break the line.
 Only completed candles appear. The 1D / 1W / 1M controls use the existing 44px
 button targets, cobalt selected state and BeUI controlled-selection mechanics;
-1M means 30 days. A native labeled range control supports keyboard and touch candle
-inspection; pointer inspection is an enhancement, not the only access mechanism.
+1M means 30 days. Candle inspection happens directly on the focusable plot through
+mouse hover, touch/pen tap, or Arrow/Home/End keys; there is no separate visible range bar.
 Show the selected close, UTC interval end, USD axis, actual-period change, fetched
 time and linked pool/source attribution. An expandable semantic close-price table
 provides the same data without requiring vision or pointer use.
