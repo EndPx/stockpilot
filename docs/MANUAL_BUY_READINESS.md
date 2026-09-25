@@ -74,6 +74,35 @@ AAPLx order for an unfunded synthetic test wallet returned `errorCode: 1`
 without transaction bytes. Neither quote is an executable or suitability
 decision; no wallet signed, submitted, or funded a trade in this check.
 
+Focused demo-wallet probe on 2026-09-25 (read-only, no signature or submission):
+
+- The owner selected Polymarket PreStocks mint
+  `Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP` and AAPLx mint
+  `XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp` for prospective
+  USDC 0.10 BUY tests. This is a test preference, not an eligibility approval.
+- Mainnet RPC reported 0.003 SOL and 1.353841 USDC at the confirmed public
+  wallet `6EuMFHPtiyoFtsBTy1hiJpNgupP7qkZfZm9ErQ58ipsC`. It had no
+  destination token account for either product. These are a point-in-time
+  observation; refresh before any transaction attempt.
+- Both mints use Token-2022. The RPC minimum rent quote for a 170-byte token
+  account was 0.00151384 SOL, so two such accounts require at least
+  0.00302768 SOL, already greater than the reported SOL balance before
+  network fees. Actual account sizing and fees must be checked again.
+- Jupiter `/order` without a taker returned indicative USDC 0.10 quotes;
+  an owner-bound Polymarket `/order` returned `errorCode: 3` (below the
+  gasless minimum), without an executable transaction. `/build` returned
+  raw instructions for USDC 0.10, but uses `route_v2` and cannot be sent
+  through the existing `/order` + `/execute` adapter. The observed AAPLx
+  `/build` route had multiple DEX legs and two setup instructions.
+- Forcing direct, read-only legacy quotes produced a one-leg Manifest route
+  for Polymarket and a one-leg Raydium CLMM route for AAPLx. Neither is the
+  sole Raydium classic instruction variant decoded by our strict verifier.
+  Restricting Polymarket quotes to Raydium or Raydium CLMM returned no route.
+- Both mints expose Token-2022 extensions outside the current verifier's
+  display-only allowlist, including transfer hooks. Treating a quote or
+  simulation as a proof of all wallet debits would weaken the agreed strict
+  verification boundary. No BUY/SELL or autonomous policy was enabled.
+
 The proposed demo investor reports being in Indonesia and not a U.S. person.
 The [Backed restricted-country list](https://assets.backed.fi/legal-documentation/restricted-countries)
 does not name Indonesia, but this alone is not permission for StockPilot to
