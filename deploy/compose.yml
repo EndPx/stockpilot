@@ -26,8 +26,11 @@ services:
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
       NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-legacy}
       PRIVY_APP_SECRET: ${PRIVY_APP_SECRET:-}
-      # Keep buys disabled for the initial deployment. There is no Jupiter key here.
-      INVESTMENTS_ENABLED: "false"
+      # Operator kill switch. The demo endpoints additionally require the exact
+      # owner wallet below; leaving either unset keeps trading unavailable.
+      INVESTMENTS_ENABLED: ${INVESTMENTS_ENABLED:-false}
+      STOCKPILOT_DEMO_TRADER_WALLET: ${STOCKPILOT_DEMO_TRADER_WALLET:-}
+      JUPITER_API_KEY: ${JUPITER_API_KEY:-}
       # Safe only with loopback access and the supplied proxy's X-Real-IP overwrite.
       TRUST_PROXY: "true"
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}

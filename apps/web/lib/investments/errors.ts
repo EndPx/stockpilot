@@ -21,7 +21,7 @@ const MESSAGES: Record<InvestmentApiErrorCode, string> = {
   INVALID_REQUEST: "The investment request is not valid.",
   WALLET_MISMATCH: "The connected wallet does not match your authenticated session.",
   ASSET_NOT_FOUND: "This PreStocks asset was not found.",
-  ASSET_NOT_ALLOWED: "Only official PreStocks assets can be purchased.",
+  ASSET_NOT_ALLOWED: "This product or wallet is not enabled for trading in this release.",
   ASSET_CATALOG_STALE: "A fresh issuer catalog is required before preparing or submitting an investment.",
   INVALID_AMOUNT: "Enter a valid USDC amount with no more than six decimal places.",
   INSUFFICIENT_USDC: "Your wallet does not have enough USDC for this investment.",

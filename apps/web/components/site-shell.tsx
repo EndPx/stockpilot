@@ -90,7 +90,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="sidebar-assurance">
           <ShieldIcon className="nav-icon" />
           {privy
-            ? <div><strong>Agent requests</strong><span>Human approval required. Trading is off.</span></div>
+            ? <div><strong>Your wallet, your control</strong><span>Review and sign each manual trade.</span></div>
             : <div><strong>Human approval</strong><span>Required for every buy</span></div>}
         </div>
         <div className="sidebar-wallet">{privy ? <PrivyAccountButton /> : <WalletButton />}</div>

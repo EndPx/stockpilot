@@ -51,7 +51,7 @@ CREATE TABLE control_manual_investment_executions (
     maximum_wallet_native_debit_lamports_raw > 0
     AND maximum_wallet_native_debit_lamports_raw <= 18446744073709551615
   ),
-  CONSTRAINT control_manual_execution_status CHECK (status IN ('CLAIMED', 'SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED')),
+  CONSTRAINT control_manual_execution_status CHECK (status IN ('CLAIMED', 'SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED', 'REJECTED')),
   CONSTRAINT control_manual_execution_expiry CHECK (expires_at > created_at),
   CONSTRAINT control_manual_execution_result CHECK (
     (status = 'CONFIRMED' AND submitted_at IS NOT NULL AND resolved_at IS NOT NULL
@@ -63,6 +63,9 @@ CREATE TABLE control_manual_investment_executions (
       AND actual_wallet_native_debit_lamports_raw > 0
       AND actual_wallet_native_debit_lamports_raw <= maximum_wallet_native_debit_lamports_raw)
     OR (status = 'FAILED' AND resolved_at IS NOT NULL
+      AND actual_input_amount_raw IS NULL AND actual_output_amount_raw IS NULL
+      AND actual_wallet_native_debit_lamports_raw IS NULL)
+    OR (status = 'REJECTED' AND submitted_at IS NULL AND resolved_at IS NOT NULL
       AND actual_input_amount_raw IS NULL AND actual_output_amount_raw IS NULL
       AND actual_wallet_native_debit_lamports_raw IS NULL)
     OR (status = 'SUBMITTED' AND submitted_at IS NOT NULL AND resolved_at IS NULL
@@ -107,14 +110,14 @@ BEGIN
       OLD.created_at, OLD.expires_at) THEN
     RAISE EXCEPTION 'Manual execution intent is immutable';
   END IF;
-  IF OLD.status IN ('CONFIRMED', 'FAILED') AND NEW IS DISTINCT FROM OLD THEN
+  IF OLD.status IN ('CONFIRMED', 'FAILED', 'REJECTED') AND NEW IS DISTINCT FROM OLD THEN
     RAISE EXCEPTION 'Resolved manual execution is immutable';
   END IF;
   IF OLD.submitted_at IS NOT NULL AND NEW.submitted_at IS DISTINCT FROM OLD.submitted_at THEN
     RAISE EXCEPTION 'Manual execution submission time is immutable';
   END IF;
   IF OLD.status <> NEW.status AND NOT (
-    (OLD.status = 'CLAIMED' AND NEW.status IN ('SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED')) OR
+    (OLD.status = 'CLAIMED' AND NEW.status IN ('SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED', 'REJECTED')) OR
     (OLD.status = 'SUBMITTED' AND NEW.status IN ('UNKNOWN', 'CONFIRMED', 'FAILED')) OR
     (OLD.status = 'UNKNOWN' AND NEW.status IN ('SUBMITTED', 'CONFIRMED', 'FAILED'))
   ) THEN
@@ -132,7 +135,7 @@ CREATE TABLE control_manual_execution_events (
   execution_id uuid NOT NULL REFERENCES control_manual_investment_executions(id),
   status text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT control_manual_event_status CHECK (status IN ('CLAIMED', 'SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED'))
+  CONSTRAINT control_manual_event_status CHECK (status IN ('CLAIMED', 'SUBMITTED', 'UNKNOWN', 'CONFIRMED', 'FAILED', 'REJECTED'))
 );
 CREATE INDEX control_manual_events_execution_idx ON control_manual_execution_events(execution_id, created_at, id);
 CREATE TRIGGER control_manual_events_append_only

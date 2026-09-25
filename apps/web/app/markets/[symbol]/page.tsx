@@ -9,6 +9,7 @@ import { ArrowLeftIcon, ArrowUpRightIcon } from "@/components/icons";
 import { InvestmentPanel } from "@/components/investment-panel";
 import { PrivyInvestmentPanel } from "@/components/privy/privy-investment-panel";
 import { investmentsEnabled } from "@/lib/investments/config";
+import { demoTradeProductSupported } from "@/lib/investments/demo-trade";
 import { isPrivyMode } from "@/lib/privy/config";
 import { getAsset } from "@/lib/assets";
 import { parseAssetSymbol } from "@/lib/asset-inputs";
@@ -82,10 +83,10 @@ export default async function AssetPage({ params }: { params: Promise<{ symbol: 
           </section>
         </div>
 
-        {investmentsEnabled() ? (isPrivyMode()
-          ? <PrivyInvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />
+        {investmentsEnabled() && demoTradeProductSupported("prestocks", asset.mintAddress) ? (isPrivyMode()
+          ? <PrivyInvestmentPanel asset={{ symbol: asset.symbol, name: asset.name, mintAddress: asset.mintAddress, provider: "prestocks" }} />
           : <InvestmentPanel asset={{ symbol: asset.symbol, name: asset.name }} />) : (
-          <aside className="surface p-6"><p className="eyebrow">Read-only release</p><h2 className="mt-3">Investments are not enabled</h2><div className="investment-disclosure" role="note"><strong>Not for U.S. persons</strong><p>Pre-IPO tokens are not available to U.S. persons or other ineligible investors and carry risk of total loss.</p></div><p className="mt-4 text-muted">Explore official market data and verified wallet holdings. This deployment cannot prepare or submit investment transactions.</p></aside>
+          <aside className="surface p-6"><p className="eyebrow">Market data</p><h2 className="mt-3">Trading unavailable for this product</h2><div className="investment-disclosure" role="note"><strong>Not for U.S. persons</strong><p>Pre-IPO tokens are not available to U.S. persons or other ineligible investors and carry risk of total loss.</p></div><p className="mt-4 text-muted">The current manual trade release supports Polymarket PreStocks and AAPLx. Other products remain available to explore.</p></aside>
         )}
       </div>
 

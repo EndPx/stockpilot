@@ -72,8 +72,11 @@ editor or secret manager, not in a shell command argument or source archive.
 are not exactly 64 hexadecimal characters, so the assembled `REDIS_URL` is safe
 without URL escaping. Keep the session secret stable through ordinary deployments.
 Set `AUTH_ENABLED=false` if the initial release should offer discovery only.
-`INVESTMENTS_ENABLED` is hardcoded to `false` in Compose, and changing the env file
-cannot enable buys. Enabling trading is a separate release/security decision.
+`INVESTMENTS_ENABLED` defaults to `false` in Compose. The manual, owner-signed
+demo path requires an explicit `true` in the protected runtime file and a matching
+`STOCKPILOT_DEMO_TRADER_WALLET`. It supports only the reviewed Polymarket
+PreStocks and AAPLx mints, capped at $0.10 per BUY and approximately $0.10
+per SELL. It does not activate agent signing or automatic execution.
 The control plane has no transaction signer or execution tool. Keep the Neon
 credentials and credential pepper stable across ordinary deployments.
 The WorkOS variables are server-only. A temporary Staging OAuth demo may set
@@ -128,7 +131,10 @@ schema migrations and **before** enabling OAuth. Migration `0002` added the OAut
 tables after the original runtime grants; without this step, WorkOS can create a
 user but StockPilot cannot bind that user to the verified Privy wallet. Verify
 `SELECT`, `INSERT`, and `UPDATE` privileges on both OAuth tables for
-`stockpilot_app`. The OAuth binding also locks `control_accounts` with
+`stockpilot_app`. After migration `0004`, apply
+`deploy/grant-runtime-manual-trades.sql` as the migration owner and verify
+the runtime role can SELECT, INSERT, UPDATE the execution ledger and SELECT,
+INSERT the event ledger; it must not have DELETE or DDL. The OAuth binding also locks `control_accounts` with
 `SELECT ... FOR UPDATE`, which PostgreSQL requires an `UPDATE` grant to use;
 grant only `UPDATE (updated_at)` there, never wallet-address updates. `DELETE`
 should remain denied. Do not edit the already-applied `0002` file, because the

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { address, getCompiledTransactionMessageDecoder, getTransactionDecoder } from "@solana/kit";
 import {
+  assembleJupiterBuildTransaction,
+  JupiterOrderError,
   JupiterOrderNotExecutableError,
   JupiterV2Adapter,
+  normalizeJupiterBuild,
   normalizeJupiterExecution,
   normalizeJupiterOrder,
 } from "@stockpilot/integrations/jupiter-v2";
@@ -33,6 +37,75 @@ function order(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const buildInput = { ...expected, slippageBps: 100 };
+const instruction = { programId: "program", accounts: [{ pubkey: "wallet", isSigner: true, isWritable: true }], data: "AQID" };
+
+function build(overrides: Record<string, unknown> = {}) {
+  return {
+    inputMint: expected.inputMint, outputMint: expected.outputMint,
+    inAmount: expected.amountRaw, outAmount: "123", otherAmountThreshold: "121",
+    swapMode: "ExactIn", slippageBps: 100, priceImpactPct: "0.01",
+    routePlan: [{ swapInfo: { label: "Manifest" } }],
+    computeBudgetInstructions: [], setupInstructions: [instruction], swapInstruction: instruction,
+    cleanupInstruction: null, otherInstructions: [], tipInstruction: null,
+    addressesByLookupTableAddress: {},
+    blockhashWithMetadata: { blockhash: Array(32).fill(1), lastValidBlockHeight: 123 },
+    ...overrides,
+  };
+}
+
+test("build normalization binds both mints, exact input, slippage, and output threshold", () => {
+  const normalized = normalizeJupiterBuild(build(), buildInput);
+  assert.equal(normalized.otherAmountThreshold, "121");
+  assert.equal(normalized.setupInstructions.length, 1);
+  for (const wrong of [
+    { outputMint: "another-mint" }, { inAmount: "1" }, { slippageBps: 500 },
+    { swapMode: "ExactOut" }, { otherAmountThreshold: "124" },
+    { priceImpactPct: "10" },
+    { blockhashWithMetadata: { blockhash: Array(31).fill(1), lastValidBlockHeight: 123 } },
+  ]) assert.throws(() => normalizeJupiterBuild(build(wrong), buildInput), JupiterOrderError);
+});
+
+test("build requests raw instructions without asking Jupiter to submit", async () => {
+  let url: URL | undefined;
+  const adapter = new JupiterV2Adapter(null, async (input) => {
+    url = new URL(input.toString());
+    return Response.json(build());
+  }, "https://example.test");
+  await adapter.build(buildInput);
+  assert.equal(url?.pathname, "/swap/v2/build");
+  assert.deepEqual([...url!.searchParams.keys()].sort(), ["amount", "inputMint", "outputMint", "slippageBps", "taker"]);
+});
+
+test("direct build requires the exact server-selected one-hop DEX", async () => {
+  const urls: URL[] = [];
+  const adapter = new JupiterV2Adapter(null, async (input) => {
+    urls.push(new URL(input.toString()));
+    return Response.json(build());
+  }, "https://example.test");
+  const direct = { ...buildInput, directDex: "Meteora DLMM" as const };
+  await assert.rejects(adapter.build(direct), JupiterOrderError);
+  assert.equal(urls[0].searchParams.get("dexes"), "Meteora DLMM");
+  const good = new JupiterV2Adapter(null, async () => Response.json(build({
+    routePlan: [{ swapInfo: { label: "Meteora DLMM" } }],
+  })), "https://example.test");
+  assert.equal((await good.build(direct)).routePlan[0].swapInfo.label, "Meteora DLMM");
+});
+
+test("assembler compiles a wallet-fee-payer v0 transaction without signing it", () => {
+  const wallet = "6EuMFHPtiyoFtsBTy1hiJpNgupP7qkZfZm9ErQ58ipsC";
+  const ix = { programId: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    accounts: [{ pubkey: wallet, isSigner: true, isWritable: true }], data: "AQID" };
+  const normalized = normalizeJupiterBuild(build({ setupInstructions: [], swapInstruction: ix }), buildInput);
+  const wire = assembleJupiterBuildTransaction(normalized, wallet);
+  const transaction = getTransactionDecoder().decode(Buffer.from(wire, "base64"));
+  const message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
+  assert.equal(message.version, 0);
+  assert.equal(message.staticAccounts[0], wallet);
+  assert.equal(message.header.numSignerAccounts, 1);
+  assert.equal(transaction.signatures[address(wallet)], null);
+});
 
 test("normalizes a current V2 order and preserves validity fields", () => {
   const normalized = normalizeJupiterOrder(order(), expected);

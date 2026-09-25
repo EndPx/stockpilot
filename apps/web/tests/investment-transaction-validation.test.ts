@@ -346,6 +346,58 @@ test("decodes shared-account exact-in route and rejects hidden platform fees", (
   assert.throws(() => parseSupportedJupiterRoute(changed, prepared()), TransactionValidationError);
 });
 
+test("route_v2 admits only one known direct CLMM or DLMM leg with exact economics", () => {
+  const account = (value: string, writable = false, signer = false) => ({ address: value, writable, signer });
+  const make = (variant: 40 | 75, payloadBytes: number) => {
+    const data = new Uint8Array(39 + payloadBytes);
+    data.set(createHash("sha256").update("global:route_v2").digest().subarray(0, 8));
+    const view = new DataView(data.buffer);
+    view.setBigUint64(8, 50_000_000n, true);
+    view.setBigUint64(16, 125_000_000n, true);
+    view.setUint16(24, 100, true);
+    view.setUint32(30, 1, true);
+    data[34] = variant;
+    view.setUint16(35 + payloadBytes, 10_000, true);
+    data[37 + payloadBytes] = 0;
+    data[38 + payloadBytes] = 1;
+    const dex = variant === 40
+      ? "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+      : "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo";
+    const inspection: PreparedTransactionInspection = {
+      feePayer: wallet, allAddresses: [], writableAddresses: [], lookupTableAddresses: [],
+      instructions: [{ programAddress: jupiterV6, data, accounts: [
+        account(wallet, false, true), account(attacker, true), account(destination, true),
+        account(inputMint), account(outputMint), account(SPL_TOKEN_PROGRAM_ADDRESS),
+        account(TOKEN_2022_PROGRAM_ADDRESS), account(jupiterV6), account(jupiterV6),
+        account(jupiterV6), account(dex),
+      ] }],
+    };
+    return inspection;
+  };
+  for (const [variant, payload] of [[40, 0], [75, 4]] as const) {
+    const inspection = make(variant, payload);
+    assert.deepEqual(parseSupportedJupiterRoute(inspection, prepared()), {
+      swapInstructionIndex: 0, ataCreateInstructionIndex: null,
+      sourceTokenAccount: attacker, destinationTokenAccount: destination,
+      maximumInputRaw: "50000000", minimumOutputRaw: "123750000", variant: "route_v2",
+    });
+    for (const mutate of [
+      (data: Uint8Array) => { data[24] = 200; },
+      (data: Uint8Array) => { data[26] = 1; },
+      (data: Uint8Array) => { data[34] = 99; },
+      (data: Uint8Array) => { data[35 + payload] = 0; },
+    ]) {
+      const data = Uint8Array.from(inspection.instructions[0].data);
+      mutate(data);
+      assert.throws(() => parseSupportedJupiterRoute({ ...inspection,
+        instructions: [{ ...inspection.instructions[0], data }] }, prepared()), TransactionValidationError);
+    }
+    const extraSystemProgram = { ...inspection, instructions: [{ ...inspection.instructions[0],
+      accounts: [...inspection.instructions[0].accounts, account(program)] }] };
+    assert.throws(() => parseSupportedJupiterRoute(extraSystemProgram, prepared()), TransactionValidationError);
+  }
+});
+
 test("rejects unknown Jupiter layout, trailing payload, excess slippage and wrong wallet authority", () => {
   const invalidPayload = new Uint8Array([...supportedRouteData(), 0]);
   const highSlippage = supportedRouteData(101);
@@ -445,4 +497,127 @@ test("ATA rent and fee are combined into one native wallet debit limit", async (
     maximumAdditionalNativeDebitLamports: "9999999",
     verifyInstructionEffects: async () => proof({ otherNativeDebitLamports: "10000000" }),
   }));
+});
+
+test("Polymarket SELL includes its transfer fee inside exact input only on the decoded Meteora route", async () => {
+  const polymarket = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
+  const meteora = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo";
+  const seller: PreparedManualSell = {
+    assetId: `prestocks:${polymarket}`, provider: "prestocks", principalId: "test-principal", walletAddress: wallet,
+    inputMint: polymarket, outputMint: inputMint, inputRaw: "100001", inputDecimals: 9,
+    inputUnits: "RAW_TOKEN_BASE_UNITS", quotedUsdcOutRaw: "9999", requiredMinimumUsdcOutRaw: "9899",
+    router: "Meteora DLMM", mode: "manual", feeBps: 0, feeMint: null, priceImpactPct: "0",
+    transaction: wire(), requestId: "fee-sell-test", lastValidBlockHeight: "100",
+    expiresAt: new Date(Date.now() + 15_000).toISOString(), transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION",
+  };
+  const originalFetch = globalThis.fetch;
+  let feeRate = 300;
+  let activeTrade: PreparedManualSell = seller;
+  const account = (value: string, writable = false, signer = false) => ({ address: value, writable, signer });
+  const makeInspection = (dex = meteora): PreparedTransactionInspection => {
+    const isMeteora = dex === meteora;
+    const data = new Uint8Array(isMeteora ? 43 : 39);
+    data.set(createHash("sha256").update("global:route_v2").digest().subarray(0, 8));
+    const view = new DataView(data.buffer);
+    view.setBigUint64(8, BigInt(activeTrade.inputRaw), true);
+    view.setBigUint64(16, BigInt(activeTrade.quotedUsdcOutRaw), true);
+    view.setUint16(24, 100, true);
+    view.setUint32(30, 1, true);
+    data[34] = isMeteora ? 75 : 40;
+    view.setUint16(isMeteora ? 39 : 35, 10_000, true);
+    data[isMeteora ? 42 : 38] = 1;
+    return {
+      feePayer: wallet, allAddresses: [], writableAddresses: [wallet, attacker, destination], lookupTableAddresses: [],
+      instructions: [{ programAddress: jupiterV6, data, accounts: [
+        account(wallet, false, true), account(attacker, true), account(destination, true),
+        account(activeTrade.inputMint), account(activeTrade.outputMint), account(TOKEN_2022_PROGRAM_ADDRESS),
+        account(SPL_TOKEN_PROGRAM_ADDRESS), account(jupiterV6), account(jupiterV6), account(jupiterV6), account(dex),
+      ] }],
+    };
+  };
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(String(init?.body)) as { id: string; method: string; params: [string[]] };
+    assert.equal(request.method, "getMultipleAccounts");
+    const value = request.params[0].map((key) => {
+      const isMint = key === activeTrade.inputMint || key === activeTrade.outputMint;
+      const isInput = key === activeTrade.inputMint || key === attacker;
+      const owner = isInput ? TOKEN_2022_PROGRAM_ADDRESS : SPL_TOKEN_PROGRAM_ADDRESS;
+      return { owner, executable: false, lamports: 2_000_000, rentEpoch: 0,
+        data: { program: isInput ? "spl-token-2022" : "spl-token", space: 165, parsed: {
+          type: isMint ? "mint" : "account",
+          info: isMint ? {
+            isInitialized: true, decimals: isInput ? 9 : 6,
+            ...(isInput ? { extensions: [{ extension: "transferFeeConfig", state: {
+              olderTransferFee: { transferFeeBasisPoints: feeRate }, newerTransferFee: { transferFeeBasisPoints: feeRate },
+            } }] } : {}),
+          } : { owner: wallet, mint: isInput ? activeTrade.inputMint : activeTrade.outputMint,
+            state: "initialized", isNative: false, tokenAmount: { amount: "100001", decimals: isInput ? 9 : 6 } },
+        } } };
+    });
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { context: { slot: 1 }, value } }),
+      { headers: { "content-type": "application/json" } });
+  };
+  try {
+    const rules = createManualTradeValidationPolicy(seller);
+    const inspection = makeInspection();
+    await rules.verifyWritableAccounts!(inspection, seller);
+    const effects = await rules.verifyInstructionEffects!(inspection, seller, "5000");
+    assert.equal(effects.maximumInputRaw, "100001", "fee must not be added to gross input");
+    assert.deepEqual(effects.tokenFees, []);
+    assert.equal(effects.guaranteedMinimumOutputRaw, "9899");
+
+    feeRate = 301;
+    await assert.rejects(rules.verifyWritableAccounts!(makeInspection(), seller), TransactionValidationError);
+    feeRate = 300;
+    await assert.rejects(rules.verifyWritableAccounts!(makeInspection("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"), seller), TransactionValidationError);
+    activeTrade = { ...seller, inputMint: outputMint };
+    await assert.rejects(createManualTradeValidationPolicy(activeTrade).verifyWritableAccounts!(makeInspection(), activeTrade), TransactionValidationError);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("output transfer fee rounds up before authorizing the minimum received", async () => {
+  const polymarket = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
+  const buy = { ...prepared(), outputAmountRaw: "101", asset: { symbol: "POLYMARKET", name: "Polymarket", mintAddress: polymarket } };
+  const base = routeInspection({ data: supportedRouteData(100, 50_000_000n, 101n) });
+  // Use route_v2 so the destination is explicitly the Token-2022 program.
+  const data = new Uint8Array(43);
+  data.set(createHash("sha256").update("global:route_v2").digest().subarray(0, 8));
+  const view = new DataView(data.buffer);
+  view.setBigUint64(8, 50_000_000n, true); view.setBigUint64(16, 101n, true);
+  view.setUint16(24, 100, true); view.setUint32(30, 1, true); data[34] = 75;
+  view.setUint16(39, 10_000, true); data[42] = 1;
+  const account = (value: string, writable = false, signer = false) => ({ address: value, writable, signer });
+  const inspection = { ...base, instructions: [{ programAddress: jupiterV6, data, accounts: [
+    account(wallet, false, true), account(attacker, true), account(destination, true),
+    account(inputMint), account(polymarket), account(SPL_TOKEN_PROGRAM_ADDRESS), account(TOKEN_2022_PROGRAM_ADDRESS),
+    account(jupiterV6), account(jupiterV6), account(jupiterV6), account("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"),
+  ] }] };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(String(init?.body)) as { id: string; params: [string[]] };
+    const value = request.params[0].map((key) => {
+      const mint = key === inputMint || key === polymarket;
+      const output = key === polymarket || key === destination;
+      return { owner: output ? TOKEN_2022_PROGRAM_ADDRESS : SPL_TOKEN_PROGRAM_ADDRESS, executable: false,
+        lamports: 2_000_000, rentEpoch: 0, data: { parsed: { type: mint ? "mint" : "account", info: mint
+          ? { isInitialized: true, decimals: output ? 9 : 6, ...(output ? { extensions: [
+            { extension: "transferFeeConfig", state: { olderTransferFee: { transferFeeBasisPoints: 300 },
+              newerTransferFee: { transferFeeBasisPoints: 300 } } },
+          ] } : {}) }
+          : { owner: wallet, mint: output ? polymarket : inputMint, state: "initialized", isNative: false,
+            tokenAmount: { amount: "50000000" } } } } };
+    });
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { context: { slot: 1 }, value } }),
+      { headers: { "content-type": "application/json" } });
+  };
+  try {
+    const rules = createManualTradeValidationPolicy(buy);
+    await rules.verifyWritableAccounts!(inspection, buy);
+    const effects = await rules.verifyInstructionEffects!(inspection, buy, "5000");
+    // Gross floor is 99, the 2.97-unit transfer fee rounds UP to 3.
+    assert.equal(effects.guaranteedMinimumOutputRaw, "96");
+    assert.equal(rules.minimumOutputRaw, "96");
+  } finally { globalThis.fetch = originalFetch; }
 });

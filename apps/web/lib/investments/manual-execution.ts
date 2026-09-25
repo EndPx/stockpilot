@@ -1,10 +1,10 @@
 import "server-only";
 
-import type { JupiterExecutionResult } from "@stockpilot/integrations/jupiter-v2";
 import {
   claimManualBuyExecution,
   markManualBuySubmitted,
   markManualBuyUncertain,
+  markManualTradeRejected,
   reconcileManualBuyExecution,
   type ManualBuyExecutionKey,
   type ManualBuyExecutionRecord,
@@ -22,6 +22,7 @@ import { reconcileManualBuyOnChain } from "./reconciliation";
 export type ManualBuyOutcome =
   | { status: "PENDING"; requestId: string; signature: string; side?: "BUY" | "SELL" }
   | { status: "FAILED"; requestId: string; signature: string; side?: "BUY" | "SELL" }
+  | { status: "REJECTED"; requestId: string; signature: string; side?: "BUY" | "SELL" }
   | { status: "CONFIRMED"; requestId: string; signature: string; side?: "BUY" | "SELL"; actualInputAmountRaw: string; actualOutputAmountRaw: string };
 
 export type ManualBuyInput = {
@@ -40,6 +41,7 @@ type Dependencies = {
   claim: typeof claimManualBuyExecution;
   markSubmitted: typeof markManualBuySubmitted;
   markUncertain: typeof markManualBuyUncertain;
+  markRejected: typeof markManualTradeRejected;
   settle: typeof reconcileManualBuyExecution;
   readChain: typeof reconcileManualBuyOnChain;
   execute: typeof executeInvestment;
@@ -53,6 +55,7 @@ const defaults: Dependencies = {
   claim: claimManualBuyExecution,
   markSubmitted: markManualBuySubmitted,
   markUncertain: markManualBuyUncertain,
+  markRejected: markManualTradeRejected,
   settle: reconcileManualBuyExecution,
   readChain: reconcileManualBuyOnChain,
   execute: executeInvestment,
@@ -62,6 +65,7 @@ function terminal(record: ManualBuyExecutionRecord): ManualBuyOutcome | null {
   const common = { requestId: record.providerRequestId, signature: record.transactionSignature,
     ...(record.side === "SELL" ? { side: "SELL" as const } : {}) };
   if (record.status === "FAILED") return { status: "FAILED", ...common };
+  if (record.status === "REJECTED") return { status: "REJECTED", ...common };
   if (record.status === "CONFIRMED" && record.actualInputAmountRaw && record.actualOutputAmountRaw) {
     return { status: "CONFIRMED", ...common,
       actualInputAmountRaw: record.actualInputAmountRaw,
@@ -113,7 +117,7 @@ export async function executeManualBuyOnce(input: ManualBuyInput,
   if (previous) return previous;
 
   if (claim.claimed) {
-    let providerResult: JupiterExecutionResult | undefined;
+    let providerResult: Awaited<ReturnType<typeof executeInvestment>> | undefined;
     try {
       providerResult = await deps.execute({
         signedTransaction: input.signedTransaction,
@@ -124,7 +128,10 @@ export async function executeManualBuyOnce(input: ManualBuyInput,
       // A timeout or dropped response can still mean the provider received the wire bytes.
     }
     try {
-      if (providerResult?.status === "Success" && providerResult.signature === signature) {
+      if (providerResult?.status === "Rejected") {
+        const result = terminal(await deps.markRejected(key));
+        if (result) return result;
+      } else if (providerResult?.status === "Success" && providerResult.signature === signature) {
         await deps.markSubmitted(key);
       } else {
         await deps.markUncertain(key);

@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyInvestmentApprovalError, runInvestmentApproval } from "../lib/investments/client";
+import { classifyInvestmentApprovalError, InvestmentClientError, readInvestmentApiResponse, runInvestmentApproval } from "../lib/investments/client";
 import type { InvestmentExecutionResponse, PreparedInvestmentResponse } from "../lib/investments/types";
 
 const wallet = "wallet-one";
+
+test("client only accepts an explicit not-submitted marker; generic errors stay ambiguous", async () => {
+  for (const marker of [undefined, "UNKNOWN", "NOT_SUBMITTED"]) {
+    await assert.rejects(readInvestmentApiResponse(new Response(JSON.stringify({ error: {
+      code: "INVESTMENT_TOKEN_EXPIRED", message: "Expired", submissionStatus: marker,
+    } }), { status: 409 })), (error: unknown) => error instanceof InvestmentClientError &&
+      error.submissionStatus === (marker === "NOT_SUBMITTED" ? "NOT_SUBMITTED" : undefined));
+  }
+});
 const prepared: PreparedInvestmentResponse = {
   investment: {
     walletAddress: wallet,

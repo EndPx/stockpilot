@@ -76,7 +76,7 @@ export async function readManualBuyStatus(
     record.providerRequestId !== key.providerRequestId) {
     throw new Error("Manual trade owner binding mismatch.");
   }
-  if (record.status === "CONFIRMED" || record.status === "FAILED") return view(record);
+  if (record.status === "CONFIRMED" || record.status === "FAILED" || record.status === "REJECTED") return view(record);
 
   let chain: ManualBuyReconciliation;
   try {

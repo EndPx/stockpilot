@@ -85,6 +85,8 @@ test("absent or terminal owner records cause no chain read and no resubmission",
   deps.getExecution = async () => ({ ...record, status: "CONFIRMED", actualInputAmountRaw: "1000000",
     actualOutputAmountRaw: "150000", actualWalletNativeDebitLamportsRaw: "100000" });
   assert.equal((await readManualBuyStatus(owner, record.providerRequestId, deps))?.status, "CONFIRMED");
+  deps.getExecution = async () => ({ ...record, status: "REJECTED" });
+  assert.equal((await readManualBuyStatus(owner, record.providerRequestId, deps))?.status, "REJECTED");
   assert.equal(calls, 0);
 });
 

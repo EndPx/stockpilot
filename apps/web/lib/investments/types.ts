@@ -53,7 +53,7 @@ export type PreparedInvestmentResponse = {
 
 export type InvestmentExecutionResponse = {
   execution: {
-    status: "PENDING" | "CONFIRMED" | "FAILED";
+    status: "PENDING" | "CONFIRMED" | "FAILED" | "REJECTED";
     side: "BUY" | "SELL";
     providerRequestId: string;
     transactionSignature: string;
@@ -65,8 +65,8 @@ export type InvestmentExecutionResponse = {
 
 export type ManualInvestmentStatusResponse = {
   execution: {
-    status: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REVIEW_REQUIRED";
-    ledgerStatus: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED";
+    status: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REJECTED" | "REVIEW_REQUIRED";
+    ledgerStatus: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REJECTED";
     side?: "BUY" | "SELL";
     providerRequestId: string;
     transactionSignature: string;

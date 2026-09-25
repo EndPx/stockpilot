@@ -3,7 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useSignTransaction, useWallets } from "@privy-io/react-auth/solana";
 import { useEffect, useState } from "react";
-import { InvestmentEligibilityNotice, InvestmentForm } from "@/components/investment-panel";
+import { DemoTradeForm } from "@/components/demo-trade-form";
 import { selectSessionWallet, signWithPrivyWallet } from "@/lib/investments/privy-wallet";
 import { exchangePrivySession } from "@/lib/privy/client-session";
 
@@ -12,7 +12,7 @@ type SessionState =
   | { kind: "ready"; userId: string; walletAddress: string }
   | { kind: "error"; userId: string };
 
-export function PrivyInvestmentPanel({ asset }: { asset: { symbol: string; name: string } }) {
+export function PrivyInvestmentPanel({ asset }: { asset: { symbol: string; name: string; mintAddress: string; provider: "prestocks" | "xstocks" } }) {
   const { ready: privyReady, authenticated, user, getAccessToken } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
   const { signTransaction } = useSignTransaction();
@@ -38,28 +38,22 @@ export function PrivyInvestmentPanel({ asset }: { asset: { symbol: string; name:
     : null;
 
   return (
-    <aside className="surface investment-panel" aria-labelledby="investment-heading">
-      <p className="text-xs font-semibold uppercase tracking-widest text-accent">Invest</p>
-      <h2 id="investment-heading" className="mt-2 text-xl font-semibold">Buy {asset.symbol}</h2>
-      <p className="mt-2 text-sm leading-6 text-muted">Invest USDC into this official PreStocks asset through Jupiter.</p>
-      <InvestmentEligibilityNotice market="pre-ipo" />
-      <div className="mt-6 border-t border-line pt-6">
+    <div>
         {privyReady && !authenticated ? (
-          <p role="alert" className="investment-error mt-0">Sign in to invest with your Privy wallet.</p>
+          <aside className="surface investment-panel"><p role="alert" className="investment-error mt-0">Sign in to trade with your Privy wallet.</p></aside>
         ) : !privyReady || currentSession.kind === "loading" || !walletsReady ? (
-          <p role="status" className="text-sm text-muted">Checking your Privy wallet…</p>
+          <aside className="surface investment-panel"><p role="status" className="text-sm text-muted">Checking your Privy wallet…</p></aside>
         ) : currentSession.kind === "error" ? (
-          <div><p role="alert" className="investment-error mt-0">We could not verify your StockPilot wallet session.</p>
+          <aside className="surface investment-panel"><p role="alert" className="investment-error mt-0">We could not verify your StockPilot wallet session.</p>
             <button type="button" className="secondary-button mt-4" onClick={() => { setSession({ kind: "loading" }); setRetry((value) => value + 1); }}>Try again</button>
-          </div>
+          </aside>
         ) : !wallet ? (
-          <p role="alert" className="investment-error mt-0">Your Privy wallet does not match the authenticated StockPilot session. Sign in again before investing.</p>
+          <aside className="surface investment-panel"><p role="alert" className="investment-error mt-0">Your Privy wallet does not match the authenticated StockPilot session. Sign in again before trading.</p></aside>
         ) : (
-          <InvestmentForm
+          <DemoTradeForm
             key={currentSession.walletAddress}
             asset={asset}
-            connectedWalletAddress={wallet.address}
-            sessionWalletAddress={currentSession.walletAddress}
+            walletAddress={currentSession.walletAddress}
             sign={(transaction) => signWithPrivyWallet({
               transaction,
               wallet,
@@ -72,7 +66,5 @@ export function PrivyInvestmentPanel({ asset }: { asset: { symbol: string; name:
           />
         )}
       </div>
-      <p className="mt-6 border-t border-line pt-5 text-xs leading-5 text-muted">You will review the executable estimate before Privy requests your signature. StockPilot never signs or retries automatically.</p>
-    </aside>
   );
 }

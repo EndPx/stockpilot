@@ -13,7 +13,12 @@ fail() {
 check_health() {
   health=$(curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3100/api/health) || fail 'local health endpoint failed; see rollback instructions'
   printf '%s\n' "$health" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' || fail 'health status is not ok'
-  printf '%s\n' "$health" | grep -Eq '"investmentsEnabled"[[:space:]]*:[[:space:]]*false' || fail 'trading unexpectedly enabled'
+  if grep -qx 'INVESTMENTS_ENABLED=true' "$runtime"; then
+    grep -Eq '^STOCKPILOT_DEMO_TRADER_WALLET=[1-9A-HJ-NP-Za-km-z]{32,44}$' "$runtime" || fail 'demo owner wallet is missing'
+    printf '%s\n' "$health" | grep -Eq '"investmentsEnabled"[[:space:]]*:[[:space:]]*true' || fail 'requested trading is not enabled'
+  else
+    printf '%s\n' "$health" | grep -Eq '"investmentsEnabled"[[:space:]]*:[[:space:]]*false' || fail 'trading unexpectedly enabled'
+  fi
   printf '%s\n' "$health" | grep -Eq '"agentExecutionEnabled"[[:space:]]*:[[:space:]]*false' || fail 'agent execution unexpectedly enabled'
 }
 

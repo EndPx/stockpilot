@@ -1,6 +1,13 @@
-import { isSignature } from "@solana/kit";
+import {
+  AccountRole, address, appendTransactionMessageInstructions, compileTransaction,
+  compressTransactionMessageUsingAddressLookupTables, createTransactionMessage,
+  getBase58Decoder, getTransactionEncoder, isSignature, pipe,
+  setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash,
+  type Address, type Blockhash, type Instruction,
+} from "@solana/kit";
 
 const JUPITER_API_URL = "https://api.jup.ag";
+const COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export type JupiterCreateOrderInput = {
@@ -9,6 +16,37 @@ export type JupiterCreateOrderInput = {
   amountRaw: string;
   taker: string;
 };
+
+export type JupiterBuildInput = JupiterCreateOrderInput & {
+  slippageBps: number;
+  /** Server-selected DEX label, never passed through from an untrusted client. */
+  directDex?: "Meteora DLMM" | "Raydium CLMM";
+};
+
+export type JupiterBuildInstruction = Readonly<{
+  programId: string;
+  accounts: readonly Readonly<{ pubkey: string; isSigner: boolean; isWritable: boolean }>[];
+  data: string;
+}>;
+
+export type JupiterBuild = Readonly<{
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  otherAmountThreshold: string;
+  priceImpactPct: string;
+  slippageBps: number;
+  routePlan: readonly Readonly<{ swapInfo: Readonly<{ label: string }> }>[];
+  computeBudgetInstructions: readonly JupiterBuildInstruction[];
+  setupInstructions: readonly JupiterBuildInstruction[];
+  swapInstruction: JupiterBuildInstruction;
+  cleanupInstruction: JupiterBuildInstruction | null;
+  otherInstructions: readonly JupiterBuildInstruction[];
+  tipInstruction: JupiterBuildInstruction | null;
+  addressesByLookupTableAddress: Readonly<Record<string, readonly string[]>>;
+  blockhashWithMetadata: Readonly<{ blockhash: readonly number[]; lastValidBlockHeight: number }>;
+}>;
 
 export type JupiterOrder = {
   requestId: string;
@@ -110,6 +148,136 @@ function providerCode(payload: Record<string, unknown>): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function buildInstruction(value: unknown): JupiterBuildInstruction {
+  const instruction = object(value);
+  const accounts = instruction?.accounts;
+  if (!instruction || typeof instruction.programId !== "string" || !instruction.programId ||
+      typeof instruction.data !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(instruction.data) ||
+      !Array.isArray(accounts) || accounts.length > 64) throw new JupiterOrderError("Jupiter returned an invalid build instruction.");
+  const canonical = Buffer.from(instruction.data, "base64");
+  if (canonical.toString("base64") !== instruction.data || canonical.length > 1_232) {
+    throw new JupiterOrderError("Jupiter returned an invalid build instruction.");
+  }
+  return {
+    programId: instruction.programId,
+    data: instruction.data,
+    accounts: accounts.map((item) => {
+      const account = object(item);
+      if (!account || typeof account.pubkey !== "string" || !account.pubkey ||
+          typeof account.isSigner !== "boolean" || typeof account.isWritable !== "boolean") {
+        throw new JupiterOrderError("Jupiter returned an invalid build account.");
+      }
+      return { pubkey: account.pubkey, isSigner: account.isSigner, isWritable: account.isWritable };
+    }),
+  };
+}
+
+/** Normalization only. A build is not executable until compiled and independently validated. */
+export function normalizeJupiterBuild(payload: unknown, expected: JupiterBuildInput): JupiterBuild {
+  const value = object(payload);
+  if (!value || value.inputMint !== expected.inputMint || value.outputMint !== expected.outputMint ||
+      value.inAmount !== expected.amountRaw || value.swapMode !== "ExactIn" ||
+      value.slippageBps !== expected.slippageBps || !Array.isArray(value.routePlan) ||
+      value.routePlan.length === 0 || value.routePlan.length > 8) {
+    throw new JupiterOrderError("Jupiter returned an invalid swap build.");
+  }
+  const output = rawAmount(value.outAmount, "outAmount");
+  const threshold = rawAmount(value.otherAmountThreshold, "otherAmountThreshold");
+  if (BigInt(output) === 0n || BigInt(threshold) === 0n || BigInt(threshold) > BigInt(output)) {
+    throw new JupiterOrderError("Jupiter returned an invalid swap threshold.");
+  }
+  if (typeof value.priceImpactPct !== "string" ||
+      !/^(?:0|[1-9]\d*)(?:\.\d{1,30})?$/.test(value.priceImpactPct) ||
+      Number(value.priceImpactPct) > 5) {
+    throw new JupiterOrderError("Jupiter returned excessive price impact.");
+  }
+  const blockhash = object(value.blockhashWithMetadata);
+  if (!blockhash || !Array.isArray(blockhash.blockhash) || blockhash.blockhash.length !== 32 ||
+      !blockhash.blockhash.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255) ||
+      !Number.isSafeInteger(blockhash.lastValidBlockHeight) || Number(blockhash.lastValidBlockHeight) <= 0) {
+    throw new JupiterOrderError("Jupiter returned an invalid swap blockhash.");
+  }
+  const lookups = value.addressesByLookupTableAddress === null ? {} : object(value.addressesByLookupTableAddress);
+  if (!lookups || Object.keys(lookups).length > 4 || Object.values(lookups).some((entries) =>
+    !Array.isArray(entries) || entries.length > 256 || entries.some((entry) => typeof entry !== "string" || !entry))) {
+    throw new JupiterOrderError("Jupiter returned invalid address lookup tables.");
+  }
+  const list = (field: string): JupiterBuildInstruction[] => {
+    const items = value[field];
+    if (!Array.isArray(items) || items.length > 16) throw new JupiterOrderError("Jupiter returned invalid swap instructions.");
+    return items.map(buildInstruction);
+  };
+  const optional = (field: string) => value[field] == null ? null : buildInstruction(value[field]);
+  const routePlan = value.routePlan.map((step) => {
+    const info = object(object(step)?.swapInfo);
+    if (!info || typeof info.label !== "string" || !info.label) throw new JupiterOrderError("Jupiter returned an invalid route plan.");
+    return { swapInfo: { label: info.label } };
+  });
+  return {
+    inputMint: expected.inputMint, outputMint: expected.outputMint, inAmount: expected.amountRaw,
+    outAmount: output, otherAmountThreshold: threshold, slippageBps: expected.slippageBps,
+    priceImpactPct: value.priceImpactPct,
+    routePlan,
+    computeBudgetInstructions: list("computeBudgetInstructions"),
+    setupInstructions: list("setupInstructions"),
+    swapInstruction: buildInstruction(value.swapInstruction),
+    cleanupInstruction: optional("cleanupInstruction"),
+    otherInstructions: list("otherInstructions"),
+    tipInstruction: optional("tipInstruction"),
+    addressesByLookupTableAddress: lookups as Record<string, string[]>,
+    blockhashWithMetadata: {
+      blockhash: blockhash.blockhash as number[],
+      lastValidBlockHeight: blockhash.lastValidBlockHeight as number,
+    },
+  };
+}
+
+/** Compilation is not authorization. The resulting bytes still need owner-bound effect review. */
+export function assembleJupiterBuildTransaction(build: JupiterBuild, taker: string): string {
+  if (build.computeBudgetInstructions.some((item) => item.programId === COMPUTE_BUDGET_PROGRAM &&
+      Buffer.from(item.data, "base64")[0] === 2)) {
+    throw new JupiterOrderError("Jupiter unexpectedly supplied a compute-unit limit.");
+  }
+  const limit = new Uint8Array(5);
+  limit[0] = 2;
+  new DataView(limit.buffer).setUint32(1, 1_000_000, true);
+  const computeLimitInstruction: JupiterBuildInstruction = {
+    programId: COMPUTE_BUDGET_PROGRAM, accounts: [], data: Buffer.from(limit).toString("base64"),
+  };
+  const toInstruction = (item: JupiterBuildInstruction): Instruction => ({
+    programAddress: address(item.programId),
+    accounts: item.accounts.map((account) => ({
+      address: address(account.pubkey),
+      role: account.isSigner
+        ? account.isWritable ? AccountRole.WRITABLE_SIGNER : AccountRole.READONLY_SIGNER
+        : account.isWritable ? AccountRole.WRITABLE : AccountRole.READONLY,
+    })),
+    data: Uint8Array.from(Buffer.from(item.data, "base64")),
+  });
+  const instructions = [
+    computeLimitInstruction, ...build.computeBudgetInstructions, ...build.setupInstructions, build.swapInstruction,
+    ...(build.cleanupInstruction ? [build.cleanupInstruction] : []),
+    ...build.otherInstructions,
+    ...(build.tipInstruction ? [build.tipInstruction] : []),
+  ].map(toInstruction);
+  if (instructions.length === 0 || instructions.length > 32) throw new JupiterOrderError("Jupiter build has too many instructions.");
+  const lookups = Object.fromEntries(Object.entries(build.addressesByLookupTableAddress)
+    .map(([key, entries]) => [address(key), entries.map((entry) => address(entry))])) as Record<Address, Address[]>;
+  const blockhash = getBase58Decoder().decode(Uint8Array.from(build.blockhashWithMetadata.blockhash)) as Blockhash;
+  const compiled = pipe(
+    createTransactionMessage({ version: 0 }),
+    (message) => appendTransactionMessageInstructions(instructions, message),
+    (message) => compressTransactionMessageUsingAddressLookupTables(message, lookups),
+    (message) => setTransactionMessageFeePayer(address(taker), message),
+    (message) => setTransactionMessageLifetimeUsingBlockhash({ blockhash,
+      lastValidBlockHeight: BigInt(build.blockhashWithMetadata.lastValidBlockHeight) }, message),
+    (message) => compileTransaction(message),
+  );
+  const bytes = getTransactionEncoder().encode(compiled);
+  if (bytes.length > 1_232) throw new JupiterOrderError("Jupiter build exceeds the Solana transaction limit.");
+  return Buffer.from(bytes).toString("base64");
+}
+
 export function normalizeJupiterOrder(payload: unknown, expected: JupiterCreateOrderInput): JupiterOrder {
   const value = object(payload);
   if (!value) throw new JupiterOrderError();
@@ -194,6 +362,42 @@ export class JupiterV2Adapter implements JupiterExecutionAdapter {
     private readonly fetchImpl: Fetch = fetch,
     private readonly baseUrl = JUPITER_API_URL,
   ) {}
+
+  async build(input: JupiterBuildInput): Promise<JupiterBuild> {
+    if (!Number.isInteger(input.slippageBps) || input.slippageBps < 1 || input.slippageBps > 100) {
+      throw new JupiterOrderError("Invalid manual swap slippage.");
+    }
+    const url = new URL("/swap/v2/build", this.baseUrl);
+    url.searchParams.set("inputMint", input.inputMint);
+    url.searchParams.set("outputMint", input.outputMint);
+    url.searchParams.set("amount", input.amountRaw);
+    url.searchParams.set("taker", input.taker);
+    url.searchParams.set("slippageBps", String(input.slippageBps));
+    if (input.directDex) {
+      url.searchParams.set("dexes", input.directDex);
+      // A 30-account ceiling prevents Metis from splitting this tiny demo
+      // order across multiple pools, which the verifier intentionally rejects.
+      url.searchParams.set("maxAccounts", "30");
+    }
+    try {
+      const response = await this.fetchImpl(url, {
+        headers: { Accept: "application/json", ...(this.apiKey ? { "x-api-key": this.apiKey } : {}) },
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new JupiterOrderError("Jupiter could not build this swap.");
+      const build = normalizeJupiterBuild(await response.json(), input);
+      if (input.directDex && (build.routePlan.length !== 1 ||
+          build.routePlan[0].swapInfo.label !== input.directDex ||
+          build.cleanupInstruction || build.otherInstructions.length || build.tipInstruction)) {
+        throw new JupiterOrderError("Jupiter did not return the required direct route.");
+      }
+      return build;
+    } catch (cause) {
+      if (cause instanceof JupiterOrderError) throw cause;
+      throw new JupiterOrderError("Jupiter could not build this swap.", null, { cause });
+    }
+  }
 
   async createOrder(input: JupiterCreateOrderInput): Promise<JupiterOrder> {
     const url = new URL("/swap/v2/order", this.baseUrl);

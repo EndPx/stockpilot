@@ -4,6 +4,7 @@ export class InvestmentClientError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    readonly submissionStatus?: "NOT_SUBMITTED",
   ) {
     super(message);
     this.name = "InvestmentClientError";
@@ -42,11 +43,12 @@ export async function readInvestmentApiResponse<T>(response: Response): Promise<
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = body && typeof body === "object" && "error" in body
-      ? (body as { error?: { code?: unknown; message?: unknown } }).error
+      ? (body as { error?: { code?: unknown; message?: unknown; submissionStatus?: unknown } }).error
       : undefined;
     throw new InvestmentClientError(
       typeof error?.code === "string" ? error.code : "PROVIDER_UNAVAILABLE",
       typeof error?.message === "string" ? error.message : "StockPilot could not complete this investment.",
+      error?.submissionStatus === "NOT_SUBMITTED" ? "NOT_SUBMITTED" : undefined,
     );
   }
   return body as T;

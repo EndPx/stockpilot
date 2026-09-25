@@ -5,7 +5,7 @@ import { address } from "@solana/kit";
 import { SOLANA_MAINNET_USDC_MINT } from "@stockpilot/core/solana";
 import { controlStore, type ControlQuery, type ControlStore } from "./db";
 
-export type ManualBuyStatus = "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED";
+export type ManualBuyStatus = "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REJECTED";
 export type ManualTradeSide = "BUY" | "SELL";
 
 export type ManualBuyExecutionKey = {
@@ -328,6 +328,26 @@ export function markManualBuyUncertain(key: ManualBuyExecutionKey,
   return transition(key, "UNKNOWN", store);
 }
 
+/** Only the first submitter may record an explicit RPC preflight rejection. */
+export async function markManualTradeRejected(key: ManualBuyExecutionKey,
+  store: ControlStore = controlStore): Promise<ManualBuyExecutionRecord> {
+  const valid = validateKey(key);
+  return store.transaction(async (db) => {
+    const current = await lockedExecution(db, valid);
+    if (current.status === "REJECTED") return normalize(current);
+    if (current.status !== "CLAIMED" || current.submitted_at !== null) {
+      throw new ManualBuyLedgerError("INVALID_TRANSITION", "Only an unsubmitted claim can be rejected by preflight.");
+    }
+    const changed = await db.query<ExecutionRow>(
+      `UPDATE control_manual_investment_executions
+       SET status = 'REJECTED', resolved_at = now(), updated_at = now()
+       WHERE id = $1 RETURNING *`, [current.id],
+    );
+    await event(db, current.id, "REJECTED");
+    return normalize(changed.rows[0]);
+  });
+}
+
 /** Call only after authoritative chain reconciliation, never on a timeout alone. */
 export async function reconcileManualBuyExecution(input: ManualBuyExecutionKey & {
   outcome: "CONFIRMED" | "FAILED";
@@ -354,7 +374,7 @@ export async function reconcileManualBuyExecution(input: ManualBuyExecutionKey &
       }
       return normalize(current);
     }
-    if (current.status === "CONFIRMED" || current.status === "FAILED") {
+    if (current.status === "CONFIRMED" || current.status === "FAILED" || current.status === "REJECTED") {
       throw new ManualBuyLedgerError("INVALID_TRANSITION", "The BUY execution is already resolved.");
     }
     const changed = await db.query<ExecutionRow>(

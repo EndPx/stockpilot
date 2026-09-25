@@ -116,6 +116,37 @@ test("ambiguous provider response never triggers an automatic second submit", as
   assert.equal(unknown, true);
 });
 
+test("acknowledged RPC preflight rejection becomes terminal without a retry or chain failure", async () => {
+  let submits = 0;
+  let rejects = 0;
+  let saved = record();
+  const dependencies = {
+    async assertSigned() {}, signature: () => signature,
+    async claim() { return { claimed: submits === 0, record: saved }; },
+    async execute() { submits++; return { status: "Rejected" as const, code: -32002 as const }; },
+    async markRejected() { rejects++; saved = record("REJECTED"); return saved; },
+    async markUncertain() { throw new Error("definite rejection is not uncertain"); },
+    async readChain() { throw new Error("rejected before broadcast"); },
+    async settle() { throw new Error("no on-chain failure"); },
+  };
+  const result = await executeManualBuyOnce(input(), dependencies);
+  assert.deepEqual(result, { status: "REJECTED", requestId: "jupiter-order-one", signature });
+  assert.deepEqual(await executeManualBuyOnce(input(), dependencies), result);
+  assert.equal(submits, 1);
+  assert.equal(rejects, 1);
+});
+
+test("an unpersisted preflight rejection stays pending and cannot authorize resubmission", async () => {
+  const result = await executeManualBuyOnce(input(), {
+    async assertSigned() {}, signature: () => signature,
+    async claim() { return { claimed: true, record: record() }; },
+    async execute() { return { status: "Rejected", code: -32002 }; },
+    async markRejected() { throw new Error("database unavailable"); },
+    async readChain() { return { status: "PENDING" }; },
+  });
+  assert.equal(result.status, "PENDING");
+});
+
 test("only finalized chain output becomes a confirmed amount", async () => {
   const result = await executeManualBuyOnce(input(), {
     async assertSigned() {}, signature: () => signature,

@@ -34,11 +34,18 @@ const ASSOCIATED_TOKEN_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const MAX_MANUAL_SLIPPAGE_BPS = 100n;
 const MAX_MANUAL_NETWORK_FEE_LAMPORTS = 300_000n;
 const MAX_ATA_RENT_LAMPORTS = 10_000_000n;
+const MAX_TRANSFER_FEE_BPS = 300;
+const DEMO_PRESTOCKS_FEE_MINT = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
 const TOKEN_2022_DISPLAY_EXTENSIONS = new Set([
   "scaledUiAmountConfig", "metadataPointer", "tokenMetadata", "groupPointer", "groupMemberPointer",
+  "permanentDelegate", "defaultAccountState", "pausableConfig", "confidentialTransferMint",
+  "confidentialTransferFeeConfig", "transferHook", "transferFeeConfig",
 ]);
 const ROUTE_DISCRIMINATOR = createHash("sha256").update("global:route").digest().subarray(0, 8);
 const SHARED_ROUTE_DISCRIMINATOR = createHash("sha256").update("global:shared_accounts_route").digest().subarray(0, 8);
+const ROUTE_V2_DISCRIMINATOR = createHash("sha256").update("global:route_v2").digest().subarray(0, 8);
+const RAYDIUM_CLMM_V2_PROGRAM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
+const METEORA_DLMM_PROGRAM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo";
 
 export type PreparedTradeTransaction = PreparedInvestment | PreparedXStocksBuy | PreparedManualSell;
 
@@ -60,12 +67,13 @@ type TradeEconomics = Readonly<{
 function tradeEconomics(prepared: PreparedTradeTransaction): TradeEconomics {
   if ("fundingAsset" in prepared) {
     const quoted = rawU64(prepared.outputAmountRaw, "INVALID_TRANSACTION");
+    const minimumBps = prepared.asset.mintAddress === DEMO_PRESTOCKS_FEE_MINT ? 9_600n : 9_900n;
     return {
       walletAddress: prepared.walletAddress, requestId: prepared.requestId,
       inputMint: prepared.fundingAsset.mintAddress, outputMint: prepared.asset.mintAddress,
       inputAmountRaw: prepared.inputAmountRaw, outputAmountRaw: prepared.outputAmountRaw,
       inputDecimals: 6, outputDecimals: prepared.outputDecimals,
-      requiredMinimumOutputRaw: (quoted * (10_000n - MAX_MANUAL_SLIPPAGE_BPS) / 10_000n).toString(),
+      requiredMinimumOutputRaw: (quoted * minimumBps / 10_000n).toString(),
       feeBps: prepared.feeBps, feeMint: prepared.feeMint, transaction: prepared.transaction,
     };
   }
@@ -259,7 +267,7 @@ type ParsedJupiterRoute = Readonly<{
   destinationTokenAccount: string;
   maximumInputRaw: string;
   minimumOutputRaw: string;
-  variant: "route" | "shared_accounts_route";
+  variant: "route" | "shared_accounts_route" | "route_v2";
 }>;
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -337,9 +345,54 @@ export function parseSupportedJupiterRoute(inspection: PreparedTransactionInspec
     } else fail("UNAUTHORIZED_PROGRAM");
   }
   const data = instruction.data;
+  const routeV2 = data.length >= 39 && Buffer.from(data.subarray(0, 8)).equals(ROUTE_V2_DISCRIMINATOR);
   const shared = data.length >= 36 && Buffer.from(data.subarray(0, 8)).equals(SHARED_ROUTE_DISCRIMINATOR);
   const direct = data.length >= 35 && Buffer.from(data.subarray(0, 8)).equals(ROUTE_DISCRIMINATOR);
-  if (!shared && !direct) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+  if (!routeV2 && !shared && !direct) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+  if (routeV2) {
+    // Jupiter V6 route_v2 Borsh layout, restricted to exactly one reviewed
+    // Raydium CLMM V2 or Meteora DLMM Swap V2 leg. Never infer the venue from
+    // the provider's route label alone.
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const variant = data[34];
+    const meteora = variant === 75 && data.length === 43 && view.getUint32(35, true) === 0;
+    const raydium = variant === 40 && data.length === 39;
+    if ((!meteora && !raydium) || view.getUint16(24, true) > Number(MAX_MANUAL_SLIPPAGE_BPS) ||
+        view.getUint16(26, true) !== 0 || view.getUint16(28, true) !== 0 ||
+        view.getUint32(30, true) !== 1) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+    const stepOffset = meteora ? 39 : 35;
+    if (view.getUint16(stepOffset, true) !== 10_000 || data[stepOffset + 2] !== 0 ||
+        data[stepOffset + 3] !== 1) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+    const input = view.getBigUint64(8, true);
+    const output = view.getBigUint64(16, true);
+    if (!input || input !== rawU64(trade.inputAmountRaw, "INVALID_TRANSACTION") ||
+        !output || output !== rawU64(trade.outputAmountRaw, "INVALID_TRANSACTION")) {
+      fail("ECONOMIC_LIMIT_EXCEEDED");
+    }
+    const accounts = instruction.accounts;
+    const expectedDexProgram = meteora ? METEORA_DLMM_PROGRAM : RAYDIUM_CLMM_V2_PROGRAM;
+    if (accounts.length < 11 || accounts[0].address !== trade.walletAddress ||
+        !accounts[0].signer ||
+        !accounts[1].writable || !accounts[2].writable ||
+        accounts[3].address !== trade.inputMint || accounts[4].address !== trade.outputMint ||
+        ![SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS].includes(accounts[5].address) ||
+        ![SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS].includes(accounts[6].address) ||
+        accounts[7].address !== JUPITER_V6_PROGRAM || accounts[9].address !== JUPITER_V6_PROGRAM ||
+        accounts[10].address !== expectedDexProgram ||
+        accounts.some((entry) => entry.address === SYSTEM_PROGRAM)) fail("UNAUTHORIZED_ACCOUNT");
+    if (ataCreateInstructionIndex !== null) {
+      assertAtaCreateShape(inspection.instructions[ataCreateInstructionIndex], trade, accounts[2].address);
+    }
+    const minimum = output * (10_000n - BigInt(view.getUint16(24, true))) / 10_000n;
+    if (!minimum) fail("ECONOMIC_LIMIT_EXCEEDED");
+    return {
+      swapInstructionIndex, ataCreateInstructionIndex,
+      sourceTokenAccount: accounts[1].address,
+      destinationTokenAccount: accounts[2].address,
+      maximumInputRaw: input.toString(), minimumOutputRaw: minimum.toString(),
+      variant: "route_v2",
+    };
+  }
   const offset = shared ? 9 : 8;
   const expectedLength = shared ? 36 : 35;
   if (data.length !== expectedLength) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
@@ -405,7 +458,7 @@ function parsedTokenAccount(value: unknown): Record<string, unknown> | null {
   return record(parsed.info);
 }
 
-function assertMintWithoutTransferEffects(value: unknown, expectedDecimals?: number): string {
+function assertMintCompatibility(value: unknown, expectedDecimals?: number): { owner: string; transferFeeBps: number } {
   const account = record(value);
   const data = record(account?.data);
   const parsed = record(data?.parsed);
@@ -417,15 +470,33 @@ function assertMintWithoutTransferEffects(value: unknown, expectedDecimals?: num
     fail("TRANSACTION_SEMANTICS_UNVERIFIED");
   }
   const extensions = info.extensions;
+  let transferFeeBps = 0;
   if (account.owner === TOKEN_2022_PROGRAM_ADDRESS) {
     if (!Array.isArray(extensions) || extensions.some((extension) =>
       !TOKEN_2022_DISPLAY_EXTENSIONS.has(String(record(extension)?.extension)))) {
       fail("TRANSACTION_SEMANTICS_UNVERIFIED");
     }
+    for (const extension of extensions) {
+      const row = record(extension);
+      const state = record(row?.state);
+      if (row?.extension === "defaultAccountState" && state?.accountState !== "initialized" ||
+          row?.extension === "pausableConfig" && state?.paused !== false ||
+          row?.extension === "transferHook" && state?.programId !== null) {
+        fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+      }
+      if (row?.extension === "transferFeeConfig") {
+        const older = record(state?.olderTransferFee);
+        const newer = record(state?.newerTransferFee);
+        const rates = [older?.transferFeeBasisPoints, newer?.transferFeeBasisPoints];
+        if (rates.some((rate) => !Number.isInteger(rate) || Number(rate) < 0 ||
+            Number(rate) > MAX_TRANSFER_FEE_BPS)) fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+        transferFeeBps = Math.max(...rates.map(Number));
+      }
+    }
   } else if (extensions !== undefined && Array.isArray(extensions) && extensions.length > 0) {
     fail("TRANSACTION_SEMANTICS_UNVERIFIED");
   }
-  return String(account.owner);
+  return { owner: String(account.owner), transferFeeBps };
 }
 
 /**
@@ -442,7 +513,7 @@ export function createManualTradeValidationPolicy(prepared: PreparedTradeTransac
   if (minimumOutputRaw === "0") fail("ECONOMIC_LIMIT_EXCEEDED");
   const rpc = createSolanaRpc(mainnet(getSolanaRpcUrl()));
   const audited = new WeakMap<PreparedTransactionInspection, Readonly<{
-    route: ParsedJupiterRoute; maximumAtaRentLamports: bigint;
+    route: ParsedJupiterRoute; maximumAtaRentLamports: bigint; outputTransferFeeBps: number;
   }>>();
   return {
     allowedProgramIds: [COMPUTE_BUDGET_PROGRAM, ASSOCIATED_TOKEN_PROGRAM, JUPITER_V6_PROGRAM],
@@ -469,24 +540,30 @@ export function createManualTradeValidationPolicy(prepared: PreparedTradeTransac
       const accounts = new Map(keys.map((value, index) => [value, response.value[index]]));
       const source = accounts.get(route.sourceTokenAccount);
       const destination = accounts.get(route.destinationTokenAccount);
-      const inputMintOwner = assertMintWithoutTransferEffects(accounts.get(trade.inputMint), trade.inputDecimals);
-      const outputMintOwner = assertMintWithoutTransferEffects(accounts.get(trade.outputMint), trade.outputDecimals);
+      const inputMint = assertMintCompatibility(accounts.get(trade.inputMint), trade.inputDecimals);
+      const outputMint = assertMintCompatibility(accounts.get(trade.outputMint), trade.outputDecimals);
+      const inputMintOwner = inputMint.owner;
+      const outputMintOwner = outputMint.owner;
+      // Meteora swap2's amount_in is the gross wallet debit: its Token-2022
+      // transfer fee is subtracted before the pool swap, not added to that
+      // amount (MeteoraAg/dlmm-sdk, commons/src/quote.rs quote_exact_in).
+      // This exception is deliberately limited to the reviewed Polymarket
+      // mint and the decoded one-leg route_v2 Meteora swap. Unknown input-fee
+      // routes cannot claim the same debit semantics.
+      const swap = inspection.instructions[route.swapInstructionIndex];
+      if (inputMint.transferFeeBps !== 0 &&
+          (trade.inputMint !== DEMO_PRESTOCKS_FEE_MINT || route.variant !== "route_v2" ||
+           swap.accounts[10]?.address !== METEORA_DLMM_PROGRAM)) {
+        fail("TRANSACTION_SEMANTICS_UNVERIFIED");
+      }
       const sourceInfo = parsedTokenAccount(source);
       const destinationInfo = parsedTokenAccount(destination);
       if (route.ataCreateInstructionIndex !== null) {
         await verifyCanonicalAssociatedTokenAccountCreation(inspection.instructions[route.ataCreateInstructionIndex], candidate,
           route.destinationTokenAccount, outputMintOwner);
-        // The Associated Token Program asks the selected token program for the
-        // account size. The audited mint-extension allowlist requires no extra
-        // account extensions, so this is 165 bytes (legacy) or 170 (Token-2022
-        // with ImmutableOwner). Never authorize if today's rent exceeds the
-        // owner's independent 0.01 SOL ATA cap.
-        const size = outputMintOwner === TOKEN_2022_PROGRAM_ADDRESS ? 170n : 165n;
-        const rent = await rpc.getMinimumBalanceForRentExemption(size, { commitment: "confirmed" })
-          .send({ abortSignal: AbortSignal.timeout(10_000) });
-        if (typeof rent !== "bigint" || rent < 0n || rent > MAX_ATA_RENT_LAMPORTS) {
-          fail("ECONOMIC_LIMIT_EXCEEDED");
-        }
+        // Token-2022 account-extension size depends on the live mint. Keep a
+        // separate conservative 0.01 SOL owner-debit cap instead of assuming
+        // a fixed 170-byte ATA rent value.
       }
       if (!sourceInfo || destination === null && route.ataCreateInstructionIndex === null ||
           destination !== null && !destinationInfo) fail("UNAUTHORIZED_ACCOUNT");
@@ -501,9 +578,12 @@ export function createManualTradeValidationPolicy(prepared: PreparedTradeTransac
           destinationInfo.mint !== trade.outputMint || record(destination)?.owner !== outputMintOwner ||
           destinationInfo.state !== "initialized" || destinationInfo.isNative !== false ||
           destinationInfo.delegate != null)) fail("UNAUTHORIZED_ACCOUNT");
-      const swap = inspection.instructions[route.swapInstructionIndex];
       if (route.variant === "route" && (inputMintOwner !== SPL_TOKEN_PROGRAM_ADDRESS ||
           outputMintOwner !== SPL_TOKEN_PROGRAM_ADDRESS)) fail("UNAUTHORIZED_ACCOUNT");
+      if (route.variant === "route_v2" &&
+          (swap.accounts[5].address !== inputMintOwner || swap.accounts[6].address !== outputMintOwner)) {
+        fail("UNAUTHORIZED_ACCOUNT");
+      }
       if (route.variant === "shared_accounts_route" &&
           (inputMintOwner === TOKEN_2022_PROGRAM_ADDRESS || outputMintOwner === TOKEN_2022_PROGRAM_ADDRESS) &&
           swap.accounts[10]?.address !== TOKEN_2022_PROGRAM_ADDRESS) fail("UNAUTHORIZED_ACCOUNT");
@@ -522,6 +602,7 @@ export function createManualTradeValidationPolicy(prepared: PreparedTradeTransac
       audited.set(inspection, {
         route,
         maximumAtaRentLamports: route.ataCreateInstructionIndex === null ? 0n : MAX_ATA_RENT_LAMPORTS,
+        outputTransferFeeBps: outputMint.transferFeeBps,
       });
     },
     async verifyInstructionEffects(inspection, candidate, verifiedNetworkFeeLamports) {
@@ -534,7 +615,11 @@ export function createManualTradeValidationPolicy(prepared: PreparedTradeTransac
         inputMint: trade.inputMint,
         outputMint: trade.outputMint,
         maximumInputRaw: checked.route.maximumInputRaw,
-        guaranteedMinimumOutputRaw: checked.route.minimumOutputRaw,
+        // floor(gross * (1 - rate)) is gross minus the rounded-up transfer
+        // fee, including the one-base-unit rounding boundary. Ignoring the
+        // configured maximum fee only makes this net output floor stricter.
+        guaranteedMinimumOutputRaw: (BigInt(checked.route.minimumOutputRaw) *
+          BigInt(10_000 - checked.outputTransferFeeBps) / 10_000n).toString(),
         maximumNetworkFeeLamports: verifiedNetworkFeeLamports,
         tokenFees: [], otherTokenDebits: [],
         otherNativeDebitLamports: checked.maximumAtaRentLamports.toString(),
@@ -645,7 +730,10 @@ export async function assertPreparedInvestmentTransaction(
     try { entries = await policy.resolveLookupTable!(lookup.lookupTableAddress); }
     catch { return fail("UNRESOLVED_LOOKUP_TABLE"); }
     if (!Array.isArray(entries) || entries.length === 0 || entries.length > 256) fail("UNRESOLVED_LOOKUP_TABLE");
-    const addresses = [...uniqueAddresses(entries, "UNRESOLVED_LOOKUP_TABLE")].map((value) => address(value));
+    // Solana ALT entries are indexed, not a set. Published tables may contain
+    // duplicate addresses at unused indices; only addresses actually selected
+    // by this message must be unique (checked in allAddresses below).
+    const addresses = entries.map((value) => validAddress(value, "UNRESOLVED_LOOKUP_TABLE"));
     const indices = [...lookup.writableIndexes, ...lookup.readonlyIndexes];
     if (!indices.length || new Set(indices).size !== indices.length || indices.some((index) => !Number.isInteger(index) || index < 0 || index >= addresses.length)) {
       fail("UNRESOLVED_LOOKUP_TABLE");

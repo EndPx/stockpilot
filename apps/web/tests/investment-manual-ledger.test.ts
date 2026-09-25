@@ -12,6 +12,7 @@ import {
   ManualBuyLedgerError,
   markManualBuySubmitted,
   markManualBuyUncertain,
+  markManualTradeRejected,
   reconcileManualBuyExecution,
   type ManualBuyClaimInput,
 } from "../lib/control-plane/manual-executions";
@@ -44,6 +45,46 @@ async function setup() {
   };
   return { db, store };
 }
+
+test("preflight rejection releases the owner lock but the original signature is permanently single-use", async () => {
+  const { db, store } = await setup();
+  try {
+    const input = claim();
+    const key = { accountId, walletAddress, providerRequestId: input.providerRequestId, transactionSignature: signature };
+    const first = await claimManualBuyExecution(input, store);
+    const rejected = await markManualTradeRejected(key, store);
+    assert.equal(rejected.status, "REJECTED");
+    assert.equal(rejected.submittedAt, null);
+    assert.ok(rejected.resolvedAt);
+    assert.equal((await markManualTradeRejected(key, store)).id, first.record.id);
+    assert.equal((await claimManualBuyExecution(input, store)).claimed, false);
+    assert.equal(await getUnresolvedManualExecution({ accountId, walletAddress }, store), null);
+    await assertNoUnresolvedManualExecution({ accountId, walletAddress }, store);
+    await assert.rejects(markManualBuySubmitted(key, store));
+    await assert.rejects(reconcileManualBuyExecution({ ...key, outcome: "FAILED" }, store));
+    await assert.rejects(db.query("UPDATE control_manual_investment_executions SET status = 'UNKNOWN', resolved_at = NULL WHERE id = $1", [first.record.id]));
+    await assert.rejects(claimManualBuyExecution(claim({ providerRequestId: "duplicate-signature" }), store),
+      (error: unknown) => error instanceof ManualBuyLedgerError && error.code === "IDEMPOTENCY_CONFLICT");
+    assert.equal((await claimManualBuyExecution(claim({ providerRequestId: "new-reviewed-trade", transactionSignature: "2".repeat(88) }), store)).claimed, true);
+    const events = await db.query<{ status: string }>("SELECT status FROM control_manual_execution_events WHERE execution_id = $1 ORDER BY created_at", [first.record.id]);
+    assert.deepEqual(events.rows.map((row) => row.status), ["CLAIMED", "REJECTED"]);
+  } finally { await db.close(); }
+});
+
+test("a submission with an ambiguous or accepted response cannot become a preflight rejection", async () => {
+  for (const state of ["UNKNOWN", "SUBMITTED"] as const) {
+    const { db, store } = await setup();
+    try {
+      const input = claim();
+      const key = { accountId, walletAddress, providerRequestId: input.providerRequestId, transactionSignature: signature };
+      await claimManualBuyExecution(input, store);
+      await (state === "UNKNOWN" ? markManualBuyUncertain(key, store) : markManualBuySubmitted(key, store));
+      await assert.rejects(markManualTradeRejected(key, store),
+        (error: unknown) => error instanceof ManualBuyLedgerError && error.code === "INVALID_TRANSITION");
+      assert.equal((await getManualBuyExecution(key, store))?.status, state);
+    } finally { await db.close(); }
+  }
+});
 
 test("manual BUY claim is durable, single-use, and bound to one exact transaction", async () => {
   const { db, store } = await setup();

@@ -39,7 +39,7 @@ export function AccessSummary({ policy, active = true }: { policy: Policy; activ
         <dl className="agent-policy-limits"><div><dt>Per request</dt><dd>{policy.maxInvestmentUsd === null ? "No request cap" : `${policy.maxInvestmentUsd} USDC`}</dd></div><div><dt>24-hour requests</dt><dd>{policy.dailyRequestLimitUsd === null ? "No request cap" : `${policy.dailyRequestLimitUsd} USDC`}</dd></div></dl></>
         : <p className="control-note">Investment requests are off. Automatic BUY and SELL are unavailable.</p>}
     </div>
-    <p className="agent-execution-boundary">This agent has no wallet-signing authority. StockPilot trading remains off.</p>
+    <p className="agent-execution-boundary">This agent has no wallet-signing authority. Manual trades require your signature in the app.</p>
   </div>;
 }
 
