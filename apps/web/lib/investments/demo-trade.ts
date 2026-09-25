@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { InvestmentAsset } from "@stockpilot/core/asset-registry";
-import { parseUsdcAmount, type PreparedInvestment } from "@stockpilot/core/investments";
+import type { PreparedInvestment } from "@stockpilot/core/investments";
 import type { PreparedManualSell } from "@stockpilot/core/manual-sell";
 import type { PreparedXStocksBuy } from "@stockpilot/core/xstocks-manual-buy";
 import { formatRawTokenAmount } from "@stockpilot/core/portfolio";
@@ -15,8 +15,6 @@ import { assertPreparedInvestmentTransaction, createManualTradeValidationPolicy 
 
 const PRESTOCKS_MINT = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
 const XSTOCKS_MINT = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
-const MAX_BUY_USDC_RAW = 100_000n;
-const MAX_SELL_USDC_OUT_RAW = 100_000n;
 const MAX_CATALOG_AGE_MS = 60_000;
 const MAX_QUOTE_MS = 60_000;
 const solana = createSolanaReadAdapter();
@@ -52,7 +50,8 @@ export function parseDemoTradeRequest(value: unknown): DemoTradeRequest {
   return row as DemoTradeRequest;
 }
 
-function rawTokenAmount(amount: string, decimals: number): bigint {
+/** Exact user-entered amount; balance and route checks apply separately. */
+export function parseDemoTradeAmount(amount: string, decimals: number): bigint {
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18 ||
       !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(amount)) throw new InvestmentApiError("INVALID_AMOUNT", 400);
   const [whole, fraction = ""] = amount.split(".");
@@ -83,7 +82,7 @@ export async function resolveDemoAsset(provider: DemoTradeRequest["provider"], m
   return asset;
 }
 
-/** Owner-only, two-asset, $0.10-capped demo. It never signs or sends a transaction. */
+/** Owner-only, two-asset manual trade. It never signs or sends a transaction. */
 export async function prepareDemoTrade(walletAddress: string, principalId: string, request: DemoTradeRequest) {
   if (!demoWalletAllowed(walletAddress) || !principalId) throw new InvestmentApiError("ASSET_NOT_ALLOWED", 403);
   const asset = await resolveDemoAsset(request.provider, request.mintAddress);
@@ -95,16 +94,13 @@ export async function prepareDemoTrade(walletAddress: string, principalId: strin
   let inputDecimals: number;
   let outputDecimals: number;
   if (request.side === "BUY") {
-    const amount = parseUsdcAmount(request.amount);
-    inputRaw = BigInt(amount.amountRaw);
-    if (inputRaw > MAX_BUY_USDC_RAW) throw new InvestmentApiError("INVALID_AMOUNT", 400,
-      "This demo limits each BUY to $0.10 USDC.");
+    inputRaw = parseDemoTradeAmount(request.amount, 6);
     inputMint = SOLANA_MAINNET_USDC_MINT;
     outputMint = asset.mintAddress;
     inputDecimals = 6;
     outputDecimals = decimals;
   } else {
-    inputRaw = rawTokenAmount(request.amount, decimals);
+    inputRaw = parseDemoTradeAmount(request.amount, decimals);
     inputMint = asset.mintAddress;
     outputMint = SOLANA_MAINNET_USDC_MINT;
     inputDecimals = decimals;
@@ -118,9 +114,6 @@ export async function prepareDemoTrade(walletAddress: string, principalId: strin
     inputMint, outputMint, amountRaw: inputRaw.toString(), taker: walletAddress,
     slippageBps: 100, directDex: dex,
   });
-  if (request.side === "SELL" && BigInt(build.outAmount) > MAX_SELL_USDC_OUT_RAW) {
-    throw new InvestmentApiError("INVALID_AMOUNT", 400, "This demo limits each SELL to approximately $0.10 USDC.");
-  }
   const transaction = assembleJupiterBuildTransaction(build, walletAddress);
   const requestId = `build:${createHash("sha256").update(transaction).digest("hex")}`;
   const now = Date.now();

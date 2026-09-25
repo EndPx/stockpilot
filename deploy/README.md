@@ -75,15 +75,17 @@ Set `AUTH_ENABLED=false` if the initial release should offer discovery only.
 `INVESTMENTS_ENABLED` defaults to `false` in Compose. The manual, owner-signed
 demo path requires an explicit `true` in the protected runtime file and a matching
 `STOCKPILOT_DEMO_TRADER_WALLET`. It supports only the reviewed Polymarket
-PreStocks and AAPLx mints, capped at $0.10 per BUY and approximately $0.10
-per SELL. It does not activate agent signing or automatic execution.
+PreStocks and AAPLx mints. The owner chooses the amount; exact balance,
+route, slippage, and signed-message checks still apply. The $0.10 amount is
+only the default test input, not an application cap. This does not activate
+agent signing or automatic execution.
 The control plane has no transaction signer or execution tool. Keep the Neon
 credentials and credential pepper stable across ordinary deployments.
 The WorkOS variables are server-only. A temporary Staging OAuth demo may set
 `AGENT_OAUTH_ENABLED=true` with the matching Staging issuer/key, but its key
 expires and Staging must not become the permanent customer-facing environment.
 WorkOS Production requires its own issuer and key; switching environments does
-not migrate OAuth users or agent grants. Keep trading disabled in either case.
+not migrate OAuth users or agent grants. OAuth never enables agent execution.
 For an existing VPS runtime file, run `sh deploy/init-control-plane.sh` once
 on that VPS; it appends only a missing pepper and prints no secrets. Add both
 Neon URLs separately to the same protected file before starting the new image.

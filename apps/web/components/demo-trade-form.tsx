@@ -204,7 +204,7 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
   return <aside className="surface investment-panel" aria-label={`Trade ${asset.symbol}`}>
     <p className="eyebrow">Manual trade · Solana</p>
     <h2 className="mt-2 text-xl font-semibold">Trade {asset.symbol}</h2>
-    <p className="mt-2 text-sm text-muted">Owner-signed demo orders, up to $0.10 per trade. Agent execution is separate.</p>
+    <p className="mt-2 text-sm text-muted">Choose your amount, review the quote, and sign with your wallet.</p>
     <InvestmentEligibilityNotice market={asset.provider === "prestocks" ? "pre-ipo" : "stocks"} />
     <div className="mt-5 grid grid-cols-2 gap-2">
       <button type="button" className={side === "BUY" ? "button" : "secondary-button"}
@@ -213,7 +213,7 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
         onClick={() => selectSide("SELL")}>Sell</button>
     </div>
     <label className="mt-5 block text-sm font-medium" htmlFor={`trade-amount-${asset.mintAddress}`}>
-      {side === "BUY" ? "USDC to spend (max $0.10)" : `${asset.symbol} to sell`}
+      {side === "BUY" ? "USDC to spend" : `${asset.symbol} to sell`}
     </label>
     <input id={`trade-amount-${asset.mintAddress}`} className="mt-2 w-full rounded-lg border border-line bg-transparent p-3"
       inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)}
@@ -236,12 +236,12 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
       onClick={() => void prepare()}>{recovering ? "Checking trade status…" : busy === "preparing" ? "Preparing quote…" : `Review ${side}`}</button>
     <p className="mt-4 text-xs leading-5 text-muted">No order is sent until you review and sign in Privy. A first BUY may create a token account and require extra SOL rent; 0.003 SOL may not cover both products. An unknown result is never retried automatically.</p>
     <dialog ref={dialogRef} className="wallet-dialog" aria-label="Review trade" onCancel={(event) => { if (busy) event.preventDefault(); }}>
-      {prepared && <div className="wallet-dialog-card">
+      {prepared && <div className="p-6">
         <p className="wallet-dialog-kicker">Review {prepared.review.side}</p>
         <h2 className="wallet-dialog-title">{prepared.review.name}</h2>
         <dl className="investment-review-list mt-6">
           <div><dt>You send</dt><dd>{prepared.review.inputAmount} {side === "BUY" ? "USDC" : asset.symbol}</dd></div>
-          <div><dt>Estimated receive</dt><dd>{prepared.review.estimatedOutputAmount} {side === "BUY" ? asset.symbol : "USDC"}</dd></div>
+          <div><dt>{side === "BUY" && asset.provider === "prestocks" ? "Quote before token transfer fee" : "Estimated receive"}</dt><dd>{prepared.review.estimatedOutputAmount} {side === "BUY" ? asset.symbol : "USDC"}</dd></div>
           <div><dt>Minimum receive</dt><dd>{prepared.review.minimumOutputAmount} {side === "BUY" ? asset.symbol : "USDC"}</dd></div>
           <div><dt>Route</dt><dd>{prepared.review.router}</dd></div>
           <div><dt>Price impact</dt><dd>{prepared.review.priceImpactPct}%</dd></div>

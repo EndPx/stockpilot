@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SOLANA_MAINNET_USDC_MINT } from "@stockpilot/core/solana";
-import { executeManualBuyOnce } from "../lib/investments/manual-execution";
+import { executeManualBuyOnce, ManualTradeNotSubmittedError } from "../lib/investments/manual-execution";
 import type { InvestmentAuthorization } from "../lib/investments/authorization";
 import type { ManualBuyExecutionRecord } from "../lib/control-plane/manual-executions";
 
@@ -38,6 +38,35 @@ function record(status: ManualBuyExecutionRecord["status"] = "CLAIMED"): ManualB
 
 const input = () => ({ accountId: "did:privy:owner", walletAddress: wallet,
   authorization: authorization(), signedTransaction: "synthetic-signed-wire" });
+
+test("pre-claim validation failures prove this invocation did not submit", async () => {
+  for (const failure of ["expired", "height", "signature"] as const) {
+    let claims = 0;
+    let submissions = 0;
+    const value = input();
+    if (failure === "expired") value.authorization.expiresAt = Date.now() - 1;
+    if (failure === "height") value.authorization.lastValidBlockHeight = "123";
+    await assert.rejects(executeManualBuyOnce(value, {
+      async blockHeight() { throw new Error("read RPC unavailable"); },
+      async assertSigned() { throw new Error("invalid signed message"); },
+      async claim() { claims++; throw new Error("must not claim"); },
+      async execute() { submissions++; throw new Error("must not submit"); },
+    }), ManualTradeNotSubmittedError);
+    assert.equal(claims, 0, failure);
+    assert.equal(submissions, 0, failure);
+  }
+});
+
+test("a failed database claim stays ambiguous and never receives a not-submitted marker", async () => {
+  const databaseFailure = new Error("response lost after possible commit");
+  let submissions = 0;
+  await assert.rejects(executeManualBuyOnce(input(), {
+    async assertSigned() {}, signature: () => signature,
+    async claim() { throw databaseFailure; },
+    async execute() { submissions++; throw new Error("must not submit"); },
+  }), (error: unknown) => error === databaseFailure && !(error instanceof ManualTradeNotSubmittedError));
+  assert.equal(submissions, 0);
+});
 
 test("one durable claim is the only path that sends a signed BUY to Jupiter", async () => {
   let claimed = false;

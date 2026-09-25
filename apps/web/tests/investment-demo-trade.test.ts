@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { demoTradeProductSupported, demoWalletAllowed, parseDemoTradeRequest } from "../lib/investments/demo-trade";
+import { demoTradeProductSupported, demoWalletAllowed, parseDemoTradeAmount, parseDemoTradeRequest } from "../lib/investments/demo-trade";
 
 const wallet = "6EuMFHPtiyoFtsBTy1hiJpNgupP7qkZfZm9ErQ58ipsC";
 const pre = "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP";
 const stock = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
+
+test("manual amounts are user-defined, not capped at the $0.10 test amount", () => {
+  assert.equal(parseDemoTradeAmount("0.1", 6), 100_000n);
+  assert.equal(parseDemoTradeAmount("1.25", 6), 1_250_000n);
+  assert.equal(parseDemoTradeAmount("1000", 6), 1_000_000_000n);
+  assert.equal(parseDemoTradeAmount("1.23456789", 8), 123_456_789n);
+  for (const invalid of ["0", "-1", "1e2", "NaN", "0.0000001", "18446744073709.551616"]) {
+    assert.throws(() => parseDemoTradeAmount(invalid, 6));
+  }
+});
 
 test("demo assets are exactly one Pre-IPO and one xStock mint", () => {
   assert.equal(demoTradeProductSupported("prestocks", pre), true);

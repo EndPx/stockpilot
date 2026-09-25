@@ -14,6 +14,7 @@ import {
   assertOrderStillValid,
   assertSignedInvestmentTransaction,
   signedInvestmentSignature,
+  InvestmentSecurityError,
   type InvestmentAuthorization,
 } from "./authorization";
 import { executeInvestment, getInvestmentBlockHeight } from "./service";
@@ -32,6 +33,14 @@ export type ManualBuyInput = {
   authorization: InvestmentAuthorization;
   signedTransaction: string;
 };
+
+/** Validation stopped this invocation before any durable claim or submission. */
+export class ManualTradeNotSubmittedError extends Error {
+  constructor(readonly reason: unknown) {
+    super(reason instanceof Error ? reason.message : "Trade validation failed before submission.");
+    this.name = "ManualTradeNotSubmittedError";
+  }
+}
 
 type Dependencies = {
   now: () => number;
@@ -83,23 +92,33 @@ export async function executeManualBuyOnce(input: ManualBuyInput,
   dependencies: Partial<Dependencies> = {}): Promise<ManualBuyOutcome> {
   const deps = { ...defaults, ...dependencies };
   const authorization = input.authorization;
-  if (!input.accountId || authorization.expiresAt <= deps.now()) {
-    throw new Error("Manual BUY authorization is unavailable or expired.");
+  let signature: string;
+  try {
+    if (!input.accountId) {
+      throw new InvestmentSecurityError("INVESTMENT_TOKEN_INVALID", "Manual trade authorization is unavailable.");
+    }
+    if (authorization.expiresAt <= deps.now()) {
+      throw new InvestmentSecurityError("INVESTMENT_TOKEN_EXPIRED", "The investment authorization expired. Prepare a new review.");
+    }
+    if (authorization.maximumWalletNativeDebitLamportsRaw === null || authorization.requiredMinimumOutputRaw === null) {
+      throw new Error("Manual BUY transaction-effect authorization is unavailable.");
+    }
+    assertAuthorizationWallet(authorization, input.walletAddress);
+    const currentBlockHeight = authorization.lastValidBlockHeight === null ? null : await deps.blockHeight();
+    assertOrderStillValid(authorization, currentBlockHeight, deps.now());
+    await deps.assertSigned(input.signedTransaction, input.walletAddress, authorization.messageFingerprint);
+    signature = deps.signature(input.signedTransaction, input.walletAddress);
+  } catch (error) {
+    throw new ManualTradeNotSubmittedError(error);
   }
-  if (authorization.maximumWalletNativeDebitLamportsRaw === null || authorization.requiredMinimumOutputRaw === null) {
-    throw new Error("Manual BUY transaction-effect authorization is unavailable.");
-  }
-  assertAuthorizationWallet(authorization, input.walletAddress);
-  const currentBlockHeight = authorization.lastValidBlockHeight === null ? null : await deps.blockHeight();
-  assertOrderStillValid(authorization, currentBlockHeight, deps.now());
-  await deps.assertSigned(input.signedTransaction, input.walletAddress, authorization.messageFingerprint);
-  const signature = deps.signature(input.signedTransaction, input.walletAddress);
   const key: ManualBuyExecutionKey = {
     accountId: input.accountId,
     walletAddress: input.walletAddress,
     providerRequestId: authorization.requestId,
     transactionSignature: signature,
   };
+  // Never wrap claim failures as not submitted: a lost database response may
+  // conceal a committed claim, including one also observed by a concurrent call.
   const claim = await deps.claim({
     ...key,
     side: authorization.side ?? "BUY",

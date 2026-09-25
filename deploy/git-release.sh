@@ -132,4 +132,13 @@ STOCKPILOT_IMAGE="$image" docker compose --project-name stockpilot --env-file "$
 running_image=$(docker inspect --type container stockpilot-app-1 --format '{{.Config.Image}}')
 [ "$running_image" = "$image" ] || fail 'running app image differs from requested release'
 check_health
+# Keep subsequent operator restarts on the verified image without exposing or
+# rewriting any unrelated secret. The previous image remains available above.
+next_runtime=$(mktemp /etc/stockpilot/runtime.image.XXXXXX)
+awk -v image="$image" '
+  !/^STOCKPILOT_IMAGE=/ { print }
+  END { print "STOCKPILOT_IMAGE=" image }
+' "$runtime" > "$next_runtime"
+chmod 600 "$next_runtime"
+mv "$next_runtime" "$runtime"
 printf 'StockPilot release %s is healthy. Previous release/image retained: %s / %s\n' "$target" "$previous_release" "$current_image"

@@ -4,7 +4,7 @@ import { assertAuthorizationWallet, readInvestmentAuthorization } from "@/lib/in
 import { assertInvestmentsEnabled } from "@/lib/investments/config";
 import { demoWalletAllowed, resolveDemoAsset } from "@/lib/investments/demo-trade";
 import { InvestmentApiError, investmentErrorResponse } from "@/lib/investments/errors";
-import { executeManualTradeOnce } from "@/lib/investments/manual-execution";
+import { executeManualTradeOnce, ManualTradeNotSubmittedError } from "@/lib/investments/manual-execution";
 import { parseExecuteRequest } from "@/lib/investments/request";
 import { readInvestmentSessionIdentity } from "@/lib/investments/session";
 
@@ -58,8 +58,9 @@ export function createDemoExecutePost(dependencies: Partial<Dependencies> = {}) 
         solscanUrl: `https://solscan.io/tx/${encodeURIComponent(outcome.signature)}`,
       } }, { status: outcome.status === "PENDING" ? 202 : 200 });
     } catch (error) {
-      const response = investmentErrorResponse(error);
-      if (submissionStarted) return response;
+      const validationStopped = error instanceof ManualTradeNotSubmittedError;
+      const response = investmentErrorResponse(validationStopped ? error.reason : error);
+      if (submissionStarted && !validationStopped) return response;
       const body = await response.json();
       return jsonResponse({ ...body, error: { ...body.error, submissionStatus: "NOT_SUBMITTED" } },
         { status: response.status });

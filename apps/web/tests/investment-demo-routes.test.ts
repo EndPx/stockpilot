@@ -220,6 +220,28 @@ test("demo execute reports not submitted only for failures before entering its d
   assert.equal(ambiguousBody.error.submissionStatus, undefined);
 });
 
+test("demo execute marks proven pre-claim failures but not a lost claim response", async () => {
+  for (const failure of ["expired", "height", "signature", "claim"] as const) {
+    let claimed = false;
+    let submitted = false;
+    const post = createDemoExecutePost({ readIdentity: identity,
+      readAuthorization: async () => authorization(failure === "expired" ? { expiresAt: Date.now() - 1 } : {}),
+      resolveAsset: async () => asset,
+      executeManual: async (value) => executeManualTradeOnce(value, {
+        blockHeight: async () => { if (failure === "height") throw new Error("RPC unavailable"); return 1n; },
+        assertSigned: async () => { if (failure === "signature") throw new Error("invalid signature"); },
+        signature: () => signature,
+        claim: async () => { claimed = true; throw new Error("database response lost"); },
+        execute: async () => { submitted = true; throw new Error("must not submit"); },
+      }) });
+    const response = await post(request(executeBody));
+    const body = await response.json() as { error: { submissionStatus?: string } };
+    assert.equal(body.error.submissionStatus, failure === "claim" ? undefined : "NOT_SUBMITTED", failure);
+    assert.equal(claimed, failure === "claim", failure);
+    assert.equal(submitted, false, failure);
+  }
+});
+
 test("demo execute binds wallet, build identifier, provider and current asset symbol before claiming", async () => {
   let submitted = false;
   for (const value of [authorization({ walletAddress: otherWallet }), authorization({ requestId: "ultra-order" }),

@@ -54,13 +54,13 @@ docker build --build-arg NEXT_PUBLIC_AUTH_PROVIDER=privy \
   export CONTROL_PLANE_DATABASE_URL
   docker run --rm --network stockpilot_egress --memory 384m --cpus 0.5 \
     --env CONTROL_PLANE_DATABASE_URL "$migration_image"
-  PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 PGDATABASE="$CONTROL_PLANE_MIGRATION_URL" \
-    psql -X -w -v ON_ERROR_STOP=1 -f "$release/deploy/grant-runtime-manual-trades.sql"
-  privileges=$(PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 PGDATABASE="$runtime_database" \
-    psql -X -w -Atqc "SELECT has_table_privilege(current_user, 'control_manual_investment_executions', 'SELECT') AND has_table_privilege(current_user, 'control_manual_investment_executions', 'INSERT') AND has_table_privilege(current_user, 'control_manual_investment_executions', 'UPDATE') AND has_table_privilege(current_user, 'control_manual_execution_events', 'SELECT') AND has_table_privilege(current_user, 'control_manual_execution_events', 'INSERT') AND NOT has_table_privilege(current_user, 'control_manual_investment_executions', 'DELETE') AND NOT has_table_privilege(current_user, 'control_manual_execution_events', 'UPDATE, DELETE')")
+  PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 \
+    psql -X -w --dbname="$CONTROL_PLANE_MIGRATION_URL" -v ON_ERROR_STOP=1 -f "$release/deploy/grant-runtime-manual-trades.sql"
+  privileges=$(PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 \
+    psql -X -w --dbname="$runtime_database" -Atqc "SELECT has_table_privilege(current_user, 'control_manual_investment_executions', 'SELECT') AND has_table_privilege(current_user, 'control_manual_investment_executions', 'INSERT') AND has_table_privilege(current_user, 'control_manual_investment_executions', 'UPDATE') AND has_table_privilege(current_user, 'control_manual_execution_events', 'SELECT') AND has_table_privilege(current_user, 'control_manual_execution_events', 'INSERT') AND NOT has_table_privilege(current_user, 'control_manual_investment_executions', 'DELETE') AND NOT has_table_privilege(current_user, 'control_manual_execution_events', 'UPDATE, DELETE')")
   [ "$privileges" = t ] || fail 'runtime ledger privileges differ from expected grants'
-  PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 PGDATABASE="$runtime_database" \
-    psql -X -w -Atqc 'SELECT count(*) AS existing_manual_trades FROM control_manual_investment_executions'
+  PGPORT=5432 PGSSLROOTCERT=system PGCONNECT_TIMEOUT=10 \
+    psql -X -w --dbname="$runtime_database" -Atqc 'SELECT count(*) AS existing_manual_trades FROM control_manual_investment_executions'
 )
 
 INVESTMENTS_ENABLED=true STOCKPILOT_DEMO_TRADER_WALLET="$wallet" STOCKPILOT_IMAGE="$image" \
