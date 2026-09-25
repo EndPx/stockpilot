@@ -33,7 +33,7 @@ test("USDC-positive empty investments presents available capital, not an unusabl
   const html = renderToStaticMarkup(createElement(PortfolioView, { portfolio: portfolio() }));
   assert.match(html, /Available to Invest/);
   assert.match(html, /\$200\.00/);
-  assert.match(html, /You don&#x27;t own any PreStocks yet/);
+  assert.match(html, /No canonical Stocks or Pre-IPO holdings found/);
   assert.match(html, /You&#x27;re ready to invest/);
   assert.match(html, /Explore Markets/);
   assert.doesNotMatch(html, /No portfolio/);

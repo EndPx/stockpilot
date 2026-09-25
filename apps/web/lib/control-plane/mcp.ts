@@ -2,15 +2,18 @@ import "server-only";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
+import { inspectMarketMint } from "@stockpilot/integrations/market-validation";
 import { getAuthRuntimeConfig } from "@/lib/auth/config";
 import { getPublicMarket, listMarkets, marketRegistry } from "@/lib/markets";
-import { getPortfolio } from "@/lib/portfolio";
+import { getBalance, getPortfolio } from "@/lib/portfolio";
 import { createInvestmentRequest, getClientRequest, listClientRequests, RequestError } from "./requests";
 import type { AgentPrincipal } from "./credentials";
 
 type Dependencies = {
   listAssets: typeof listMarkets;
   getAsset: (assetId: string) => Promise<{ asset: Awaited<ReturnType<typeof marketRegistry.getAssetById>>; stale: boolean }>;
+  inspectMint: typeof inspectMarketMint;
+  balance: typeof getBalance;
   portfolio: typeof getPortfolio;
   createRequest: typeof createInvestmentRequest;
   getRequest: typeof getClientRequest;
@@ -45,6 +48,8 @@ export async function resolveMcpAsset(assetId: string, readers: AssetReaders = {
 const defaults: Dependencies = {
   listAssets: listMarkets,
   getAsset: resolveMcpAsset,
+  inspectMint: inspectMarketMint,
+  balance: getBalance,
   portfolio: getPortfolio,
   createRequest: createInvestmentRequest,
   getRequest: getClientRequest,
@@ -74,6 +79,8 @@ function compactAsset(asset: Awaited<ReturnType<typeof marketRegistry.getAssetBy
     markPriceUsd: asset.markPriceUsd ?? null, executionStatus: asset.executionStatus,
     availability: asset.availability?.status ?? "REVIEW_REQUIRED",
     restrictionNote: asset.availability?.reason ?? "Catalog listing is not execution authorization.",
+    mintSource: "issuer_catalog", priceSource: "issuer_api",
+    executableQuote: false,
   };
 }
 
@@ -110,8 +117,60 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
       } catch (error) { return failure(error); }
     });
 
+    const marketListSchema = z.object({
+      query: z.string().max(100).optional(),
+      limit: z.number().int().min(1).max(50).optional(),
+      cursor: z.string().max(1600).optional(),
+    }).strict();
+    const marketTools = [
+      { provider: "xstocks", list: "list_stocks", get: "get_stock", label: "Stocks (xStocks)",
+        assetId: /^xstocks:[1-9A-HJ-NP-Za-km-z]{32,44}$/ },
+      { provider: "prestocks", list: "list_pre_ipo", get: "get_pre_ipo", label: "Pre-IPO (PreStocks)",
+        assetId: /^prestocks:[1-9A-HJ-NP-Za-km-z]{32,44}$/ },
+    ] as const;
+    for (const market of marketTools) {
+      server.registerTool(market.list, {
+        description: `Search ${market.label} in the official issuer catalog. Mint addresses are issuer-reported; USD token prices are cached indicative issuer API values, not on-chain contract prices or executable quotes.`,
+        inputSchema: marketListSchema,
+      }, async (input) => {
+        if (!can("markets:read")) return denied();
+        try {
+          const page = await deps.listAssets({ ...input, provider: market.provider, limit: input.limit ?? 25 });
+          if (page.assets.some((asset) => asset.provider !== market.provider)) throw new Error("Market provider mismatch.");
+          return result({ market: market.provider, assets: page.assets.map(compactAsset), nextCursor: page.nextCursor,
+            total: page.total, stale: page.stale, sources: page.sources });
+        } catch (error) { return failure(error); }
+      });
+
+      server.registerTool(market.get, {
+        description: `Inspect one ${market.label} issuer catalog entry by canonical assetId from ${market.list}. Set includeOnChainMint to read Solana mint account facts via confirmed RPC. Issuer USD price is not an on-chain price or trading quote.`,
+        inputSchema: z.object({ assetId: z.string().regex(market.assetId), includeOnChainMint: z.boolean().optional() }).strict(),
+      }, async ({ assetId, includeOnChainMint }) => {
+        if (!can("markets:read")) return denied();
+        try {
+          const selected = await deps.getAsset(assetId);
+          if (selected.asset && (selected.asset.provider !== market.provider || selected.asset.id !== assetId)) {
+            throw new Error("Market provider mismatch.");
+          }
+          const inspection = includeOnChainMint && selected.asset ? await deps.inspectMint(selected.asset.mintAddress) : null;
+          if (inspection && inspection.mint !== selected.asset?.mintAddress) throw new Error("Mint inspection identity mismatch.");
+          return result({ market: market.provider, asset: compactAsset(selected.asset), stale: selected.stale,
+            onChainMint: inspection ? { ...inspection, source: "solana_rpc", commitment: "confirmed" } : null });
+        } catch (error) { return failure(error); }
+      });
+    }
+
+    server.registerTool("get_balance", {
+      description: "Read confirmed Solana RPC balances of SOL and canonical mainnet USDC for the authenticated StockPilot wallet. This does not value other assets.",
+      inputSchema: z.object({}).strict(),
+    }, async () => {
+      if (!can("portfolio:read")) return denied();
+      try { return result(await deps.balance(principal.walletAddress)); }
+      catch (error) { return failure(error); }
+    });
+
     server.registerTool("get_portfolio", {
-      description: "Read the authenticated StockPilot account's verified Solana wallet balances and PreStocks positions.",
+      description: "Read confirmed Solana wallet holdings in canonical Pre-IPO and Stocks products. USD values, when available, use indicative issuer quotes; unknown xStocks display multipliers remain unvalued. No trade quote or PnL is implied.",
       inputSchema: z.object({}).strict(),
     }, async () => {
       if (!can("portfolio:read")) return denied();
@@ -119,7 +178,11 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
         const portfolio = await deps.portfolio(principal.walletAddress);
         return result({ asOf: portfolio.asOf, walletAddress: portfolio.walletAddress,
           availableUsdc: portfolio.funding.usdc.amount, networkSol: portfolio.funding.sol.amount,
-          privatePositions: portfolio.positions, publicPositionsSupported: false });
+          portfolioValueUsd: portfolio.portfolioValueUsd, positions: portfolio.positions,
+          privatePositions: portfolio.positions.filter((position) => position.provider === "prestocks"),
+          publicPositions: portfolio.positions.filter((position) => position.provider === "xstocks"),
+          unrecognizedTokenMintCount: portfolio.unrecognizedTokenMintCount ?? 0,
+          balanceSource: "solana_rpc", priceSource: "issuer_api", executableQuote: false });
       } catch (error) { return failure(error); }
     });
 

@@ -34,11 +34,25 @@ function fixture(scopes = principal.scopes) {
     listAssets: async () => ({ assets: [asset], total: 1, catalogTotal: 1, offset: 0,
       nextCursor: null, sources: [], stale: false }),
     getAsset: async () => ({ asset, stale: false }),
+    balance: async (wallet) => {
+      calls.push(`balance:${wallet}`);
+      return { walletAddress: wallet, funding: { usdc: { mintAddress: saved.fundingMint,
+        amount: "12", amountUsd: 12 }, sol: { amount: "0.5" } },
+      asOf: "2026-09-23T00:00:00.000Z", source: "solana_rpc", commitment: "confirmed" };
+    },
     portfolio: async (wallet) => {
       calls.push(`portfolio:${wallet}`);
       return { walletAddress: wallet, funding: { usdc: { mintAddress: saved.fundingMint,
         amount: "12", amountUsd: 12 }, sol: { amount: "0.5" } },
-        portfolioValueUsd: 0, positions: [], asOf: "2026-09-23T00:00:00.000Z" };
+        portfolioValueUsd: null, positions: [
+          { provider: "prestocks", assetId: asset.id, marketType: "PRE_IPO", symbol: asset.symbol,
+            name: asset.name, mintAddress: asset.mintAddress, quantity: "1", rawTokenAmount: "1000000",
+            decimals: 6, displayStatus: "RAW_DECIMALS", tokenPriceUsd: 100, estimatedValueUsd: 100, imageUrl: null },
+          { provider: "xstocks", assetId: `xstocks:${mint}`, marketType: "PUBLIC_MARKET_PRODUCT", symbol: "EXx",
+            name: "Example xStock", mintAddress: mint, quantity: null, rawTokenAmount: "1000000",
+            decimals: 6, displayStatus: "MULTIPLIER_UNVERIFIED", tokenPriceUsd: 123.45,
+            estimatedValueUsd: null, imageUrl: null },
+        ], asOf: "2026-09-23T00:00:00.000Z" };
     },
     createRequest: async (caller, input) => {
       calls.push(`request:${caller.accountId}:${caller.clientId}:${input.assetId}:${input.amountUsd}:${input.clientRequestId}`);
@@ -72,7 +86,7 @@ async function rpc(handler: ReturnType<typeof createStockPilotMcp>, method: stri
   return payload;
 }
 
-test("official MCP handler exposes only six non-execution tools", async () => {
+test("official MCP handler exposes provider-specific discovery alongside legacy tools", async () => {
   const { handler } = fixture();
   const initialized = await rpc(handler, "initialize", {
     protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "fixture", version: "1" },
@@ -80,7 +94,8 @@ test("official MCP handler exposes only six non-execution tools", async () => {
   assert.ok(initialized.result);
   const listed = await rpc(handler, "tools/list");
   assert.deepEqual(listed.result?.tools?.map((tool) => tool.name).sort(),
-    ["get_asset", "get_portfolio", "get_request", "list_assets", "list_requests", "request_investment"]);
+    ["get_asset", "get_balance", "get_portfolio", "get_pre_ipo", "get_request", "get_stock", "list_assets", "list_pre_ipo",
+      "list_requests", "list_stocks", "request_investment"]);
   await handler.close();
 });
 
@@ -112,13 +127,21 @@ test("MCP asset detail uses the public-market price reader and rejects mismatche
 test("MCP list and detail expose indicative prices for both market providers", async () => {
   const publicAsset: InvestmentAsset = { ...asset, id: `xstocks:${mint}`, provider: "xstocks",
     marketType: "PUBLIC_MARKET_PRODUCT", symbol: "EXx", tokenPriceUsd: 123.45, markPriceUsd: undefined };
+  const filters: (string | undefined)[] = [];
+  const inspected: string[] = [];
   const handler = createStockPilotMcp({ ...principal, scopes: ["markets:read"] }, {
     listAssets: async (filter) => {
+      filters.push(filter?.provider);
       const selected = filter?.provider === "xstocks" ? publicAsset : asset;
       return { assets: [selected], total: 1, catalogTotal: 1, offset: 0,
         nextCursor: null, sources: [], stale: false };
     },
     getAsset: async (assetId) => ({ asset: assetId === publicAsset.id ? publicAsset : asset, stale: false }),
+    inspectMint: async (mintAddress) => {
+      inspected.push(mintAddress);
+      return { mint: mintAddress, program: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", decimals: 6,
+        supplyRaw: "123456", mintAuthority: null, freezeAuthority: null, extensions: [] };
+    },
   });
   const call = async (name: string, args: object) => {
     const reply = await rpc(handler, "tools/call", { name, arguments: args });
@@ -133,6 +156,58 @@ test("MCP list and detail expose indicative prices for both market providers", a
   assert.equal(publicList.assets[0].tokenPriceUsd, 123.45);
   const detail = await call("get_asset", { assetId: publicAsset.id });
   assert.equal(detail.asset.tokenPriceUsd, 123.45);
+  const stocks = await call("list_stocks", { limit: 2 });
+  assert.equal(stocks.market, "xstocks");
+  assert.equal(stocks.assets[0].provider, "xstocks");
+  assert.equal(stocks.assets[0].canonicalMint, mint);
+  assert.equal(stocks.assets[0].tokenPriceUsd, 123.45);
+  assert.equal(stocks.assets[0].priceSource, "issuer_api");
+  assert.equal(stocks.assets[0].mintSource, "issuer_catalog");
+  assert.equal(stocks.assets[0].executableQuote, false);
+  const preIpo = await call("list_pre_ipo", { limit: 2 });
+  assert.equal(preIpo.market, "prestocks");
+  assert.equal(preIpo.assets[0].provider, "prestocks");
+  assert.equal(preIpo.assets[0].tokenPriceUsd, 100);
+  assert.equal((await call("get_stock", { assetId: publicAsset.id })).asset.tokenPriceUsd, 123.45);
+  assert.equal((await call("get_pre_ipo", { assetId: asset.id })).asset.tokenPriceUsd, 100);
+  const verifiedMint = await call("get_stock", { assetId: publicAsset.id, includeOnChainMint: true });
+  assert.equal(verifiedMint.onChainMint.mint, mint);
+  assert.equal(verifiedMint.onChainMint.supplyRaw, "123456");
+  assert.equal(verifiedMint.onChainMint.source, "solana_rpc");
+  assert.equal(verifiedMint.onChainMint.commitment, "confirmed");
+  assert.equal(verifiedMint.asset.priceSource, "issuer_api");
+  assert.deepEqual(inspected, [mint]);
+  assert.deepEqual(filters, ["prestocks", "xstocks", "xstocks", "prestocks"]);
+  const wrongProvider = await rpc(handler, "tools/call", { name: "get_stock", arguments: { assetId: asset.id } });
+  assert.equal(wrongProvider.result?.isError, true);
+  const providerOverride = await rpc(handler, "tools/call", { name: "list_stocks", arguments: { provider: "prestocks" } });
+  assert.equal(providerOverride.result?.isError, true);
+  await handler.close();
+});
+
+test("provider-specific MCP tools fail closed if a reader returns another provider", async () => {
+  const handler = createStockPilotMcp({ ...principal, scopes: ["markets:read"] }, {
+    listAssets: async () => ({ assets: [asset], total: 1, catalogTotal: 1, offset: 0,
+      nextCursor: null, sources: [], stale: false }),
+    getAsset: async () => ({ asset, stale: false }),
+  });
+  const list = await rpc(handler, "tools/call", { name: "list_stocks", arguments: {} });
+  assert.equal(list.result?.isError, true);
+  assert.match(list.result?.content?.[0].text ?? "", /STOCKPILOT_UNAVAILABLE/);
+  const get = await rpc(handler, "tools/call", { name: "get_stock", arguments: { assetId: `xstocks:${mint}` } });
+  assert.equal(get.result?.isError, true);
+  await handler.close();
+});
+
+test("market detail reports RPC unavailability instead of inventing on-chain facts", async () => {
+  const handler = createStockPilotMcp({ ...principal, scopes: ["markets:read"] }, {
+    getAsset: async () => ({ asset, stale: false }),
+    inspectMint: async () => { throw new Error("RPC unavailable"); },
+  });
+  const reply = await rpc(handler, "tools/call", { name: "get_pre_ipo",
+    arguments: { assetId: asset.id, includeOnChainMint: true } });
+  assert.equal(reply.result?.isError, true);
+  assert.match(reply.result?.content?.[0].text ?? "", /STOCKPILOT_UNAVAILABLE/);
   await handler.close();
 });
 
@@ -143,8 +218,18 @@ test("MCP tools bind portfolio and request to server principal; missing scope is
   assert.equal(JSON.parse(assets.result?.content?.[0].text ?? "{}").assets[0].assetId, asset.id);
   const detail = await call("get_asset", { assetId: asset.id });
   assert.equal(JSON.parse(detail.result?.content?.[0].text ?? "{}").asset.canonicalMint, mint);
+  const balance = await call("get_balance", {});
+  assert.equal(JSON.parse(balance.result?.content?.[0].text ?? "{}").funding.sol.amount, "0.5");
   const portfolio = await call("get_portfolio", {});
-  assert.equal(JSON.parse(portfolio.result?.content?.[0].text ?? "{}").availableUsdc, "12");
+  const holdings = JSON.parse(portfolio.result?.content?.[0].text ?? "{}");
+  assert.equal(holdings.availableUsdc, "12");
+  assert.equal(holdings.positions.length, 2);
+  assert.equal(holdings.privatePositions.length, 1);
+  assert.equal(holdings.publicPositions.length, 1);
+  assert.equal(holdings.publicPositions[0].quantity, null);
+  assert.equal(holdings.publicPositions[0].displayStatus, "MULTIPLIER_UNVERIFIED");
+  assert.equal(holdings.publicPositions[0].estimatedValueUsd, null);
+  assert.equal(holdings.portfolioValueUsd, null);
   const missingKey = await call("request_investment", { assetId: asset.id, amountUsd: "5" });
   assert.equal(missingKey.result?.isError, true);
   const created = await call("request_investment", { assetId: asset.id, amountUsd: "5", clientRequestId });
@@ -154,6 +239,7 @@ test("MCP tools bind portfolio and request to server principal; missing scope is
   assert.ok((await call("get_request", { requestId })).result?.content?.length);
   assert.ok((await call("list_requests", {})).result?.content?.length);
   assert.deepEqual(calls, [
+    `balance:${principal.walletAddress}`,
     `portfolio:${principal.walletAddress}`,
     `request:${principal.accountId}:${principal.clientId}:${asset.id}:5:${clientRequestId}`,
     `get:${principal.clientId}`, `list:${principal.clientId}`,
@@ -164,6 +250,14 @@ test("MCP tools bind portfolio and request to server principal; missing scope is
   const denied = await rpc(restricted.handler, "tools/call", { name: "request_investment",
     arguments: { assetId: asset.id, amountUsd: "5", clientRequestId } });
   assert.equal(denied.result?.isError, true);
+  const balanceDenied = await rpc(restricted.handler, "tools/call", { name: "get_balance", arguments: {} });
+  assert.equal(balanceDenied.result?.isError, true);
   assert.deepEqual(restricted.calls, []);
   await restricted.handler.close();
+
+  const noMarkets = fixture(["portfolio:read"]);
+  const stockDenied = await rpc(noMarkets.handler, "tools/call", { name: "list_stocks", arguments: {} });
+  assert.equal(stockDenied.result?.isError, true);
+  assert.deepEqual(noMarkets.calls, []);
+  await noMarkets.handler.close();
 });

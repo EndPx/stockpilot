@@ -133,7 +133,7 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
       <div className="metric-block metric-block-primary">
         <p className="text-sm font-medium text-muted">Portfolio Estimate</p>
         <p className="metric-value">{formatUsd(portfolio.portfolioValueUsd)}</p>
-        <p className="mt-2 text-xs text-muted">Estimated from current PreStocks token prices</p>
+        <p className="mt-2 text-xs text-muted">Indicative value of cataloged holdings; unavailable when a holding cannot be normalized</p>
       </div>
       <div className="metric-block">
         <p className="text-sm font-medium text-muted">Available to Invest</p>
@@ -171,7 +171,9 @@ export function PortfolioInvestments({ portfolio }: { portfolio: Portfolio }) {
                     </span>
                   </span>
                   <span className="grid gap-1 text-left sm:text-right">
-                    <span className="font-medium tabular-nums">{position.quantity} {position.symbol}</span>
+                    <span className="font-medium tabular-nums">{position.quantity === null
+                      ? `${position.symbol} held · display quantity unavailable`
+                      : `${position.quantity} ${position.symbol}`}</span>
                     <span className="text-sm text-muted tabular-nums">Estimated Value {formatUsd(position.estimatedValueUsd)}</span>
                   </span>
                 </Link>
@@ -180,7 +182,7 @@ export function PortfolioInvestments({ portfolio }: { portfolio: Portfolio }) {
           </ul>
         ) : (
           <div className="empty-surface border-0">
-            <h3 className="text-lg font-semibold">You don&apos;t own any PreStocks yet.</h3>
+            <h3 className="text-lg font-semibold">No canonical Stocks or Pre-IPO holdings found.</h3>
             <p className="mt-2 text-sm text-muted">
               {hasAvailableUsdc
                 ? "You're ready to invest with your available USDC."
@@ -191,7 +193,7 @@ export function PortfolioInvestments({ portfolio }: { portfolio: Portfolio }) {
         )}
       </section>
       <p className="mt-5 text-xs leading-6 text-muted">
-        Estimates use current PreStocks token prices and are not executable liquidation quotes.
+        Estimates use indicative issuer token prices and are not executable liquidation quotes. xStocks with unverified Scaled UI multipliers are listed without a quantity or value.
         Updated <time dateTime={portfolio.asOf}>{new Date(portfolio.asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC</time>.
       </p>
     </>

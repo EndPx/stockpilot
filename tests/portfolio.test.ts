@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { type Asset } from "@stockpilot/core/assets";
+import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import {
   formatRawTokenAmount,
   PortfolioService,
@@ -67,13 +68,20 @@ function token(
 
 function createService(
   tokenBalances: TokenBalance[],
-  options: { assets?: Asset[]; assetError?: Error; rpcError?: Error } = {},
+  options: { assets?: InvestmentAsset[]; assetError?: Error; rpcError?: Error;
+    prices?: Map<string, number | null>; priceError?: Error; catalogStale?: boolean } = {},
 ) {
   const calls: string[] = [];
   const assetReader = {
     async getSnapshot() {
       if (options.assetError) throw options.assetError;
-      return { assets: options.assets ?? assets, fetchedAt: new Date(0).toISOString(), stale: false };
+      return { assets: options.assets ?? assets, fetchedAt: new Date(0).toISOString(), stale: options.catalogStale ?? false };
+    },
+    async getHeldIndicativePrices(held: readonly InvestmentAsset[]) {
+      if (options.priceError) throw options.priceError;
+      return new Map(held.flatMap((asset) => options.prices?.has(asset.mintAddress)
+        ? [[asset.mintAddress, { quote: options.prices.get(asset.mintAddress)!,
+          fetchedAt: "2023-11-14T22:13:20.000Z", stale: false }] as const] : []));
     },
   };
   const solana: SolanaReadAdapter = {
@@ -141,6 +149,89 @@ test("returns multiple official positions and excludes unrelated SPL tokens", as
   assert.equal(portfolio.positions[1].quantity, "0.03");
   assert.equal(portfolio.positions[1].estimatedValueUsd, null);
   assert.equal(portfolio.portfolioValueUsd, null);
+  assert.equal(portfolio.unrecognizedTokenMintCount, 1);
+});
+
+test("getBalance reads confirmed SOL and canonical USDC without an issuer catalog", async () => {
+  const { service, calls } = createService([
+    token(SOLANA_MAINNET_USDC_MINT, "12500000", 6, "spl-token"),
+  ], { assetError: new Error("both issuer catalogs unavailable") });
+  const balance = await service.getBalance("session-wallet");
+  assert.equal(balance.walletAddress, "session-wallet");
+  assert.equal(balance.funding.usdc.amount, "12.5");
+  assert.equal(balance.funding.sol.amount, "0.42");
+  assert.equal(balance.source, "solana_rpc");
+  assert.equal(balance.commitment, "confirmed");
+  assert.deepEqual(calls.sort(), ["sol:session-wallet", "tokens:session-wallet"]);
+});
+
+test("getBalance rejects RPC failure and contradictory canonical USDC decimals", async () => {
+  const unavailable = createService([], { rpcError: new Error("rpc unavailable") });
+  await assert.rejects(unavailable.service.getBalance("session-wallet"), /rpc unavailable/);
+  const malformed = createService([token(SOLANA_MAINNET_USDC_MINT, "100", 9)]);
+  await assert.rejects(malformed.service.getBalance("session-wallet"), /unexpected decimals/);
+});
+
+test("canonical xStocks holding is reported from on-chain raw amount but never valued without Scaled UI multiplier", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null,
+    tokenPriceUsd: null,
+  };
+  const { service } = createService([
+    token(spacexMint, "1000000000", 9),
+    token(unrelatedMint, "2500000000", 9),
+  ], { assets: [...assets, stock], prices: new Map([[unrelatedMint, 200]]) });
+  const portfolio = await service.getPortfolio("session-wallet");
+  assert.deepEqual(portfolio.positions.map(({ provider }) => provider), ["prestocks", "xstocks"]);
+  const xstock = portfolio.positions[1];
+  assert.equal(xstock.rawTokenAmount, "2500000000");
+  assert.equal(xstock.decimals, 9);
+  assert.equal(xstock.quantity, null);
+  assert.equal(xstock.displayStatus, "MULTIPLIER_UNVERIFIED");
+  assert.equal(xstock.tokenPriceUsd, 200);
+  assert.equal(xstock.priceSource, "xstocks_issuer");
+  assert.equal(xstock.priceStale, false);
+  assert.equal(xstock.estimatedValueUsd, null);
+  assert.equal(portfolio.portfolioValueUsd, null);
+  assert.equal(portfolio.valuationScope, "INVESTMENT_POSITIONS_ONLY");
+  assert.equal(portfolio.unrecognizedTokenMintCount, 0);
+});
+
+test("issuer quote failure leaves xStocks unvalued without hiding verified token holdings", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null,
+    tokenPriceUsd: null,
+  };
+  const { service } = createService([token(unrelatedMint, "1", 9)], {
+    assets: [stock], priceError: new Error("price provider down"),
+  });
+  const portfolio = await service.getPortfolio("session-wallet");
+  assert.equal(portfolio.positions[0].rawTokenAmount, "1");
+  assert.equal(portfolio.positions[0].tokenPriceUsd, null);
+  assert.equal(portfolio.positions[0].priceSource, null);
+  assert.equal(portfolio.positions[0].priceStale, true);
+  assert.equal(portfolio.positions[0].estimatedValueUsd, null);
+  assert.equal(portfolio.portfolioValueUsd, null);
+});
+
+test("fresh issuer quote does not conceal a stale canonical catalog", async () => {
+  const stock: InvestmentAsset = {
+    id: `xstocks:${unrelatedMint}`, provider: "xstocks", marketType: "PUBLIC_MARKET_PRODUCT",
+    canonical: true, executionStatus: "UNKNOWN", mintAddress: unrelatedMint,
+    name: "Example xStock", symbol: "EXx", description: null, imageUrl: null,
+    tokenPriceUsd: null,
+  };
+  const { service } = createService([token(unrelatedMint, "10", 9)], {
+    assets: [stock], prices: new Map([[unrelatedMint, 200]]), catalogStale: true,
+  });
+  const portfolio = await service.getPortfolio("session-wallet");
+  assert.equal(portfolio.positions[0].priceSource, "xstocks_issuer");
+  assert.equal(portfolio.positions[0].priceStale, true);
+  assert.equal(portfolio.positions[0].estimatedValueUsd, null);
 });
 
 test("does not list zero-balance official positions", async () => {
