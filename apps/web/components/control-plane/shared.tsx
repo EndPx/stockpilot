@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 
 export type ClientRecord = {
   id: string; name: string; clientType: string; status: string; createdAt: string;
-  lastUsedAt: string | null; scopes: string[];
+  lastUsedAt: string | null; expiresAt: string | null; oauthConnectedAt: string | null;
+  oauthRevokedAt: string | null;
+  authMethods: Array<"oauth" | "api_key">; scopes: string[];
 };
 export type Policy = {
   clientId: string; approvalMode: string; scopes: string[];

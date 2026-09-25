@@ -3,7 +3,10 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AgentConnectionGuide } from "../components/control-plane/clients-view";
+import { AccessSummary } from "../components/control-plane/agent-detail-view";
+import { agentConnectionLabel } from "../components/control-plane/agent-labels";
 import { OAuthConnectContent } from "../components/oauth-connect-summary";
+import type { ClientRecord, Policy } from "../components/control-plane/shared";
 
 test("Agent onboarding does not offer a URL or a false connection before OAuth is available", () => {
   const html = renderToStaticMarkup(createElement(AgentConnectionGuide, {
@@ -63,4 +66,48 @@ test("OAuth handoff shows only the verified wallet and real read-only starting s
   assert.match(html, /action="\/api\/oauth\/authorize" method="post"/);
   assert.match(html, /name="handoff" value="test-signed-proof"/);
   assert.doesNotMatch(html, /Full access|Buy stocks|Sell stocks|30 days|90 days/);
+});
+
+const detailPolicy: Policy = {
+  clientId: "00000000-0000-0000-0000-000000000001", approvalMode: "REQUIRED",
+  scopes: ["markets:read"], buyMode: "DISABLED", sellMode: "DISABLED",
+  maxInvestmentUsd: "10", dailyRequestLimitUsd: "50",
+  allowedProviders: ["prestocks"], allowedMarketTypes: ["PRE_IPO"],
+  version: 1, updatedAt: "2026-09-25T00:00:00.000Z",
+};
+
+test("agent detail distinguishes read-only access from an investment request grant", () => {
+  const html = renderToStaticMarkup(createElement(AccessSummary, { policy: detailPolicy }));
+  assert.match(html, /Read Stocks and Pre-IPO market data/);
+  assert.match(html, /Investment requests are off/);
+  assert.match(html, /no wallet-signing authority/);
+  assert.doesNotMatch(html, /No request cap|signing key|Full access|autonomous/i);
+});
+
+test("agent detail shows request caps without implying execution authority", () => {
+  const html = renderToStaticMarkup(createElement(AccessSummary, {
+    policy: { ...detailPolicy, scopes: ["markets:read", "investments:request"], buyMode: "APPROVAL", maxInvestmentUsd: null },
+  }));
+  assert.match(html, /Requires your approval/);
+  assert.match(html, /No request cap/);
+  assert.match(html, /50 USDC/);
+  assert.match(html, /Approval does not sign or execute a trade/);
+  assert.doesNotMatch(html, /Full access|autonomous|Generate signing key/i);
+});
+
+test("revoked OAuth is not presented as an active connection when a legacy key survives", () => {
+  const client: ClientRecord = {
+    id: "00000000-0000-0000-0000-000000000001", name: "Codex", clientType: "CUSTOM", status: "ACTIVE",
+    createdAt: "2026-09-25T00:00:00.000Z", lastUsedAt: null, expiresAt: null,
+    oauthConnectedAt: "2026-09-25T00:00:00.000Z", oauthRevokedAt: "2026-09-25T01:00:00.000Z",
+    authMethods: ["oauth", "api_key"], scopes: ["markets:read"],
+  };
+  assert.equal(agentConnectionLabel(client), "OAuth revoked · Legacy key on record");
+  assert.equal(agentConnectionLabel({ ...client, status: "REVOKED", oauthRevokedAt: null }), "OAuth connection on record");
+});
+
+test("inactive agent detail labels saved policy as non-operative", () => {
+  const html = renderToStaticMarkup(createElement(AccessSummary, { policy: detailPolicy, active: false }));
+  assert.match(html, /saved permissions no longer grant access/);
+  assert.match(html, /Saved read permissions/);
 });

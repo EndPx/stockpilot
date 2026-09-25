@@ -20,15 +20,24 @@ test("activity is durable, owner-scoped, bounded and append-only", async () => {
     query: db.query.bind(db),
   };
   try {
-    await createClient({ identity: alice, name: "Alice Agent", clientType: "CUSTOM", scopes: ["markets:read"],
+    const aliceClient = await createClient({ identity: alice, name: "Alice Agent", clientType: "CUSTOM", scopes: ["markets:read"],
       maxInvestmentUsd: "10", dailyRequestLimitUsd: "20" }, store);
-    await createClient({ identity: bob, name: "Bob Agent", clientType: "CUSTOM", scopes: ["markets:read"],
+    const aliceOther = await createClient({ identity: alice, name: "Alice Other", clientType: "CUSTOM", scopes: ["markets:read"],
+      maxInvestmentUsd: "10", dailyRequestLimitUsd: "20" }, store);
+    const bobClient = await createClient({ identity: bob, name: "Bob Agent", clientType: "CUSTOM", scopes: ["markets:read"],
       maxInvestmentUsd: "10", dailyRequestLimitUsd: "20" }, store);
     const activity = await listActivity(alice, 10, store);
-    assert.equal(activity.length, 1);
-    assert.equal(activity[0].clientName, "Alice Agent");
+    assert.equal(activity.length, 2);
+    assert.deepEqual(activity.map((event) => event.clientId).sort(), [aliceClient.id, aliceOther.id].sort());
     assert.equal(activity[0].eventType, "CLIENT_CREATED");
     assert.deepEqual((await listActivity(bob, 10, store)).map((event) => event.clientName), ["Bob Agent"]);
+    const clientActivity = await listActivity(alice, 10, store, aliceClient.id);
+    assert.deepEqual(clientActivity.map((event) => event.clientId), [aliceClient.id]);
+    assert.deepEqual((await listActivity(alice, 10, store, aliceOther.id)).map((event) => event.clientId), [aliceOther.id]);
+    await assert.rejects(listActivity(alice, 10, store, bobClient.id),
+      (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "CLIENT_NOT_FOUND");
+    await assert.rejects(listActivity(alice, 10, store, "invalid"),
+      (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "CLIENT_NOT_FOUND");
     await assert.rejects(listActivity({ ...alice, walletAddress: bob.walletAddress }, 10, store));
     await assert.rejects(listActivity(alice, 101, store));
     await assert.rejects(db.query("DELETE FROM control_activity_events WHERE id = $1", [activity[0].id]));

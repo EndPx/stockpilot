@@ -245,6 +245,23 @@ Quick choices may select Read only, Request only, or Read + request; the latter
 two mean an approval request, not an executable write. Custom per-scope changes
 remain possible and may leave no quick choice selected.
 
+Connected-agent detail revision (2026-09-25): each row in Agents opens an
+owner-scoped `/clients/[id]` detail page. Use the existing compact graphite
+system and document scroll, with a back link, clear agent identity/status,
+connection method, creation/last-use and client-level expiry metadata. The
+main surface groups *actual* StockPilot policy scopes under granted access;
+read permissions and approval-required investment requests remain visibly
+distinct. Show request caps only as request caps, never as spending authority.
+`Edit policy` reveals the existing versioned policy editor on this page;
+revoked or expired clients have read-only detail and no save action. Recent
+activity is filtered server-side to this client and has separate loading,
+empty, and error states. Revoke is a confirmed, destructive secondary action.
+The PayBox reference contributes information hierarchy, not its branding,
+signing-key control, EVM/card/secret grants, autonomous labels, or swap
+slippage controls, none of which StockPilot implements. Do not describe a
+client-level `NULL` expiry as a non-expiring OAuth token. The detail page stacks
+cleanly at mobile widths with 44px action targets and no internal page scroll.
+
 Control-plane navigation/theme revision (2026-09-23): in Privy mode the desktop
 rail groups Overview, Credentials, Agents, Approvals, Activity before market
 discovery. The app has a two-state Light/Dark theme control in the rail and

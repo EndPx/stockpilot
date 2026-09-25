@@ -1,6 +1,6 @@
 import "server-only";
 import { controlStore, type ControlStore } from "./db";
-import { ControlPlaneError, type ControlIdentity } from "./clients";
+import { ControlPlaneError, getClient, type ControlIdentity } from "./clients";
 
 export type ActivityRecord = {
   id: string;
@@ -14,16 +14,20 @@ export type ActivityRecord = {
   createdAt: string;
 };
 
-export async function listActivity(identity: ControlIdentity, limit = 50, store: ControlStore = controlStore): Promise<ActivityRecord[]> {
+export async function listActivity(identity: ControlIdentity, limit = 50, store: ControlStore = controlStore, clientId?: string): Promise<ActivityRecord[]> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new ControlPlaneError("INVALID_CLIENT", "Invalid activity page size.");
   }
-  const account = await store.query<{ primary_wallet_address: string }>(
-    "SELECT primary_wallet_address FROM control_accounts WHERE id = $1", [identity.privyUserId],
-  );
-  if (!account.rows.length) return [];
-  if (account.rows[0].primary_wallet_address !== identity.walletAddress) {
-    throw new ControlPlaneError("WALLET_BINDING_MISMATCH", "Verified wallet does not match this StockPilot account.");
+  if (clientId !== undefined) {
+    await getClient(identity, clientId, store);
+  } else {
+    const account = await store.query<{ primary_wallet_address: string }>(
+      "SELECT primary_wallet_address FROM control_accounts WHERE id = $1", [identity.privyUserId],
+    );
+    if (!account.rows.length) return [];
+    if (account.rows[0].primary_wallet_address !== identity.walletAddress) {
+      throw new ControlPlaneError("WALLET_BINDING_MISMATCH", "Verified wallet does not match this StockPilot account.");
+    }
   }
   const rows = await store.query<{
     id: string; event_type: string; actor_type: "USER" | "CLIENT" | "SYSTEM";
@@ -34,8 +38,9 @@ export async function listActivity(identity: ControlIdentity, limit = 50, store:
      FROM control_activity_events e
      LEFT JOIN control_clients c ON c.id = e.client_id AND c.account_id = e.account_id
      LEFT JOIN control_investment_requests r ON r.id = e.request_id AND r.account_id = e.account_id
-     WHERE e.account_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT $2`,
-    [identity.privyUserId, limit]);
+     WHERE e.account_id = $1 ${clientId !== undefined ? "AND e.client_id = $3" : ""}
+     ORDER BY e.created_at DESC, e.id DESC LIMIT $2`,
+    clientId !== undefined ? [identity.privyUserId, limit, clientId] : [identity.privyUserId, limit]);
   return rows.rows.map((row) => ({
     id: row.id, eventType: row.event_type, actorType: row.actor_type,
     clientId: row.client_id, clientName: row.client_name, requestId: row.request_id,

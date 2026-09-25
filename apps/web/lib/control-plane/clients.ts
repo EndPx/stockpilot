@@ -14,7 +14,53 @@ export type ClientRecord = {
   lastUsedAt: string | null;
   revokedAt: string | null;
   scopes: ClientScope[];
+  expiresAt: string | null;
+  authMethods: ("oauth" | "api_key")[];
+  oauthConnectedAt: string | null;
 };
+
+export type ClientDetailRecord = ClientRecord & {
+  oauthRevokedAt: string | null;
+};
+
+type ClientDetailRow = {
+  id: string; name: string; client_type: ClientType; status: ClientRecord["status"];
+  created_at: Date; last_used_at: Date | null; revoked_at: Date | null; expires_at: Date | null;
+  scopes: ClientScope[]; oauth_connected_at: Date | null; oauth_revoked_at: Date | null;
+  has_credential: boolean; has_active_credential: boolean; has_expired_credential: boolean;
+};
+
+const clientDetailSelect = `SELECT c.id, c.name, c.client_type, c.status, c.created_at, c.last_used_at,
+       c.revoked_at, c.expires_at, p.scopes,
+       o.created_at AS oauth_connected_at, o.revoked_at AS oauth_revoked_at,
+       EXISTS (SELECT 1 FROM control_credentials k WHERE k.client_id = c.id) AS has_credential,
+       EXISTS (SELECT 1 FROM control_credentials k WHERE k.client_id = c.id
+         AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())) AS has_active_credential,
+       EXISTS (SELECT 1 FROM control_credentials k WHERE k.client_id = c.id
+         AND k.revoked_at IS NULL AND k.expires_at <= now()) AS has_expired_credential
+     FROM control_clients c
+     JOIN control_accounts a ON a.id = c.account_id
+     JOIN control_grant_policies p ON p.client_id = c.id
+     LEFT JOIN control_oauth_connections o ON o.client_id = c.id AND o.account_id = c.account_id`;
+
+function normalizeClientDetail(row: ClientDetailRow): ClientDetailRecord {
+  const expired = row.status === "EXPIRED" || (row.expires_at !== null && row.expires_at.getTime() <= Date.now());
+  const revoked = row.status === "REVOKED" || row.revoked_at !== null;
+  const hasActiveOAuth = row.oauth_connected_at !== null && row.oauth_revoked_at === null;
+  const status: ClientRecord["status"] = revoked ? "REVOKED" : expired ? "EXPIRED"
+    : hasActiveOAuth || row.has_active_credential ? "ACTIVE"
+      : row.oauth_revoked_at !== null ? "REVOKED"
+        : row.has_expired_credential ? "EXPIRED" : row.has_credential ? "REVOKED" : "ACTIVE";
+  return {
+    id: row.id, name: row.name, clientType: row.client_type, status,
+    createdAt: row.created_at.toISOString(), lastUsedAt: row.last_used_at?.toISOString() ?? null,
+    revokedAt: row.revoked_at?.toISOString() ?? null, expiresAt: row.expires_at?.toISOString() ?? null,
+    scopes: row.scopes,
+    authMethods: [...(row.oauth_connected_at ? ["oauth" as const] : []), ...(row.has_credential ? ["api_key" as const] : [])],
+    oauthConnectedAt: row.oauth_connected_at?.toISOString() ?? null,
+    oauthRevokedAt: row.oauth_revoked_at?.toISOString() ?? null,
+  };
+}
 
 export class ControlPlaneError extends Error {
   constructor(readonly code: "INVALID_CLIENT" | "INVALID_POLICY" | "WALLET_BINDING_MISMATCH" | "CLIENT_NOT_FOUND" | "POLICY_NOT_FOUND", message: string) {
@@ -95,6 +141,9 @@ export async function createClient(input: {
       lastUsedAt: null,
       revokedAt: null,
       scopes: [...validated.scopes],
+      expiresAt: null,
+      authMethods: [],
+      oauthConnectedAt: null,
     };
   });
 }
@@ -107,17 +156,22 @@ export async function listClients(identity: ControlIdentity, store: ControlStore
   if (account.rows[0].primary_wallet_address !== identity.walletAddress) {
     throw new ControlPlaneError("WALLET_BINDING_MISMATCH", "This StockPilot account has a different verified wallet binding.");
   }
-  const rows = await store.query<{
-    id: string; name: string; client_type: ClientType; status: ClientRecord["status"];
-    created_at: Date; last_used_at: Date | null; revoked_at: Date | null; scopes: ClientScope[];
-  }>(`SELECT c.id, c.name, c.client_type, c.status, c.created_at, c.last_used_at, c.revoked_at, p.scopes
-    FROM control_clients c JOIN control_grant_policies p ON p.client_id = c.id
-    WHERE c.account_id = $1 ORDER BY c.created_at DESC, c.id DESC LIMIT 100`, [identity.privyUserId]);
-  return rows.rows.map((row) => ({
-    id: row.id, name: row.name, clientType: row.client_type, status: row.status,
-    createdAt: row.created_at.toISOString(), lastUsedAt: row.last_used_at?.toISOString() ?? null,
-    revokedAt: row.revoked_at?.toISOString() ?? null, scopes: row.scopes,
-  }));
+  const rows = await store.query<ClientDetailRow>(`${clientDetailSelect}
+    WHERE c.account_id = $1 AND a.primary_wallet_address = $2
+    ORDER BY c.created_at DESC, c.id DESC LIMIT 100`, [identity.privyUserId, identity.walletAddress]);
+  return rows.rows.map(normalizeClientDetail);
+}
+
+export async function getClient(identity: ControlIdentity, clientId: string, store: ControlStore = controlStore): Promise<ClientDetailRecord> {
+  if (typeof clientId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(clientId)) {
+    throw new ControlPlaneError("CLIENT_NOT_FOUND", "Client not found.");
+  }
+  const result = await store.query<ClientDetailRow>(`${clientDetailSelect}
+     WHERE c.id = $1 AND c.account_id = $2 AND a.primary_wallet_address = $3`,
+    [clientId, identity.privyUserId, identity.walletAddress]);
+  const row = result.rows[0];
+  if (!row) throw new ControlPlaneError("CLIENT_NOT_FOUND", "Client not found.");
+  return normalizeClientDetail(row);
 }
 
 export async function revokeClient(identity: ControlIdentity, clientId: string, store: ControlStore = controlStore): Promise<void> {
