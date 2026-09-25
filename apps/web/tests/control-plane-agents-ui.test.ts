@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AgentConnectionGuide } from "../components/control-plane/clients-view";
+import { AgentConnectionGuide, AgentDirectory } from "../components/control-plane/clients-view";
 import { AccessSummary } from "../components/control-plane/agent-detail-view";
 import { agentConnectionLabel } from "../components/control-plane/agent-labels";
 import { OAuthConnectContent } from "../components/oauth-connect-summary";
@@ -49,6 +49,37 @@ test("Agent onboarding reports status failures with a retry action", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /temporary outage/);
   assert.match(html, /Try again/);
+});
+
+test("connected agents render as compact cards with a truthful active count and actions", () => {
+  const connected: ClientRecord = {
+    id: "00000000-0000-0000-0000-000000000001", name: "Codex", clientType: "CUSTOM", status: "ACTIVE",
+    createdAt: "2026-09-25T00:00:00.000Z", lastUsedAt: null, expiresAt: null,
+    oauthConnectedAt: "2026-09-25T00:00:00.000Z", oauthRevokedAt: null,
+    authMethods: ["oauth"], scopes: ["markets:read"],
+  };
+  const revoked: ClientRecord = {
+    ...connected, id: "00000000-0000-0000-0000-000000000002", name: "Former agent",
+    status: "REVOKED", oauthRevokedAt: "2026-09-25T01:00:00.000Z",
+  };
+  const notConnected: ClientRecord = {
+    ...connected, id: "00000000-0000-0000-0000-000000000003", name: "Unused client",
+    oauthConnectedAt: null, authMethods: [],
+  };
+  const html = renderToStaticMarkup(createElement(AgentDirectory, {
+    items: [connected, revoked, notConnected], error: "", reload: () => undefined,
+  }));
+  assert.match(html, /agent-card-grid/);
+  assert.equal((html.match(/class="surface agent-card"/g) ?? []).length, 3);
+  assert.match(html, /1 active/);
+  assert.match(html, /1 saved permission/);
+  assert.match(html, /Not used yet/);
+  assert.match(html, /OAuth revoked/);
+  assert.match(html, /not connected/);
+  assert.match(html, /No connection on record/);
+  assert.equal((html.match(/>Details /g) ?? []).length, 3);
+  assert.equal((html.match(/>Revoke</g) ?? []).length, 2);
+  assert.doesNotMatch(html, /Create client|pbx_live_|Full access/);
 });
 
 test("OAuth handoff shows only the verified wallet and real read-only starting scope", () => {

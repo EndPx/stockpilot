@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { ClientRecord, formatDate, LoadState, PageHeader, useControlList } from "./shared";
+import { ClientRecord, controlFetch, formatDate, LoadState, PageHeader, useControlList } from "./shared";
 import { agentConnectionLabel } from "./agent-labels";
 import { LegacyAgentKeys } from "./legacy-agent-keys";
 
@@ -100,6 +100,39 @@ export function AgentConnectionGuide({ status, error, retry }: {
   </section>;
 }
 
+export function AgentDirectory({ items, error, reload }: {
+  items: ClientRecord[] | null; error: string; reload: () => void;
+}) {
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<{ id: string; message: string } | null>(null);
+  const activeCount = items?.filter((client) => client.status === "ACTIVE" && client.authMethods.length > 0).length;
+
+  async function revoke(client: ClientRecord) {
+    if (!window.confirm(`Revoke ${client.name} (${client.id})? Its OAuth access and any legacy credential will stop working.`)) return;
+    setRevokingId(client.id);
+    setRevokeError(null);
+    try {
+      await controlFetch(`/clients/${encodeURIComponent(client.id)}`, "DELETE");
+      reload();
+    } catch (cause) {
+      setRevokeError({ id: client.id, message: cause instanceof Error ? cause.message : "Revocation failed. Try again." });
+    } finally {
+      setRevokingId(null);
+    }
+  }
+
+  return <section className="agent-directory" aria-labelledby="agent-directory-heading">
+    <div className="agent-directory-header"><div className="agent-directory-heading"><h2 id="agent-directory-heading">Agents</h2><span className="control-muted">{activeCount ?? "—"} active</span></div><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div>
+    <LoadState items={items} error={error} retry={reload} empty="No agent has made an authorized tool request yet. After browser authorization, ask your AI app to list StockPilot markets, then refresh." />
+    {items && items.length > 0 && <div className="agent-card-grid">{items.map((client) => <article className="surface agent-card" key={client.id}>
+      <div className="agent-card-identity"><AgentMark name={client.name} /><div className="agent-card-identity-copy"><div className="agent-card-title"><span className={`control-status ${client.status === "ACTIVE" && client.authMethods.length > 0 ? "control-status-active" : ""}`}>{client.status === "ACTIVE" && client.authMethods.length === 0 ? "not connected" : client.status.toLowerCase()}</span><h3>{client.name}</h3></div><span className="agent-card-method">{agentConnectionLabel(client)}</span></div></div>
+      <p className="agent-card-meta"><code className="agent-client-id">{client.id.slice(0, 8)}…{client.id.slice(-4)}</code><span aria-hidden="true"> · </span>{client.scopes.length} saved {client.scopes.length === 1 ? "permission" : "permissions"}<span aria-hidden="true"> · </span>{client.lastUsedAt ? `Last used ${formatDate(client.lastUsedAt)}` : "Not used yet"}</p>
+      {revokeError?.id === client.id && <p className="control-feedback" role="alert">{revokeError.message}</p>}
+      <div className="agent-card-actions"><Link className="text-link" href={`/clients/${client.id}`} aria-label={`View details for ${client.name}`}>Details <span aria-hidden="true">→</span></Link>{client.status === "ACTIVE" && <button type="button" className="secondary-button control-danger" aria-label={`Revoke ${client.name}`} disabled={revokingId !== null} onClick={() => void revoke(client)}>{revokingId === client.id ? "Revoking…" : "Revoke"}</button>}</div>
+    </article>)}</div>}
+  </section>;
+}
+
 export function ClientsView() {
   const { items, error, reload } = useControlList<ClientRecord>("/clients", "clients");
   const [oauthStatus, setOAuthStatus] = useState<OAuthStatus | null>(null);
@@ -122,17 +155,9 @@ export function ClientsView() {
   }, [oauthRevision]);
 
   return <div className="dashboard-stack">
-    <PageHeader title="Agents" description="Connect an AI app with browser authorization, then review what its client can access." action={<Link className="secondary-button" href="/wallet">Wallet</Link>} />
+    <PageHeader title="Agents" description="Connect an AI app with browser authorization, then review its access and activity." />
     <AgentConnectionGuide status={oauthStatus} error={oauthError} retry={() => setOauthRevision((value) => value + 1)} />
-    <section className="surface control-panel"><div className="surface-header"><h2>Your agents</h2><div className="control-row-actions"><span className="control-muted">{items?.length ?? "—"} clients</span><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div></div>
-      <LoadState items={items} error={error} retry={reload} empty="No agent has made an authorized tool request yet. After browser authorization, ask your AI app to list StockPilot markets, then refresh." />
-      {items && items.length > 0 && <div className="control-list">{items.map((client) => <article className="control-row" key={client.id}>
-        <AgentMark name={client.name} />
-        <div className="control-row-main"><strong>{client.name} <code className="agent-client-id">{client.id.slice(0, 8)}…{client.id.slice(-4)}</code></strong><span>{agentConnectionLabel(client)} · {client.scopes.length} saved permissions · Last used {formatDate(client.lastUsedAt)}</span></div>
-        <span className={`control-status ${client.status === "ACTIVE" ? "control-status-active" : ""}`}>{client.status.toLowerCase()}</span>
-        <Link className="secondary-button" href={`/clients/${client.id}`}>View details</Link>
-      </article>)}</div>}
-    </section>
+    <AgentDirectory items={items} error={error} reload={reload} />
     <LegacyAgentKeys />
   </div>;
 }

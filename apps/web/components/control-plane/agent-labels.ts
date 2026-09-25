@@ -11,5 +11,5 @@ export function agentConnectionLabel(client: ClientRecord): string {
     return hasLegacyKey ? "Connected with OAuth · Legacy key on record" : "Connected with OAuth";
   }
   if (hasOAuth) return "OAuth connection on record";
-  return hasLegacyKey ? "Legacy key on record" : "Legacy client";
+  return hasLegacyKey ? "Legacy key on record" : "No connection on record";
 }

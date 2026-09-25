@@ -282,6 +282,23 @@ slippage controls, none of which StockPilot implements. Do not describe a
 client-level `NULL` expiry as a non-expiring OAuth token. The detail page stacks
 cleanly at mobile widths with 44px action targets and no internal page scroll.
 
+Connected-agent directory revision (2026-09-25): below the existing host
+connection choices, show a standalone "Agents" heading with the count of
+clients that are both active and have an authentication method. Keep a quiet
+Refresh action so a newly authorized MCP client can appear without a reload.
+Repeat real client records as compact, left-aligned cards rather than one
+full-width row or a nested panel. Each card has an explicit active/revoked/
+expired state, name, connection method, abbreviated non-secret client ID,
+saved-permission count, truthful last-use text, a Details link and, only when
+active, a confirmed Revoke action. No manual Create client action or PayBox key
+prefix is copied from the reference. Revoked and expired cards remain visible
+but do not count as active. Cards use the established surface, ink and focus
+tokens in both themes; [StyleGallery card-grid](https://github.com/changeroa/StyleGallery/blob/main/patterns/grid-repetition/card-grid.md)
+supplies fluid repetition and [line-up](https://github.com/changeroa/StyleGallery/blob/main/patterns/stacking/line-up.md)
+keeps actions aligned. The document alone scrolls; at narrow widths cards
+become a single column with at least 44px action targets. Revocation has
+confirming, busy, success/refresh and retryable error states.
+
 Control-plane navigation/theme revision (2026-09-23): in Privy mode the desktop
 rail groups Overview, Wallet, Agents, Approvals, Activity before market
 discovery. The app has a two-state Light/Dark theme control in the rail and
