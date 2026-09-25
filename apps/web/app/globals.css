@@ -277,6 +277,10 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 .agent-policy-limits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }.agent-policy-limits div { min-width: 0; }.agent-policy-limits dt { color: var(--muted); font-size: 11px; }.agent-policy-limits dd { margin: 3px 0 0; color: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; }
 .agent-execution-boundary { grid-column: 1 / -1; margin: 0; border-top: 1px solid var(--line); padding: 14px 20px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .agent-policy-editor { max-width: 100%; }.agent-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }.agent-policy-editor .control-feedback { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.agent-policy-navigation { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.agent-policy-navigation button { min-height: 44px; }
+.agent-wallet-permission { padding-bottom: 0; }
+.agent-wallet-permission fieldset { min-width: 0; }
 .agent-revoke-region { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding-top: 14px; }.agent-revoke-region strong { font-size: 13px; }.agent-revoke-region p { margin: 4px 0 0; }.agent-revoke-region .secondary-button { min-height: 44px; }
 .control-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0; padding: 8px 20px; }.control-facts div { min-width: 0; border-bottom: 1px solid var(--line); padding: 13px 0; }.control-facts dt { color: var(--muted); font-size: 11px; }.control-facts dd { margin: 5px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }.control-address { overflow-wrap: anywhere; font-family: monospace; }.control-decision { display: grid; gap: 12px; padding: 20px; }.control-decision p { margin: 0; color: var(--warning); font-size: 12px; }
 .market-navigation-pending { position: fixed; z-index: 10; inset: 0 0 0 248px; display: grid; place-items: center; background: var(--canvas); pointer-events: none; }

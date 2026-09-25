@@ -97,9 +97,30 @@ test("execution form renders independent opt-ins, no key material, and no mutati
 test("saved execution grants are not presented as a connected wallet or active revoked client", () => {
   const enabled = { ...policy, version: 1, automationOptIn: true, buyEnabled: true };
   const waiting = renderToStaticMarkup(createElement(ExecutionPolicySummary, { policy: enabled, active: true, walletReady: false }));
-  assert.match(waiting, /must be connected separately/);
+  assert.match(waiting, /Connect wallet automation in Edit policy/);
   const revoked = renderToStaticMarkup(createElement(ExecutionPolicySummary, { policy: enabled, active: false, walletReady: true }));
   assert.match(revoked, /inactive; its saved grants cannot execute/);
   const expired = renderToStaticMarkup(createElement(ExecutionPolicySummary, { policy: { ...enabled, expiresAt: "2020-01-01T00:00:00.000Z" }, active: true, walletReady: true }));
   assert.match(expired, /execution policy has expired/);
+});
+
+test("wallet permission and execution live inside the single policy editor with explicit consent", () => {
+  const detail = readFileSync(new URL("../components/control-plane/agent-detail-view.tsx", import.meta.url), "utf8");
+  const editor = readFileSync(new URL("../components/control-plane/execution-policy-editor.tsx", import.meta.url), "utf8");
+  const wallet = readFileSync(new URL("../components/control-plane/delegated-wallet-setup.tsx", import.meta.url), "utf8");
+  assert.equal((detail.match(/>Edit policy<\/button>/g) ?? []).length, 1);
+  assert.match(detail, /aria-label="Agent policy"/);
+  assert.match(detail, /aria-label="Policy section"/);
+  assert.match(detail, /disabled=\{editing\} onClick=\{\(\) => setSection\("wallet"\)\}/);
+  assert.doesNotMatch(detail, /DelegatedWalletSetup|walletReady|Edit execution policy/);
+  assert.match(detail.slice(detail.indexOf("export function AgentDetailView")), /<AgentPolicyPanel/);
+  assert.doesNotMatch(detail.slice(detail.indexOf("export function AgentDetailView")), /<ExecutionPolicyEditor/);
+  assert.match(editor, /<DelegatedWalletSetup editable=\{editing && active && policy !== null && !error\}/);
+  assert.doesNotMatch(editor, /className="surface control-panel"|<h2>Automatic actions/);
+  assert.match(wallet, /<fieldset disabled=\{disabled \|\| busy\}><legend>Wallet automation/);
+  assert.match(wallet, /\{editable && <>/);
+  assert.match(wallet, /if \(!editable \|\| disabled \|\| connectionInFlight.current \|\| busy \|\| !consent/);
+  assert.match(wallet, /Connecting does not save this policy or send a transaction/);
+  assert.match(wallet, /cancelling policy edits does not undo a wallet permission/);
+  assert.doesNotMatch(wallet, /className="surface control-panel"/);
 });

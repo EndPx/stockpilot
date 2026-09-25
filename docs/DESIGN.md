@@ -161,14 +161,21 @@ separately. Existing typography, buttons, focus and status primitives are reused
 The BeUI action-swap mechanism informs state labels in place; no new motion/library
 is needed and feedback stays static under all motion preferences.
 
-Delegated agent execution revision (2026-09-25): the connected-agent detail
-keeps read/request policy separate from an explicit owner-only Wallet execution
-panel. BUY, SELL, transfer SOL, and transfer USDC are four independent opt-ins;
-new clients start with every execution permission off. The panel uses existing
+Delegated agent execution revision (2026-09-26): the connected-agent detail
+has one Policy surface and one Edit policy entry point. The Wallet actions view
+contains both wallet automation permission and execution grants; Read & requests
+contains the independent read/request policy. The selected view saves through its
+own versioned endpoint, never an implied combined save. Save or cancel before
+switching views so drafts are not silently discarded. BUY, SELL, transfer SOL, and
+transfer USDC are four independent opt-ins; new clients start with every execution
+permission off. The panel uses existing
 Surface, control-form, fieldset, button, and ConfirmDialog primitives, without
 changing the two-column layout or document scroll ownership. A saved policy
-alone does not connect wallet signing: the separate Wallet automation control
-requires its own user action and server-verified readiness. Never claim a
+alone does not connect wallet signing: the inline Wallet automation fieldset in
+Edit policy requires its own explicit user action and server-verified readiness.
+The summary shows readiness without grant controls. Explain that wallet delegation
+is shared across agents but each agent's own policy limits its actions; cancelling
+draft edits does not undo an already-confirmed wallet permission. Never claim a
 policy save, OAuth reconnect, or legacy approval request executed a transaction.
 Before an enabled automation policy is saved, the themed confirmation names
 the agent and selected actions and states that those actions can run without

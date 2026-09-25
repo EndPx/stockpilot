@@ -5,6 +5,7 @@ import type { AgentWalletPolicy, AgentWalletPolicyInput } from "@/lib/control-pl
 import { EXECUTION_POLICY_ASSETS, executionAmountDisplay, executionPolicyActions, executionPolicyConfirmation, executionPolicyDraft,
   executionPolicyInput, type ExecutionLimitDraft, type ExecutionPolicyDraft } from "@/lib/control-plane/execution-policy-format";
 import { ConfirmDialog } from "./confirm-dialog";
+import { DelegatedWalletSetup } from "./delegated-wallet-setup";
 import { controlFetch, formatDate } from "./shared";
 
 function LimitFields({ label, unit, value, onChange, disabled }: {
@@ -129,7 +130,7 @@ export function ExecutionPolicySummary({ policy, active, walletReady }: {
       : expired ? "This execution policy has expired. Update it before using wallet actions."
         : !enabled ? "Automatic wallet actions are off for this agent."
           : walletReady ? "Saved actions may execute without a new approval, within this policy."
-            : "Execution permissions are saved. Wallet automation must be connected separately before they can run."}</p>
+            : "Execution permissions are saved. Connect wallet automation in Edit policy before they can run."}</p>
     <dl className="agent-policy-limits">
       <div><dt>Saved actions</dt><dd>{executionPolicyActions(policy).join(", ") || "None"}</dd></div>
       <div><dt>Policy expiry</dt><dd>{policy.expiresAt ? formatDate(policy.expiresAt) : "No policy expiry"}</dd></div>
@@ -143,21 +144,22 @@ export function ExecutionPolicySummary({ policy, active, walletReady }: {
   </div>;
 }
 
-export function ExecutionPolicyEditor({ clientId, clientName, active, walletReady, onSaved }: {
-  clientId: string; clientName: string; active: boolean; walletReady: boolean; onSaved?: () => void;
+export function ExecutionPolicyEditor({ clientId, clientName, active, editing, onEditingComplete, onSaved }: {
+  clientId: string; clientName: string; active: boolean; editing: boolean; onEditingComplete: () => void; onSaved?: () => void;
 }) {
   const [policy, setPolicy] = useState<AgentWalletPolicy | null>(null);
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [revision, setRevision] = useState(0);
-  const [editing, setEditing] = useState(false);
+  const [walletReady, setWalletReady] = useState(false);
+  const [walletConnecting, setWalletConnecting] = useState(false);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const endpoint = `/clients/${encodeURIComponent(clientId)}/execution-policy`;
   useEffect(() => {
     const controller = new AbortController();
-    setPolicy(null); setError(""); setEditing(false); setSaveError("");
+    setPolicy(null); setError(""); setSaveError("");
     void controlFetch<{ policy: AgentWalletPolicy }>(endpoint, "GET", undefined, controller.signal)
       .then((result) => { if (!controller.signal.aborted) setPolicy(result.policy); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Execution policy unavailable."); });
@@ -169,21 +171,22 @@ export function ExecutionPolicyEditor({ clientId, clientName, active, walletRead
     saving.current = true; setBusy(true); setSaveError(""); setFeedback("");
     try {
       const result = await controlFetch<{ policy: AgentWalletPolicy }>(endpoint, "PATCH", { ...input, expectedVersion: policy.version });
-      setPolicy(result.policy); setEditing(false); onSaved?.();
+      setPolicy(result.policy); onEditingComplete(); onSaved?.();
       setFeedback("Execution policy saved. No transaction was initiated by this change.");
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : "Execution policy could not be saved. Reload and try again."); }
     finally { saving.current = false; setBusy(false); }
   }
 
-  return <section className="surface control-panel">
-    <div className="surface-header"><div><span className="agent-detail-kicker">Wallet execution</span><h2>Automatic actions</h2></div>
-      {active && policy && !editing && <button className="secondary-button" type="button" onClick={() => { setFeedback(""); setEditing(true); }}>Edit execution policy</button>}</div>
+  return <div className="agent-wallet-policy">
+    <DelegatedWalletSetup editable={editing && active && policy !== null && !error} disabled={busy}
+      onReadyChange={setWalletReady} onBusyChange={setWalletConnecting} />
     {error ? <div className="control-state" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => setRevision((value) => value + 1)}>Try again</button></div>
       : !policy ? <div className="control-state" role="status">Loading execution policy…</div>
-        : editing && active ? <ExecutionPolicyForm key={policy.version} policy={policy} clientName={clientName} busy={busy} error={saveError}
-          onSave={save} onCancel={() => { setEditing(false); setSaveError(""); }} />
+        : editing && active ? <ExecutionPolicyForm key={policy.version} policy={policy} clientName={clientName} busy={busy || walletConnecting} error={saveError}
+          onSave={save} onCancel={() => { onEditingComplete(); setSaveError(""); }} />
           : <ExecutionPolicySummary policy={policy} active={active} walletReady={walletReady} />}
+    {editing && (error || !policy) && <div className="control-form"><button type="button" className="secondary-button" onClick={onEditingComplete}>Cancel</button></div>}
     {saveError && <div className="control-form"><button className="text-link" type="button" disabled={busy} onClick={() => setRevision((value) => value + 1)}>Reload current execution policy</button></div>}
-    {feedback && <p className="control-form control-note" role="status">{feedback}</p>}
-  </section>;
+    {feedback && !editing && <p className="control-form control-note" role="status">{feedback}</p>}
+  </div>;
 }

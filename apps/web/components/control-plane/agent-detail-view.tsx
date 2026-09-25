@@ -5,7 +5,6 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 import { AgentMark } from "./clients-view";
 import { agentConnectionLabel } from "./agent-labels";
 import { ConfirmDialog } from "./confirm-dialog";
-import { DelegatedWalletSetup } from "./delegated-wallet-setup";
 import { ExecutionPolicyEditor } from "./execution-policy-editor";
 import { Activity, ClientRecord, Policy, controlFetch, formatDate } from "./shared";
 
@@ -39,9 +38,9 @@ export function AccessSummary({ policy, active = true }: { policy: Policy; activ
     <div className="agent-access-group"><span className="agent-detail-kicker">{active ? "Investment requests" : "Saved request permission"}</span>
       {canRequest ? <><div className="agent-access-item"><span className="agent-access-dot agent-access-dot-request" aria-hidden="true" /><div><strong>Request a Pre-IPO BUY</strong><span>Requires your approval. Approval does not sign or execute a trade.</span></div></div>
         <dl className="agent-policy-limits"><div><dt>Per request</dt><dd>{policy.maxInvestmentUsd === null ? "No request cap" : `${policy.maxInvestmentUsd} USDC`}</dd></div><div><dt>24-hour requests</dt><dd>{policy.dailyRequestLimitUsd === null ? "No request cap" : `${policy.dailyRequestLimitUsd} USDC`}</dd></div></dl></>
-        : <p className="control-note">Investment requests are off. Wallet execution permissions are managed separately below.</p>}
+        : <p className="control-note">Investment requests are off. Manage automatic transactions in this policy's Wallet actions section.</p>}
     </div>
-    <p className="agent-execution-boundary">Read access and approval requests do not grant wallet-signing authority. Manual trades require your signature; automatic actions require a separate execution policy and wallet permission.</p>
+    <p className="agent-execution-boundary">Read access and approval requests do not grant wallet-signing authority. Automatic actions require wallet permission and explicit grants in Wallet actions.</p>
   </div>;
 }
 
@@ -105,7 +104,7 @@ function AgentPolicyEditor({ policy, onSaved, onCancel, onReload }: {
     <p className="control-note">Policy version {currentPolicy.version}. Changes affect future requests only.</p>
     <div className="control-filter" role="group" aria-label="Permission quick choices">{presets.map((preset) => <button key={preset.label} type="button" aria-pressed={matches(scopes, preset.scopes)} className={matches(scopes, preset.scopes) ? "control-filter-active" : ""} onClick={() => setScopes([...preset.scopes])}>{preset.label}</button>)}</div>
     <fieldset><legend>Read access</legend><div className="control-checks">{readScopes.map((item) => policy.scopes.includes(item.value) || item.value !== "approvals:read-own" ? <label key={item.value}><input type="checkbox" checked={scopes.includes(item.value)} onChange={(event) => toggleScope(item.value, event.target.checked)} />{item.value === "approvals:read-own" ? "Keep legacy approvals-read grant (no MCP tool)" : `Read ${item.label.toLowerCase()}`}</label> : null)}</div></fieldset>
-    <fieldset><legend>Investment access</legend><div className="control-checks"><label><input type="checkbox" checked={scopes.includes("investments:request")} onChange={(event) => toggleScope("investments:request", event.target.checked)} />Request a Pre-IPO BUY for my approval</label></div><p className="control-note">Approval does not sign or execute a transaction. Automatic wallet actions have a separate policy below.</p></fieldset>
+    <fieldset><legend>Investment access</legend><div className="control-checks"><label><input type="checkbox" checked={scopes.includes("investments:request")} onChange={(event) => toggleScope("investments:request", event.target.checked)} />Request a Pre-IPO BUY for my approval</label></div><p className="control-note">Approval does not sign or execute a transaction. Configure automatic transactions in Wallet actions.</p></fieldset>
     <div className="control-form-pair">
       <div className="agent-limit-field"><label htmlFor={maxId}>Maximum per request · USDC</label><input id={maxId} type="number" inputMode="decimal" min="0.000001" step="0.000001" value={max} onChange={(event) => setMax(event.target.value)} disabled={maxUnlimited} required={!maxUnlimited} /><label className="agent-unlimited-option"><input type="checkbox" checked={maxUnlimited} onChange={(event) => setMaxUnlimited(event.target.checked)} />No per-request cap</label></div>
       <div className="agent-limit-field"><label htmlFor={dailyId}>24-hour request limit · USDC</label><input id={dailyId} type="number" inputMode="decimal" min="0.000001" step="0.000001" value={daily} onChange={(event) => setDaily(event.target.value)} disabled={dailyUnlimited} required={!dailyUnlimited} /><label className="agent-unlimited-option"><input type="checkbox" checked={dailyUnlimited} onChange={(event) => setDailyUnlimited(event.target.checked)} />No daily cap</label></div>
@@ -133,17 +132,28 @@ function AgentIdentity({ client }: { client: ClientRecord }) {
   </>;
 }
 
-function AgentPolicyPanel({ client, policy, error, reload, onSaved }: {
-  client: ClientRecord; policy: Policy | null; error: string; reload: () => void; onSaved: (policy: Policy) => void;
+export function AgentPolicyPanel({ client, policy, error, reload, onSaved, onExecutionSaved }: {
+  client: ClientRecord; policy: Policy | null; error: string; reload: () => void; onSaved: (policy: Policy) => void; onExecutionSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [section, setSection] = useState<"wallet" | "access">("wallet");
   const active = client.status === "ACTIVE";
-  return <section className="surface control-panel">
-    <div className="surface-header"><div><span className="agent-detail-kicker">Policy</span><h2>{active ? "Granted access" : "Last saved policy"}</h2></div>{active && !editing && policy && <button className="secondary-button" type="button" onClick={() => setEditing(true)}>Edit policy</button>}{editing && <span className="control-muted">Changes apply to future requests</span>}</div>
-    {error ? <div className="control-state" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={reload}>Try again</button></div>
+  return <section className="surface control-panel" aria-label="Agent policy">
+    <div className="surface-header"><div><span className="agent-detail-kicker">Policy</span><h2>{active ? "Granted access" : "Last saved policy"}</h2></div>{active && !editing && (section === "wallet" || policy) && <button className="secondary-button" type="button" onClick={() => setEditing(true)}>Edit policy</button>}{editing && <span className="control-muted">Save or cancel to switch sections</span>}</div>
+    <div className="agent-policy-navigation control-filter" role="group" aria-label="Policy section">
+      <button type="button" aria-pressed={section === "wallet"} className={section === "wallet" ? "control-filter-active" : ""}
+        disabled={editing} onClick={() => setSection("wallet")}>Wallet actions</button>
+      <button type="button" aria-pressed={section === "access"} className={section === "access" ? "control-filter-active" : ""}
+        disabled={editing} onClick={() => setSection("access")}>Read &amp; requests</button>
+    </div>
+    <div hidden={section !== "wallet"}>
+      <ExecutionPolicyEditor key={client.id} clientId={client.id} clientName={client.name} active={active}
+        editing={editing && section === "wallet"} onEditingComplete={() => setEditing(false)} onSaved={onExecutionSaved} />
+    </div>
+    {section === "access" && (error ? <div className="control-state" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={reload}>Try again</button></div>
       : !policy ? <div className="control-state" role="status">Loading granted access…</div>
-        : editing && active ? <AgentPolicyEditor policy={policy} onSaved={onSaved} onCancel={() => setEditing(false)} onReload={() => { setEditing(false); reload(); }} />
-          : <AccessSummary policy={policy} active={active} />}
+        : editing && active ? <AgentPolicyEditor policy={policy} onSaved={(next) => { onSaved(next); setEditing(false); }} onCancel={() => setEditing(false)} onReload={() => { setEditing(false); reload(); }} />
+          : <AccessSummary policy={policy} active={active} />)}
   </section>;
 }
 
@@ -170,7 +180,6 @@ export function AgentDetailView({ clientId }: { clientId: string }) {
   const [revoking, setRevoking] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [revokeError, setRevokeError] = useState("");
-  const [walletReady, setWalletReady] = useState(false);
   const revokeReturnFocusRef = useRef<HTMLElement | null>(null);
   const backLinkRef = useRef<HTMLAnchorElement>(null);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
@@ -213,10 +222,8 @@ export function AgentDetailView({ clientId }: { clientId: string }) {
         <AgentIdentity client={client} />
         <div className="agent-detail-layout">
           <div className="agent-detail-main">
-            <AgentPolicyPanel client={client} policy={policy} error={policyError} reload={reload} onSaved={setPolicy} />
-            {client.status === "ACTIVE" && <DelegatedWalletSetup onReadyChange={setWalletReady} />}
-            <ExecutionPolicyEditor key={client.id} clientId={client.id} clientName={client.name}
-              active={client.status === "ACTIVE"} walletReady={walletReady} onSaved={reloadActivity} />
+            <AgentPolicyPanel client={client} policy={policy} error={policyError} reload={reload}
+              onSaved={(next) => { setPolicy(next); reloadActivity(); }} onExecutionSaved={reloadActivity} />
             {client.status === "ACTIVE" && <div className="agent-revoke-region"><div><strong>Disconnect this agent</strong><p className="control-note">Revoking stops its OAuth access and any legacy key. This cannot be undone.</p></div><button className="secondary-button control-danger" type="button" disabled={revoking} onClick={(event) => { revokeReturnFocusRef.current = event.currentTarget; setConfirmRevoke(true); }}>{revoking ? "Revoking…" : "Revoke access"}</button></div>}
             {revokeError && <p className="control-feedback" role="alert">{revokeError}</p>}
           </div>

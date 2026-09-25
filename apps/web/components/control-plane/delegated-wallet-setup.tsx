@@ -17,7 +17,9 @@ const reasons: Record<DelegatedSignerReadiness["reason"], string> = {
   PRIVY_UNAVAILABLE: "Wallet permissions could not be checked. Try again shortly.",
 };
 
-export function DelegatedWalletSetup({ onReadyChange }: { onReadyChange?: (ready: boolean) => void }) {
+export function DelegatedWalletSetup({ editable, disabled = false, onReadyChange, onBusyChange }: {
+  editable: boolean; disabled?: boolean; onReadyChange?: (ready: boolean) => void; onBusyChange?: (busy: boolean) => void;
+}) {
   const { ready: privyReady, authenticated } = usePrivy();
   const { addSigners } = useSigners();
   const [data, setData] = useState<ReadinessResponse | null>(null);
@@ -32,9 +34,11 @@ export function DelegatedWalletSetup({ onReadyChange }: { onReadyChange?: (ready
   }, []);
   useEffect(() => { void refresh().catch(() => setError("Unable to check wallet automation.")); }, [refresh]);
   useEffect(() => { onReadyChange?.(data?.readiness.ready === true); }, [data?.readiness.ready, onReadyChange]);
+  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  useEffect(() => { if (!editable) setConsent(false); }, [editable]);
 
   async function enable() {
-    if (connectionInFlight.current || busy || !consent || !privyReady || !authenticated) return;
+    if (!editable || disabled || connectionInFlight.current || busy || !consent || !privyReady || !authenticated) return;
     connectionInFlight.current = true;
     setBusy(true); setError("");
     try {
@@ -54,12 +58,12 @@ export function DelegatedWalletSetup({ onReadyChange }: { onReadyChange?: (ready
   const status = data?.readiness;
   const canEnable = status?.configured && status.enabled &&
     ["OWNER_CONSENT_REQUIRED", "SIGNER_POLICY_MISMATCH"].includes(status.reason);
-  return <section className="surface control-panel" aria-label="Wallet automation">
-    <div className="surface-header"><h2>Wallet automation</h2>
-      <span className="control-note">{status?.ready ? "Connected" : "Not connected"}</span></div>
-    <div className="control-form">
+  return <div className="control-form agent-wallet-permission">
+    <fieldset disabled={disabled || busy}><legend>Wallet automation</legend>
+      <span className={`control-status ${status?.ready ? "control-status-active" : ""}`}>{status ? status.ready ? "Connected" : "Not connected" : "Checking…"}</span>
       <p className="control-note" role="status">{status ? reasons[status.reason] : "Checking wallet permissions…"}</p>
-      <p className="control-note">Automatic BUY, SELL, and transfers are separate agent permissions. Only actions allowed by the agent's saved policy can run. Disable those permissions in the agent's policy whenever you want to stop them.</p>
+      {editable && <>
+      <p className="control-note">This one-time wallet permission is shared by your agents. Each agent can only use its own saved actions, assets and limits. Connecting does not save this policy or send a transaction; cancelling policy edits does not undo a wallet permission you already confirmed.</p>
       {canEnable && <label className="agent-unlimited-option"><input type="checkbox" checked={consent}
         onChange={(event) => setConsent(event.target.checked)} disabled={busy} />
         I allow StockPilot to sign permitted wallet actions while I am away.</label>}
@@ -69,7 +73,8 @@ export function DelegatedWalletSetup({ onReadyChange }: { onReadyChange?: (ready
         <button type="button" className="secondary-button" disabled={busy}
           onClick={() => { setError(""); void refresh().catch(() => setError("Unable to check wallet automation.")); }}>Refresh</button>
       </div>
+      </>}
       {error && <p role="alert" className="control-note">{error}</p>}
-    </div>
-  </section>;
+    </fieldset>
+  </div>;
 }
