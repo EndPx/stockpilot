@@ -19,6 +19,11 @@ authorization and release boundary.
   compatibility, an executable route, canonical USDC balance, and a bounded
   order. The current xStocks catalog normalizer marks products
   `REVIEW_REQUIRED`; discovery and a quote are **not** trading permission.
+- The transaction-effect verifier now accepts the xStocks BUY preparer's
+  canonical USDC-input shape and enforces the stricter of the server product
+  floor and its 1% maximum-slippage floor. Its separate unsigned-envelope
+  check rejects an unexpected signer. These offline checks do not establish
+  that a live Jupiter order uses the one supported instruction layout.
 - The local BUY preparer calls an instruction-effect verifier and puts the
   proven minimum token output and native-SOL debit cap into the short-lived
   signed authorization and owner review. The current verifier accepts only a
@@ -62,6 +67,12 @@ IPO/swap deadline on 12 March 2027; an earlier quote observation must not be
 mistaken for a recommendation to test that product. A joint category release
 must show BUY only for assets that independently pass all current gates; it
 cannot promise every row in the discovery catalog is executable.
+
+A further keyless, read-only spot check returned indicative Metis quotes for
+one AAPLx and one Polymarket PreStocks catalog mint. Requesting an assembled
+AAPLx order for an unfunded synthetic test wallet returned `errorCode: 1`
+without transaction bytes. Neither quote is an executable or suitability
+decision; no wallet signed, submitted, or funded a trade in this check.
 
 The proposed demo investor reports being in Indonesia and not a U.S. person.
 The [Backed restricted-country list](https://assets.backed.fi/legal-documentation/restricted-countries)

@@ -18,6 +18,7 @@ import {
 } from "@solana/kit";
 import type { PreparedInvestment } from "@stockpilot/core/investments";
 import type { PreparedManualSell } from "@stockpilot/core/manual-sell";
+import type { PreparedXStocksBuy } from "@stockpilot/core/xstocks-manual-buy";
 import { SOLANA_MAINNET_USDC_MINT, SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
 import {
   assertPreparedInvestmentTransaction,
@@ -26,6 +27,7 @@ import {
   parseSupportedJupiterRoute,
   TransactionValidationError,
   verifyCanonicalAssociatedTokenAccountCreation,
+  verifyUnsignedOrderEnvelope,
   type InstructionEffectProof,
   type PreparedTransactionInspection,
   type PreparedTransactionPolicy,
@@ -96,6 +98,31 @@ function prepared(transaction = wire()): PreparedInvestment {
   };
 }
 
+function preparedXStock(transaction = wire()): PreparedXStocksBuy {
+  return {
+    assetId: `xstocks:${outputMint}`,
+    principalId: "privy-test-owner",
+    walletAddress: wallet,
+    inputMint,
+    outputMint,
+    inputRaw: "50000000",
+    quotedOutputRaw: "125000000",
+    requiredMinimumOutputRaw: "124000000",
+    outputDecimals: 9,
+    outputUnits: "RAW_TOKEN_2022_BASE_UNITS",
+    router: "synthetic-test-only",
+    mode: "test",
+    feeBps: 0,
+    feeMint: null,
+    priceImpactPct: "0",
+    transaction,
+    requestId: "test-order",
+    lastValidBlockHeight: "100",
+    expiresAt: new Date(100_000).toISOString(),
+    transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION",
+  };
+}
+
 function proof(overrides: Partial<InstructionEffectProof> = {}): InstructionEffectProof {
   return {
     requestId: "test-order",
@@ -137,6 +164,13 @@ test("fails closed when a complete instruction verifier is not installed", async
   await rejects("TRANSACTION_SEMANTICS_UNVERIFIED", prepared(), MANUAL_BUY_FAIL_CLOSED_POLICY);
 });
 
+test("unsigned order envelope guard binds the sole signer to the owner", async () => {
+  assert.equal(await verifyUnsignedOrderEnvelope(wire(), wallet), true);
+  assert.equal(await verifyUnsignedOrderEnvelope(wire(), otherWallet), false);
+  assert.equal(await verifyUnsignedOrderEnvelope(wire({ extraSigner: true }), wallet), false);
+  assert.equal(await verifyUnsignedOrderEnvelope("not-base64!", wallet), false);
+});
+
 test("passes only a fully resolved envelope with matching server-owned proof", async () => {
   const seen = await assertPreparedInvestmentTransaction(prepared(), policy());
   assert.deepEqual(seen.lookupTableAddresses, []);
@@ -148,6 +182,24 @@ test("passes only a fully resolved envelope with matching server-owned proof", a
     requiredMinimumOutputRaw: "123000000",
     maximumWalletNativeDebitLamportsRaw: "10000",
   });
+});
+
+test("xStocks BUY uses the stricter product floor and rejects an insufficient output proof", async () => {
+  const buy = preparedXStock();
+  const rules = createManualTradeValidationPolicy(buy);
+  assert.equal(rules.minimumOutputRaw, "124000000");
+  await assert.rejects(
+    assertPreparedInvestmentTransaction(buy, policy({
+      minimumOutputRaw: rules.minimumOutputRaw,
+      verifyInstructionEffects: async () => proof({ guaranteedMinimumOutputRaw: "123999999" }),
+    })),
+    (error) => error instanceof TransactionValidationError && error.code === "ECONOMIC_LIMIT_EXCEEDED",
+  );
+  const accepted = await assertPreparedInvestmentTransaction(buy, policy({
+    minimumOutputRaw: rules.minimumOutputRaw,
+    verifyInstructionEffects: async () => proof({ guaranteedMinimumOutputRaw: "124000000" }),
+  }));
+  assert.equal(accepted.effects?.requiredMinimumOutputRaw, "124000000");
 });
 
 test("rejects invalid wire, changed payer, extra signer, and missing canonical mint", async () => {

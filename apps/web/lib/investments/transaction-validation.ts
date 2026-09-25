@@ -18,6 +18,7 @@ import {
 } from "@solana/kit";
 import type { PreparedInvestment } from "@stockpilot/core/investments";
 import type { PreparedManualSell } from "@stockpilot/core/manual-sell";
+import type { PreparedXStocksBuy } from "@stockpilot/core/xstocks-manual-buy";
 import { SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
 import { getSolanaRpcUrl } from "@/lib/solana/read-adapter";
 
@@ -39,7 +40,7 @@ const TOKEN_2022_DISPLAY_EXTENSIONS = new Set([
 const ROUTE_DISCRIMINATOR = createHash("sha256").update("global:route").digest().subarray(0, 8);
 const SHARED_ROUTE_DISCRIMINATOR = createHash("sha256").update("global:shared_accounts_route").digest().subarray(0, 8);
 
-export type PreparedTradeTransaction = PreparedInvestment | PreparedManualSell;
+export type PreparedTradeTransaction = PreparedInvestment | PreparedXStocksBuy | PreparedManualSell;
 
 type TradeEconomics = Readonly<{
   walletAddress: string;
@@ -65,6 +66,19 @@ function tradeEconomics(prepared: PreparedTradeTransaction): TradeEconomics {
       inputAmountRaw: prepared.inputAmountRaw, outputAmountRaw: prepared.outputAmountRaw,
       inputDecimals: 6, outputDecimals: prepared.outputDecimals,
       requiredMinimumOutputRaw: (quoted * (10_000n - MAX_MANUAL_SLIPPAGE_BPS) / 10_000n).toString(),
+      feeBps: prepared.feeBps, feeMint: prepared.feeMint, transaction: prepared.transaction,
+    };
+  }
+  if ("quotedOutputRaw" in prepared) {
+    const quoted = rawU64(prepared.quotedOutputRaw, "INVALID_TRANSACTION");
+    const productMinimum = rawU64(prepared.requiredMinimumOutputRaw, "INVALID_TRANSACTION");
+    const slippageMinimum = quoted * (10_000n - MAX_MANUAL_SLIPPAGE_BPS) / 10_000n;
+    return {
+      walletAddress: prepared.walletAddress, requestId: prepared.requestId,
+      inputMint: prepared.inputMint, outputMint: prepared.outputMint,
+      inputAmountRaw: prepared.inputRaw, outputAmountRaw: prepared.quotedOutputRaw,
+      inputDecimals: 6, outputDecimals: prepared.outputDecimals,
+      requiredMinimumOutputRaw: (productMinimum > slippageMinimum ? productMinimum : slippageMinimum).toString(),
       feeBps: prepared.feeBps, feeMint: prepared.feeMint, transaction: prepared.transaction,
     };
   }
@@ -191,6 +205,20 @@ function canonicalTransactionBytes(serialized: string): Uint8Array {
   const bytes = Buffer.from(serialized, "base64");
   if (bytes.length === 0 || bytes.length > MAX_TRANSACTION_BYTES || bytes.toString("base64") !== serialized) fail("INVALID_TRANSACTION");
   return bytes;
+}
+
+/** Pre-quote envelope guard; a true result is never transaction-effect approval. */
+export async function verifyUnsignedOrderEnvelope(serialized: string, walletAddress: string): Promise<boolean> {
+  try {
+    const wallet = validAddress(walletAddress, "INVALID_TRANSACTION").toString();
+    const transaction = getTransactionDecoder().decode(canonicalTransactionBytes(serialized));
+    const message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
+    return message.version === 0 && message.header.numSignerAccounts === 1 &&
+      message.header.numReadonlySignerAccounts === 0 && message.staticAccounts[0] === wallet &&
+      Object.keys(transaction.signatures).length === 1 && transaction.signatures[wallet as Address] === null;
+  } catch {
+    return false;
+  }
 }
 
 function uniqueAddresses(values: readonly string[], code: TransactionValidationCode): Set<string> {
