@@ -1,4 +1,4 @@
-import { readInvestmentApiResponse } from "./client";
+import { InvestmentClientError, readInvestmentApiResponse } from "./client";
 import type { ActiveManualInvestmentStatusResponse, InvestmentExecutionResponse, ManualInvestmentStatusResponse } from "./types";
 
 export type TradeExecution = Omit<InvestmentExecutionResponse["execution"], "status"> & {
@@ -23,6 +23,14 @@ export function tradeStatusLabel(status: TradeExecution["status"]): string {
     case "REVIEW_REQUIRED": return "Transaction needs review. Do not resubmit.";
     default: return "Confirming on Solana…";
   }
+}
+
+/** Only use after the server explicitly proves NOT_SUBMITTED, never for an unknown outcome. */
+export function notSubmittedTradeMessage(error: InvestmentClientError): string {
+  if (error.code === "JUPITER_ORDER_EXPIRED" || error.code === "INVESTMENT_TOKEN_EXPIRED") {
+    return "Quote expired. No transaction was sent. Review a new quote.";
+  }
+  return `${error.message} No transaction was sent.`;
 }
 
 export async function readTradeStatus(requestId: string | null, signal: AbortSignal, fetcher = fetch) {

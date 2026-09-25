@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { decodeBase64Transaction, encodeBase64Transaction, InvestmentClientError, readInvestmentApiResponse } from "@/lib/investments/client";
 import type { InvestmentExecutionResponse } from "@/lib/investments/types";
-import { pollTradeStatus, readSellHolding, readTradeStatus, tradeStatusLabel, type SellHolding, type TradeExecution } from "@/lib/investments/trade-state";
+import { notSubmittedTradeMessage, pollTradeStatus, readSellHolding, readTradeStatus, tradeStatusLabel, type SellHolding, type TradeExecution } from "@/lib/investments/trade-state";
 import { InvestmentEligibilityNotice } from "./investment-panel";
 
 type Review = {
@@ -157,8 +157,11 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
   }
 
   async function submit() {
-    if (!prepared || busy || Date.parse(prepared.review.expiresAt) <= Date.now()) {
-      setError("The quote expired. Prepare a fresh review.");
+    if (!prepared || busy) return;
+    if (Date.parse(prepared.review.expiresAt) <= Date.now()) {
+      setPrepared(null);
+      dialogRef.current?.close();
+      setError("Quote expired. Review a new quote.");
       return;
     }
     setError(null);
@@ -185,7 +188,7 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
       if (signed && cause instanceof InvestmentClientError && cause.submissionStatus === "NOT_SUBMITTED") {
         rememberPending(null);
         setPrepared(null);
-        setError(`${cause.message} No transaction was submitted. Prepare a fresh review.`);
+        setError(notSubmittedTradeMessage(cause));
         dialogRef.current?.close();
       } else if (signed) {
         setUnknown(true);

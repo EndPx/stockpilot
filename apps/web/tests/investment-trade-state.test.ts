@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { pollTradeStatus, readSellHolding, readTradeStatus, statusExecution, tradeStatusLabel } from "../lib/investments/trade-state";
+import { notSubmittedTradeMessage, pollTradeStatus, readSellHolding, readTradeStatus, statusExecution, tradeStatusLabel } from "../lib/investments/trade-state";
+import { InvestmentClientError } from "../lib/investments/client";
 import type { ManualInvestmentStatusResponse } from "../lib/investments/types";
 
 const wallet = "6EuMFHPtiyoFtsBTy1hiJpNgupP7qkZfZm9ErQ58ipsC";
@@ -15,6 +16,15 @@ const execution = (status: ManualInvestmentStatusResponse["execution"]["status"]
   actualWalletNativeDebitLamportsRaw: null,
 });
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+test("expired quote feedback has one next step, only behind the explicit not-submitted guard", () => {
+  for (const code of ["JUPITER_ORDER_EXPIRED", "INVESTMENT_TOKEN_EXPIRED"]) {
+    assert.equal(notSubmittedTradeMessage(new InvestmentClientError(code, "Expired. Prepare a new review.", "NOT_SUBMITTED")),
+      "Quote expired. No transaction was sent. Review a new quote.");
+  }
+  const source = readFileSync(new URL("../components/demo-trade-form.tsx", import.meta.url), "utf8");
+  assert.match(source, /cause.submissionStatus === "NOT_SUBMITTED"[\s\S]*?setError\(notSubmittedTradeMessage\(cause\)\)/);
+});
 
 test("SELL reads the exact Wallet holding, including small amounts and zero decimals", async () => {
   assert.deepEqual(await readSellHolding(json(portfolio()), wallet, mint), {
