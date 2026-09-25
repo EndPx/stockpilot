@@ -273,6 +273,18 @@ Quick choices may select Read only, Request only, or Read + request; the latter
 two mean an approval request, not an executable write. Custom per-scope changes
 remain possible and may leave no quick choice selected.
 
+Control-plane confirmation revision (2026-09-25): policy cap removal,
+agent revocation, approval decisions, and legacy-key rotation/revocation use
+one themed native-dialog primitive rather than browser `confirm()`. The dialog
+names the exact consequence and target, puts Cancel first and focuses it on
+open, traps focus through `showModal()`, supports Escape while idle, and returns
+focus to the trigger or a stable replacement after a completed mutation.
+Cancellation never sends a request. During a mutation, both actions are
+disabled and the dialog stays open until the outcome is known. The destructive
+variant uses the existing danger token; both themes keep 44px targets and a
+separate backdrop. Removing a request cap never implies wallet-signing or
+automatic execution authority.
+
 Connected-agent detail revision (2026-09-25): each row in Agents opens an
 owner-scoped `/clients/[id]` detail page. Use the existing compact graphite
 system and document scroll, with a back link, clear agent identity/status,

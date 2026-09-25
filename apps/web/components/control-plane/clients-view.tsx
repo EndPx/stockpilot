@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { ClientRecord, controlFetch, formatDate, LoadState, PageHeader, useControlList } from "./shared";
 import { agentConnectionLabel } from "./agent-labels";
+import { ConfirmDialog } from "./confirm-dialog";
 import { LegacyAgentKeys } from "./legacy-agent-keys";
 
 type OAuthStatus = { enabled: boolean; mcpUrl: string };
@@ -104,15 +105,19 @@ export function AgentDirectory({ items, error, reload }: {
   items: ClientRecord[] | null; error: string; reload: () => void;
 }) {
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<ClientRecord | null>(null);
+  const revokeReturnFocusRef = useRef<HTMLElement | null>(null);
+  const refreshRef = useRef<HTMLButtonElement>(null);
   const [revokeError, setRevokeError] = useState<{ id: string; message: string } | null>(null);
   const activeCount = items?.filter((client) => client.status === "ACTIVE" && client.authMethods.length > 0).length;
 
   async function revoke(client: ClientRecord) {
-    if (!window.confirm(`Revoke ${client.name} (${client.id})? Its OAuth access and any legacy credential will stop working.`)) return;
+    if (revokingId !== null) return;
     setRevokingId(client.id);
     setRevokeError(null);
     try {
       await controlFetch(`/clients/${encodeURIComponent(client.id)}`, "DELETE");
+      revokeReturnFocusRef.current = refreshRef.current;
       reload();
     } catch (cause) {
       setRevokeError({ id: client.id, message: cause instanceof Error ? cause.message : "Revocation failed. Try again." });
@@ -122,14 +127,25 @@ export function AgentDirectory({ items, error, reload }: {
   }
 
   return <section className="agent-directory" aria-labelledby="agent-directory-heading">
-    <div className="agent-directory-header"><div className="agent-directory-heading"><h2 id="agent-directory-heading">Agents</h2><span className="control-muted">{activeCount ?? "—"} active</span></div><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div>
+    <div className="agent-directory-header"><div className="agent-directory-heading"><h2 id="agent-directory-heading">Agents</h2><span className="control-muted">{activeCount ?? "—"} active</span></div><button ref={refreshRef} type="button" className="secondary-button" onClick={reload}>Refresh</button></div>
     <LoadState items={items} error={error} retry={reload} empty="No agent has made an authorized tool request yet. After browser authorization, ask your AI app to list StockPilot markets, then refresh." />
     {items && items.length > 0 && <div className="agent-card-grid">{items.map((client) => <article className="surface agent-card" key={client.id}>
       <div className="agent-card-identity"><AgentMark name={client.name} /><div className="agent-card-identity-copy"><div className="agent-card-title"><span className={`control-status ${client.status === "ACTIVE" && client.authMethods.length > 0 ? "control-status-active" : ""}`}>{client.status === "ACTIVE" && client.authMethods.length === 0 ? "not connected" : client.status.toLowerCase()}</span><h3>{client.name}</h3></div><span className="agent-card-method">{agentConnectionLabel(client)}</span></div></div>
       <p className="agent-card-meta"><code className="agent-client-id">{client.id.slice(0, 8)}…{client.id.slice(-4)}</code><span aria-hidden="true"> · </span>{client.scopes.length} saved {client.scopes.length === 1 ? "permission" : "permissions"}<span aria-hidden="true"> · </span>{client.lastUsedAt ? `Last used ${formatDate(client.lastUsedAt)}` : "Not used yet"}</p>
       {revokeError?.id === client.id && <p className="control-feedback" role="alert">{revokeError.message}</p>}
-      <div className="agent-card-actions"><Link className="text-link" href={`/clients/${client.id}`} aria-label={`View details for ${client.name}`}>Details <span aria-hidden="true">→</span></Link>{client.status === "ACTIVE" && <button type="button" className="secondary-button control-danger" aria-label={`Revoke ${client.name}`} disabled={revokingId !== null} onClick={() => void revoke(client)}>{revokingId === client.id ? "Revoking…" : "Revoke"}</button>}</div>
+      <div className="agent-card-actions"><Link className="text-link" href={`/clients/${client.id}`} aria-label={`View details for ${client.name}`}>Details <span aria-hidden="true">→</span></Link>{client.status === "ACTIVE" && <button type="button" className="secondary-button control-danger" aria-label={`Revoke ${client.name}`} disabled={revokingId !== null} onClick={(event) => { revokeReturnFocusRef.current = event.currentTarget; setPendingRevoke(client); }}>{revokingId === client.id ? "Revoking…" : "Revoke"}</button>}</div>
     </article>)}</div>}
+    <ConfirmDialog
+      open={pendingRevoke !== null}
+      title="Revoke agent access?"
+      description={pendingRevoke ? `Revoke ${pendingRevoke.name} (${pendingRevoke.id})? Its OAuth access and any legacy credential will stop working. This cannot be undone.` : ""}
+      confirmLabel="Revoke access"
+      variant="danger"
+      busy={revokingId !== null}
+      onConfirm={() => { const client = pendingRevoke; if (client) void revoke(client).finally(() => setPendingRevoke(null)); }}
+      onCancel={() => setPendingRevoke(null)}
+      returnFocusRef={revokeReturnFocusRef}
+    />
   </section>;
 }
 

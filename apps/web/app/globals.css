@@ -626,3 +626,29 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
   .market-loading-spinner { animation-name: market-loading-pulse !important; animation-duration: 1.4s !important; animation-iteration-count: infinite !important; }
   .pulse-card:hover { transform: none; }
 }
+
+/* Owner-confirmed control-plane changes use the app's own modal surface. */
+.confirm-dialog {
+  width: calc(100% - 32px);
+  max-width: 460px;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 30px 100px rgb(0 0 0 / 35%);
+}
+.confirm-dialog::backdrop { background: rgb(5 8 14 / 70%); backdrop-filter: blur(5px); }
+html[data-theme="light"] .app-shell .confirm-dialog::backdrop { background: rgb(16 22 32 / 42%); }
+.confirm-dialog-body { display: grid; gap: 24px; padding: 24px; }
+.confirm-dialog-kicker { margin: 0; color: var(--accent-text); font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+.confirm-dialog-danger .confirm-dialog-kicker { color: var(--danger); }
+.confirm-dialog-title { margin: 8px 0 0; color: var(--ink); font-size: 20px; font-weight: 680; letter-spacing: -.025em; line-height: 1.25; overflow-wrap: anywhere; }
+.confirm-dialog-description { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.confirm-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-top: 16px; }
+.confirm-dialog-actions .button, .confirm-dialog-actions .secondary-button { min-height: 44px; }
+.confirm-dialog-danger .confirm-dialog-confirm { border-color: var(--danger); background: var(--danger); color: var(--canvas); box-shadow: none; }
+.confirm-dialog-danger .confirm-dialog-confirm:hover { border-color: color-mix(in srgb, var(--danger) 88%, var(--ink)); background: color-mix(in srgb, var(--danger) 88%, var(--ink)); }

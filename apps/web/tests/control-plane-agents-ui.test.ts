@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AgentConnectionGuide, AgentDirectory } from "../components/control-plane/clients-view";
+import { ConfirmDialog } from "../components/control-plane/confirm-dialog";
 import { AccessSummary } from "../components/control-plane/agent-detail-view";
 import { agentConnectionLabel } from "../components/control-plane/agent-labels";
 import { OAuthConnectContent } from "../components/oauth-connect-summary";
@@ -141,4 +143,26 @@ test("inactive agent detail labels saved policy as non-operative", () => {
   const html = renderToStaticMarkup(createElement(AccessSummary, { policy: detailPolicy, active: false }));
   assert.match(html, /saved permissions no longer grant access/);
   assert.match(html, /Saved read permissions/);
+});
+
+test("control-plane confirmations use the themed dialog instead of browser-native prompts", () => {
+  const html = renderToStaticMarkup(createElement(ConfirmDialog, {
+    open: true,
+    title: "Remove request limits?",
+    description: "Unlimited requests still need human approval and cannot execute a trade.",
+    confirmLabel: "Remove limit and save",
+    onConfirm: () => undefined,
+    onCancel: () => undefined,
+  }));
+  assert.match(html, /<dialog[^>]*class="confirm-dialog"/);
+  assert.match(html, /aria-labelledby="[^"]+"[^>]*aria-describedby="[^"]+"/);
+  assert.match(html, /Remove request limits\?/);
+  assert.match(html, /Unlimited requests still need human approval/);
+  assert.match(html, /type="button"[^>]*>Cancel<\/button>/);
+
+  for (const component of ["agent-detail-view", "clients-view", "approvals-view", "legacy-agent-keys"]) {
+    const source = readFileSync(new URL(`../components/control-plane/${component}.tsx`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /window\.(?:confirm|alert|prompt)\s*\(/, component);
+    assert.match(source, /<ConfirmDialog\b/, component);
+  }
 });

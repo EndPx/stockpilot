@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AgentMark } from "./clients-view";
 import { agentConnectionLabel } from "./agent-labels";
+import { ConfirmDialog } from "./confirm-dialog";
 import { Activity, ClientRecord, Policy, controlFetch, formatDate } from "./shared";
 
 const readScopes = [
@@ -54,6 +55,8 @@ function AgentPolicyEditor({ policy, onSaved, onCancel, onReload }: {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [hasError, setHasError] = useState(false);
+  const [confirmRemoveCap, setConfirmRemoveCap] = useState(false);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const maxId = useId();
   const dailyId = useId();
 
@@ -61,11 +64,8 @@ function AgentPolicyEditor({ policy, onSaved, onCancel, onReload }: {
     setScopes((current) => checked ? [...current, scope] : current.filter((item) => item !== scope));
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const removingCap = (maxUnlimited && currentPolicy.maxInvestmentUsd !== null) ||
-      (dailyUnlimited && currentPolicy.dailyRequestLimitUsd !== null);
-    if (removingCap && !window.confirm("Remove this agent’s request cap? It can submit uncapped requests, but every investment still requires your approval and cannot execute a trade.")) return;
+  async function persistPolicy() {
+    if (busy) return;
     setBusy(true); setFeedback(""); setHasError(false);
     try {
       const result = await controlFetch<{ policy: Policy }>(`/clients/${currentPolicy.clientId}/policy`, "PATCH", {
@@ -85,7 +85,21 @@ function AgentPolicyEditor({ policy, onSaved, onCancel, onReload }: {
     } finally { setBusy(false); }
   }
 
-  return <form className="control-form agent-policy-editor" onSubmit={(event) => void save(event)}>
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const removingCap = (maxUnlimited && currentPolicy.maxInvestmentUsd !== null) ||
+      (dailyUnlimited && currentPolicy.dailyRequestLimitUsd !== null);
+    if (removingCap) { setConfirmRemoveCap(true); return; }
+    void persistPolicy();
+  }
+
+  const removingPerRequestCap = maxUnlimited && currentPolicy.maxInvestmentUsd !== null;
+  const removingDailyCap = dailyUnlimited && currentPolicy.dailyRequestLimitUsd !== null;
+  const capLabel = removingPerRequestCap && removingDailyCap ? "the per-request and 24-hour request caps"
+    : removingPerRequestCap ? "the per-request cap" : "the 24-hour request cap";
+
+  return <form className="control-form agent-policy-editor" onSubmit={save}>
     <p className="control-note">Policy version {currentPolicy.version}. Changes affect future requests only.</p>
     <div className="control-filter" role="group" aria-label="Permission quick choices">{presets.map((preset) => <button key={preset.label} type="button" aria-pressed={matches(scopes, preset.scopes)} className={matches(scopes, preset.scopes) ? "control-filter-active" : ""} onClick={() => setScopes([...preset.scopes])}>{preset.label}</button>)}</div>
     <fieldset><legend>Read access</legend><div className="control-checks">{readScopes.map((item) => policy.scopes.includes(item.value) || item.value !== "approvals:read-own" ? <label key={item.value}><input type="checkbox" checked={scopes.includes(item.value)} onChange={(event) => toggleScope(item.value, event.target.checked)} />{item.value === "approvals:read-own" ? "Keep legacy approvals-read grant (no MCP tool)" : `Read ${item.label.toLowerCase()}`}</label> : null)}</div></fieldset>
@@ -95,8 +109,18 @@ function AgentPolicyEditor({ policy, onSaved, onCancel, onReload }: {
       <div className="agent-limit-field"><label htmlFor={dailyId}>24-hour request limit · USDC</label><input id={dailyId} type="number" inputMode="decimal" min="0.000001" step="0.000001" value={daily} onChange={(event) => setDaily(event.target.value)} disabled={dailyUnlimited} required={!dailyUnlimited} /><label className="agent-unlimited-option"><input type="checkbox" checked={dailyUnlimited} onChange={(event) => setDailyUnlimited(event.target.checked)} />No daily cap</label></div>
     </div>
     <p className="control-note">Limits apply to requests, not wallet execution. Removing a limit does not let this agent sign or spend funds.</p>
-    <div className="agent-detail-actions"><button className="secondary-button" type="button" onClick={onCancel} disabled={busy}>Cancel</button><button className="button" type="submit" disabled={busy || scopes.length === 0}>{busy ? "Saving…" : "Save policy"}</button></div>
+    <div className="agent-detail-actions"><button className="secondary-button" type="button" onClick={onCancel} disabled={busy}>Cancel</button><button ref={saveButtonRef} className="button" type="submit" disabled={busy || scopes.length === 0}>{busy ? "Saving…" : "Save policy"}</button></div>
     {feedback && <div role={hasError ? "alert" : "status"} className="control-feedback">{feedback}{hasError && <button className="text-link" type="button" onClick={onReload}>Reload current policy</button>}</div>}
+    <ConfirmDialog
+      open={confirmRemoveCap}
+      title="Remove request limits?"
+      description={`This removes ${capLabel} for this agent. It can submit requests without those limits, but every investment still requires your approval. Approval cannot sign or execute a trade.`}
+      confirmLabel="Remove limit and save"
+      busy={busy}
+      onConfirm={() => { void persistPolicy().finally(() => setConfirmRemoveCap(false)); }}
+      onCancel={() => setConfirmRemoveCap(false)}
+      returnFocusRef={saveButtonRef}
+    />
   </form>;
 }
 
@@ -142,7 +166,10 @@ export function AgentDetailView({ clientId }: { clientId: string }) {
   const [revision, setRevision] = useState(0);
   const [activityRevision, setActivityRevision] = useState(0);
   const [revoking, setRevoking] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [revokeError, setRevokeError] = useState("");
+  const revokeReturnFocusRef = useRef<HTMLElement | null>(null);
+  const backLinkRef = useRef<HTMLAnchorElement>(null);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   const reloadActivity = useCallback(() => setActivityRevision((value) => value + 1), []);
 
@@ -168,23 +195,34 @@ export function AgentDetailView({ clientId }: { clientId: string }) {
   }, [clientId, revision, activityRevision]);
 
   async function revoke() {
-    if (!client || !window.confirm(`Revoke ${client.name} (${client.id})? Its OAuth access and any legacy credential will stop working.`)) return;
+    if (!client || revoking) return;
     setRevoking(true); setRevokeError("");
-    try { await controlFetch(`/clients/${encodeURIComponent(client.id)}`, "DELETE"); reload(); }
+    try { await controlFetch(`/clients/${encodeURIComponent(client.id)}`, "DELETE"); revokeReturnFocusRef.current = backLinkRef.current; reload(); }
     catch (cause) { setRevokeError(cause instanceof Error ? cause.message : "Revocation failed."); }
     finally { setRevoking(false); }
   }
 
   return <div className="dashboard-stack agent-detail-page">
-    <Link className="text-link agent-back-link" href="/clients"><span aria-hidden="true">←</span> Back to Agents</Link>
+    <Link ref={backLinkRef} className="text-link agent-back-link" href="/clients"><span aria-hidden="true">←</span> Back to Agents</Link>
     {clientError ? <section className="surface control-state" role="alert"><p>{clientError}</p><button className="secondary-button" type="button" onClick={reload}>Try again</button></section>
       : !client ? <section className="surface control-state" role="status">Loading agent details…</section>
       : <>
         <AgentIdentity client={client} />
         <AgentPolicyPanel client={client} policy={policy} error={policyError} reload={reload} onSaved={setPolicy} />
         <AgentActivityPanel activity={activity} error={activityError} reload={reloadActivity} />
-        {client.status === "ACTIVE" && <div className="agent-revoke-region"><div><strong>Disconnect this agent</strong><p className="control-note">Revoking stops its OAuth access and any legacy key. This cannot be undone.</p></div><button className="secondary-button control-danger" type="button" disabled={revoking} onClick={() => void revoke()}>{revoking ? "Revoking…" : "Revoke access"}</button></div>}
+        {client.status === "ACTIVE" && <div className="agent-revoke-region"><div><strong>Disconnect this agent</strong><p className="control-note">Revoking stops its OAuth access and any legacy key. This cannot be undone.</p></div><button className="secondary-button control-danger" type="button" disabled={revoking} onClick={(event) => { revokeReturnFocusRef.current = event.currentTarget; setConfirmRevoke(true); }}>{revoking ? "Revoking…" : "Revoke access"}</button></div>}
         {revokeError && <p className="control-feedback" role="alert">{revokeError}</p>}
+        <ConfirmDialog
+          open={confirmRevoke}
+          title="Revoke agent access?"
+          description={`Revoke ${client.name} (${client.id})? Its OAuth access and any legacy credential will stop working. This cannot be undone.`}
+          confirmLabel="Revoke access"
+          variant="danger"
+          busy={revoking}
+          onConfirm={() => { void revoke().finally(() => setConfirmRevoke(false)); }}
+          onCancel={() => setConfirmRevoke(false)}
+          returnFocusRef={revokeReturnFocusRef}
+        />
       </>}
   </div>;
 }

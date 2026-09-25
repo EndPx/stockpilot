@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { ConfirmDialog } from "./confirm-dialog";
 import { Approval, controlFetch, formatDate, LoadState, PageHeader, useControlList } from "./shared";
 
 const filters = ["ALL", "PENDING_APPROVAL", "APPROVED", "REJECTED", "EXPIRED"] as const;
@@ -26,6 +27,9 @@ export function ApprovalDetailView() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [confirmDecision, setConfirmDecision] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const backLinkRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
     const controller = new AbortController();
     controlFetch<{ approval: Approval }>(`/approvals/${id}`, "GET", undefined, controller.signal)
@@ -35,20 +39,32 @@ export function ApprovalDetailView() {
   }, [id]);
 
   async function decide(decision: "APPROVED" | "REJECTED") {
-    if (!item || !window.confirm(`${decision === "APPROVED" ? "Approve" : "Reject"} this ${item.amountUsd} USDC request from ${item.clientName}? Approval does not execute a trade.`)) return;
+    if (!item || item.status !== "PENDING_APPROVAL" || busy) return;
     setBusy(true); setFeedback("");
     try {
       const result = await controlFetch<{ approval: Approval; executionAvailable: boolean }>(`/approvals/${id}`, "POST", { decision });
       setItem(result.approval);
       setFeedback(result.approval.status === "APPROVED" ? "Approval recorded. Trading remains disabled; no funds moved." : "Request rejected. No funds moved.");
+      returnFocusRef.current = backLinkRef.current;
     } catch (cause) { setFeedback(cause instanceof Error ? cause.message : "Decision failed. Refresh the request status."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setConfirmDecision(null); }
   }
 
-  return <div className="dashboard-stack"><PageHeader title="Review request" description="Verify the asset, client, amount, and policy snapshot before deciding." action={<Link href="/approvals" className="secondary-button">Back to approvals</Link>} />
+  return <div className="dashboard-stack"><PageHeader title="Review request" description="Verify the asset, client, amount, and policy snapshot before deciding." action={<Link ref={backLinkRef} href="/approvals" className="secondary-button">Back to approvals</Link>} />
     {error ? <section className="surface control-state" role="alert">{error}</section> : !item ? <section className="surface control-state" role="status">Loading request…</section> : <section className="surface control-panel"><div className="surface-header"><h2>{item.assetName} · {item.assetSymbol}</h2><span className={`control-status ${item.status === "PENDING_APPROVAL" ? "control-status-pending" : ""}`}>{item.status.replaceAll("_", " ").toLowerCase()}</span></div>
       <dl className="control-facts"><div><dt>Client</dt><dd>{item.clientName}</dd></div><div><dt>Requested amount</dt><dd>${item.amountUsd} USDC</dd></div><div><dt>Provider / market</dt><dd>PreStocks · Pre-IPO</dd></div><div><dt>Canonical mint</dt><dd className="control-address">{item.canonicalMint}</dd></div><div><dt>Policy snapshot</dt><dd>Version {item.policyVersion} · {item.policyMaxInvestmentUsd === null ? "No per-request cap" : `max $${item.policyMaxInvestmentUsd} USDC`}</dd></div><div><dt>Submitted</dt><dd>{formatDate(item.createdAt)}</dd></div><div><dt>Expires</dt><dd>{formatDate(item.expiresAt)}</dd></div>{item.decidedAt && <div><dt>Decided</dt><dd>{formatDate(item.decidedAt)}</dd></div>}</dl>
-      <div className="control-decision"><p>Approval is a record of your decision only. It does not prepare, sign, or execute a wallet transaction.</p>{item.status === "PENDING_APPROVAL" && <div className="control-row-actions"><button type="button" className="button" disabled={busy} onClick={() => void decide("APPROVED")}>{busy ? "Saving…" : "Approve request"}</button><button type="button" className="secondary-button control-danger" disabled={busy} onClick={() => void decide("REJECTED")}>Reject</button></div>}</div>
+      <div className="control-decision"><p>Approval is a record of your decision only. It does not prepare, sign, or execute a wallet transaction.</p>{item.status === "PENDING_APPROVAL" && <div className="control-row-actions"><button type="button" className="button" disabled={busy} onClick={(event) => { returnFocusRef.current = event.currentTarget; setConfirmDecision("APPROVED"); }}>Approve request</button><button type="button" className="secondary-button control-danger" disabled={busy} onClick={(event) => { returnFocusRef.current = event.currentTarget; setConfirmDecision("REJECTED"); }}>Reject</button></div>}</div>
     </section>}{feedback && <p className="control-feedback" role="status">{feedback}</p>}
+    <ConfirmDialog
+      open={confirmDecision !== null && item?.status === "PENDING_APPROVAL"}
+      title={confirmDecision === "REJECTED" ? "Reject investment request?" : "Approve investment request?"}
+      description={item ? `${item.clientName} requested ${item.amountUsd} USDC for ${item.assetName}. ${confirmDecision === "REJECTED" ? "Rejecting records your decision and moves no funds." : "Approving records consent only; it does not sign or execute a trade."}` : ""}
+      confirmLabel={confirmDecision === "REJECTED" ? "Reject request" : "Approve request"}
+      variant={confirmDecision === "REJECTED" ? "danger" : "default"}
+      busy={busy}
+      onConfirm={() => { if (confirmDecision) void decide(confirmDecision); }}
+      onCancel={() => setConfirmDecision(null)}
+      returnFocusRef={returnFocusRef}
+    />
   </div>;
 }
