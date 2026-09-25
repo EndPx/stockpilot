@@ -19,9 +19,14 @@ As of 25 September 2026, the repository implements:
 - Agent BUY, SELL, SOL transfer, and USDC transfer behind separate owner opt-ins,
   per-agent limits, explicit wallet delegation, and durable single-send recovery.
 
-Release `483f73d` is being deployed; this documentation checkpoint does **not**
-yet confirm its live health or enabled capabilities. No real finalized BUY,
-SELL, or agent transfer has been verified in the current acceptance record.
+Release `e5b53a2` is deployed to the StockPilot app container and verified healthy;
+`investmentsEnabled` and `agentExecutionEnabled` are both true. The live agent
+page confirms that wallet automation still requires the owner's consent and
+that its initial execution policy grants no actions. This release also fixes
+the missing Privy mainnet RPC configuration and embedded-wallet readiness,
+permits only the SDK's exact wallet-catalogue path in CSP, and removes the
+separate candle-inspection bar. The live manual BUY/SELL form loads normally.
+No real finalized BUY, SELL, or agent transfer has been verified in the current acceptance record.
 Passing tests, a quote, or an enabled health flag is not evidence of a completed
 mainnet transaction. See [current wallet-execution boundary and test handoff](docs/AGENT_WALLET_EXECUTION.md)
 for the exact opt-ins, supported assets, six-day server authorization, and

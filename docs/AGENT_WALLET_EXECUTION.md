@@ -2,9 +2,20 @@
 
 ## Status — 25 September 2026
 
-The implementation in release `483f73d` includes owner-signed manual BUY/SELL
-and owner-delegated agent wallet actions. Deployment is in progress at this
-documentation checkpoint; live image/health verification is still pending.
+Release `e5b53a25d61dc4f0e15f2ab1f69240a33810e856` is deployed to
+`stockpilot-app-1` on VPS 1330754. The exact image and public health endpoint
+were verified: authentication, manual investments, and agent execution are
+enabled. Redis was not replaced. The live agent page shows wallet automation
+awaiting owner consent and an initial execution policy with no granted actions.
+The release also supplies Privy's explicit mainnet RPC/subscription configuration
+to fix the manual signing UI's missing-chain error; no verifier was relaxed.
+The follow-up wallet fix preserves SDK connector initialization (required even
+for its embedded Solana wallet) and permits only the SDK's exact catalogue path
+in CSP. Fresh browser verification showed the BUY/SELL form with 0.1 USDC,
+successful session/portfolio/trade-status reads, and a successful wallet-catalogue
+request. The owner still needs to make their declaration and approve real signing.
+The separate candle-inspection bar was removed; chart-backend remediation was
+explicitly deferred and is not included in this release.
 No real finalized BUY, SELL, or agent transfer has been verified in the current
 acceptance record. This document supersedes the execution-disabled statements
 in earlier readiness reports; those reports remain historical evidence.
@@ -24,8 +35,9 @@ single-send, and reconciliation boundaries; they are not mainnet acceptance.
    that same Privy wallet. Completion requires a finalized result, not merely a
    submitted signature. Network fees and token-account rent require additional SOL.
 3. For agent execution, connect the AI host through OAuth and open its entry
-   under **Agents**. Explicitly connect **Wallet automation**, then save the
-   agent's **Automatic actions** policy. Both permissions are required; the
+   under **Agents**. Read and explicitly accept **Wallet automation**, then use
+   **Enable wallet automation**. Configure the agent's **Automatic actions**,
+   choose **Save execution policy**, and review **Authorize and save**. Both permissions are required; the
    initial policy enables nothing. Saving policy does not initiate a trade.
 4. Ask the agent for the selected operation using one unique `clientRequestId`
    for that exact intent. Retain the returned operation ID/signature. Use
@@ -121,6 +133,10 @@ The provisioning helper accepts only an explicit future expiry within seven
 days. An owner's **No policy expiry** selection does not override this separate
 server expiry. There is no automatic renewal job.
 
+The currently configured server authorization expires on **1 October 2026 at
+16:11:16 UTC (23:11:16 WIB)**. It was provisioned without attaching its signer
+to any user wallet; the owner must still grant that access through Privy.
+
 Before `PRIVY_EXECUTION_EXPIRES_AT`, the operator must deliberately renew the
 server authorization and publish the updated protected configuration. The
 existing release helper reuses its protected signer file; rerunning a deployment
@@ -141,12 +157,16 @@ The authoritative paths are the manual preparer/verifier under
 adds the agent execution ledger and shared wallet lock; the release procedure
 must separately verify migration/runtime privileges and the resulting app image.
 
+The execution release passed **523 tests**. The final wallet/UI follow-ups passed
+**18 targeted tests**, with production builds locally and on the VPS.
 Focused tests cover exact amount parsing, owner/CSRF isolation, policy conflicts,
 revocation/expiry, atomic caps, duplicate/ambiguous attempts, strict transfers,
 and finalized reconciliation. Those tests and successful builds establish local
 implementation evidence only. Deployment health, owner opt-in, real signing,
 and finalized mainnet execution remain distinct acceptance checks.
 
-**Next action:** check the deployed `/api/health` and exact release image, then
-open **Agents → your connected agent** to inspect wallet readiness and configure
-only the permissions needed for the owner-led acceptance test above.
+**Next action:** hard-refresh the trading page and complete the owner-led manual
+signing/finalized-result check. For automation, open **Agents → your connected
+agent** and grant only the wallet and action permissions needed. Refresh the MCP
+host's tool list after deployment if it still exposes only the older read/request
+tools. No actual trade or transfer was signed or submitted during deployment.
