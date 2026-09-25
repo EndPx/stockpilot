@@ -256,8 +256,11 @@ ink `#18212f`, muted `#526174`, faint `#64748b`, line `#dce3ec`, strong line
 `#9aa9ba`, rail `#f9fbfd`, hover `#e9eef7`, pale cobalt `#e8ecff`, accent text
 `#354ccc`, success `#176a4f`, warning `#80550c`, danger `#b6363e`. Surfaces keep
 the same radius and a low-contrast, broad shadow. Theme control has focused,
-pressed, and announced states, with no decorative page-cover animation. Agents
-shows only host connection paths supported by the configured OAuth service;
+pressed, and announced states, with no decorative page-cover animation. Because
+the document owns vertical scrolling, its native scrollbar uses the active app
+color scheme; the landing, sign-in, and OAuth handoff remain dark even when a
+light app preference is saved. Agents shows only host connection paths supported
+by the configured OAuth service;
 legacy bearer setup is not offered as a new-client path. Approvals keeps pending/decided
 filters and links to the full request review; an empty list never claims a trade
 occurred. The obsolete Phantom migration paragraph is removed from Credentials.
