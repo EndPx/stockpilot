@@ -32,12 +32,12 @@ test("Privy browser RPC uses only the encoded public app ID and is lazy", async 
   assert.deepEqual([...requests[0]!.searchParams], [["privyAppId", "public-app +&test"]]);
 });
 
-test("embedded-only login does not initialize unused external WalletConnect", () => {
+test("embedded login disables WalletConnect without deadlocking SDK connector readiness", () => {
   const config = createPrivyClientConfig("public-test-app");
   assert.deepEqual(config.loginMethods, ["google", "email"]);
   assert.equal(config.embeddedWallets?.solana?.createOnLogin, "users-without-wallets");
   assert.equal(config.externalWallets?.walletConnect?.enabled, false);
-  assert.equal(config.externalWallets?.disableAllExternalWallets, true);
+  assert.notEqual(config.externalWallets?.disableAllExternalWallets, true);
 });
 
 test("the mounted Privy provider uses the mainnet-aware client config", () => {

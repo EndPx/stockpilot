@@ -9,7 +9,8 @@ export function createPrivyClientConfig(appId: string): PrivyClientConfig {
     loginMethods: ["google", "email"],
     embeddedWallets: { solana: { createOnLogin: "users-without-wallets" } },
     externalWallets: {
-      disableAllExternalWallets: true,
+      // Keep connector readiness initialization: Privy 3.45's Solana useWallets
+      // also waits for it, even when the selected wallet is embedded.
       walletConnect: { enabled: false },
     },
     appearance: { theme: "dark", accentColor: "#5468ff" },
