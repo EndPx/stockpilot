@@ -145,6 +145,14 @@ test("inactive agent detail labels saved policy as non-operative", () => {
   assert.match(html, /Saved read permissions/);
 });
 
+test("agent detail keeps policy first and recent activity in a responsive right pane", () => {
+  const component = readFileSync(new URL("../components/control-plane/agent-detail-view.tsx", import.meta.url), "utf8");
+  const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(component, /<div className="agent-detail-layout">\s*<div className="agent-detail-main">[\s\S]*?<aside className="agent-detail-aside" aria-label="Agent recent activity">/);
+  assert.match(styles, /\.agent-detail-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1\.65fr\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(styles, /@container\s*\(max-width:\s*880px\)[^}]*\.agent-detail-layout\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+});
+
 test("control-plane confirmations use the themed dialog instead of browser-native prompts", () => {
   const html = renderToStaticMarkup(createElement(ConfirmDialog, {
     open: true,

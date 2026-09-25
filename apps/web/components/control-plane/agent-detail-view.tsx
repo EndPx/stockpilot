@@ -208,10 +208,16 @@ export function AgentDetailView({ clientId }: { clientId: string }) {
       : !client ? <section className="surface control-state" role="status">Loading agent details…</section>
       : <>
         <AgentIdentity client={client} />
-        <AgentPolicyPanel client={client} policy={policy} error={policyError} reload={reload} onSaved={setPolicy} />
-        <AgentActivityPanel activity={activity} error={activityError} reload={reloadActivity} />
-        {client.status === "ACTIVE" && <div className="agent-revoke-region"><div><strong>Disconnect this agent</strong><p className="control-note">Revoking stops its OAuth access and any legacy key. This cannot be undone.</p></div><button className="secondary-button control-danger" type="button" disabled={revoking} onClick={(event) => { revokeReturnFocusRef.current = event.currentTarget; setConfirmRevoke(true); }}>{revoking ? "Revoking…" : "Revoke access"}</button></div>}
-        {revokeError && <p className="control-feedback" role="alert">{revokeError}</p>}
+        <div className="agent-detail-layout">
+          <div className="agent-detail-main">
+            <AgentPolicyPanel client={client} policy={policy} error={policyError} reload={reload} onSaved={setPolicy} />
+            {client.status === "ACTIVE" && <div className="agent-revoke-region"><div><strong>Disconnect this agent</strong><p className="control-note">Revoking stops its OAuth access and any legacy key. This cannot be undone.</p></div><button className="secondary-button control-danger" type="button" disabled={revoking} onClick={(event) => { revokeReturnFocusRef.current = event.currentTarget; setConfirmRevoke(true); }}>{revoking ? "Revoking…" : "Revoke access"}</button></div>}
+            {revokeError && <p className="control-feedback" role="alert">{revokeError}</p>}
+          </div>
+          <aside className="agent-detail-aside" aria-label="Agent recent activity">
+            <AgentActivityPanel activity={activity} error={activityError} reload={reloadActivity} />
+          </aside>
+        </div>
         <ConfirmDialog
           open={confirmRevoke}
           title="Revoke agent access?"

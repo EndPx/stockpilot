@@ -295,7 +295,14 @@ distinct. Show request caps only as request caps, never as spending authority.
 `Edit policy` reveals the existing versioned policy editor on this page;
 revoked or expired clients have read-only detail and no save action. Recent
 activity is filtered server-side to this client and has separate loading,
-empty, and error states. Revoke is a confirmed, destructive secondary action.
+empty, and error states. On wide screens, a supporting-pane grid places policy
+and its destructive secondary action in the wider left column and Recent
+activity in the narrower right column, directly below the full-width identity
+metadata. The document remains the only scroll owner; neither panel gets an
+internal scrollbar. Below the two-column content threshold, the DOM order
+stacks policy, revoke, then activity without changing keyboard focus order.
+Long activity labels and timestamps wrap within the pane. Revoke is a confirmed,
+destructive secondary action.
 The PayBox reference contributes information hierarchy, not its branding,
 signing-key control, EVM/card/secret grants, autonomous labels, or swap
 slippage controls, none of which StockPilot implements. Do not describe a

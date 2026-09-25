@@ -250,7 +250,13 @@ html[data-theme="light"] .app-shell .control-status-pending { border-color: colo
 .agent-limit-field input[type="number"]:disabled { opacity: .55; }
 .agent-unlimited-option { display: flex !important; min-height: 44px; align-items: center; gap: 8px !important; color: var(--muted) !important; font-weight: 500 !important; }
 .agent-unlimited-option input { width: 16px; height: 16px; accent-color: var(--accent); }
-.agent-detail-page { max-width: 1000px; }
+.agent-detail-page { max-width: 1320px; container-type: inline-size; }
+.agent-detail-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); align-items: start; gap: 18px; }
+.agent-detail-main { display: grid; min-width: 0; gap: 18px; }
+.agent-detail-aside { min-width: 0; }
+.agent-detail-aside .control-row { align-items: start; padding-inline: 16px; }
+.agent-detail-aside .control-row-main, .agent-detail-aside .control-row time { overflow-wrap: anywhere; }
+@container (max-width: 880px) { .agent-detail-layout { grid-template-columns: minmax(0, 1fr); } }
 .agent-back-link { width: fit-content; min-height: 44px; }
 .agent-detail-header { display: flex; min-width: 0; align-items: center; gap: 16px; }
 .agent-detail-header > .agent-host-mark { width: 54px; height: 54px; flex-basis: 54px; border-radius: 15px; }
