@@ -35,7 +35,7 @@ export function CredentialsView() {
   return <div className="dashboard-stack">
     <PageHeader title="Credentials" description="Your verified Solana wallet and existing agent keys. Private wallet keys are never shown." action={<Link className="secondary-button" href="/clients">Manage agents</Link>} />
     <PrivyCredentials embedded />
-    <section className="surface control-panel"><div className="surface-header"><h2>Legacy agent keys</h2><span className="control-muted">Existing bearer keys only · new connections use OAuth</span></div>
+    <section className="surface control-panel"><div className="surface-header"><h2>Legacy agent keys</h2></div>
       {activeCredentials.length > 0 && <div className="control-list">{activeCredentials.map((credential) => {
         return <article className="control-row" key={credential.id}><div className="control-row-main"><strong>{credential.clientName}</strong><span>{credential.displayPrefix}… · Expires {formatDate(credential.expiresAt)} · Used {formatDate(credential.lastUsedAt)}</span></div>
           <div className="control-row-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void action(credential, "PUT")}>Rotate</button><button type="button" className="secondary-button control-danger" disabled={busy} onClick={() => void action(credential, "DELETE")}>Revoke</button></div>

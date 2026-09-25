@@ -83,7 +83,7 @@ export function AgentConnectionGuide({ status, error, retry }: {
   }
 
   return <section className="surface control-panel">
-    <div className="surface-header"><h2>Connect an agent</h2><span className="control-muted">Browser sign-in · no API key to paste</span></div>
+    <div className="surface-header"><h2>Connect an agent</h2></div>
     {error ? <div className="control-state" role="alert"><p>Could not check OAuth availability: {error}</p><button type="button" className="secondary-button" onClick={retry}>Try again</button></div>
       : !status ? <div className="control-state" role="status">Checking secure connection availability…</div>
       : !status.enabled ? <div className="control-state" role="status"><p>OAuth connection setup is pending. New agent connections are not available yet. Existing clients and credentials remain manageable below.</p></div>
