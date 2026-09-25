@@ -90,33 +90,6 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
     const server = new McpServer({ name: "stockpilot", version: "1.0.0" });
     const can = (scope: string) => principal.scopes.includes(scope as AgentPrincipal["scopes"][number]);
 
-    server.registerTool("list_assets", {
-      description: "Search canonical StockPilot Pre-IPO and public-market assets. Discovery does not authorize trading.",
-      inputSchema: z.object({
-        query: z.string().max(100).optional(), provider: z.enum(["prestocks", "xstocks"]).optional(),
-        marketType: z.enum(["PRE_IPO", "PUBLIC_EQUITY", "ETF", "PUBLIC_MARKET_PRODUCT"]).optional(),
-        limit: z.number().int().min(1).max(50).optional(), cursor: z.string().max(1600).optional(),
-      }).strict(),
-    }, async (input) => {
-      if (!can("markets:read")) return denied();
-      try {
-        const page = await deps.listAssets({ ...input, limit: input.limit ?? 25 });
-        return result({ assets: page.assets.map(compactAsset), nextCursor: page.nextCursor,
-          total: page.total, stale: page.stale, sources: page.sources });
-      } catch (error) { return failure(error); }
-    });
-
-    server.registerTool("get_asset", {
-      description: "Inspect one official catalog asset by its canonical assetId.",
-      inputSchema: z.object({ assetId: z.string().min(1).max(100) }).strict(),
-    }, async ({ assetId }) => {
-      if (!can("markets:read")) return denied();
-      try {
-        const selected = await deps.getAsset(assetId);
-        return result({ asset: compactAsset(selected.asset), stale: selected.stale });
-      } catch (error) { return failure(error); }
-    });
-
     const marketListSchema = z.object({
       query: z.string().max(100).optional(),
       limit: z.number().int().min(1).max(50).optional(),

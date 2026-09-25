@@ -102,7 +102,6 @@ The read tools have separate market and wallet purposes:
 | --- | --- |
 | `list_stocks`, `get_stock` | Search/inspect official xStocks Stocks catalog entries. |
 | `list_pre_ipo`, `get_pre_ipo` | Search/inspect official PreStocks Pre-IPO catalog entries. |
-| `list_assets`, `get_asset` | Existing combined-market tools retained for compatibility. |
 | `get_balance` | Read confirmed Solana RPC SOL and canonical mainnet USDC balances for the authenticated wallet. |
 | `get_portfolio` | Read that wallet's canonical PreStocks and xStocks holdings. Investment-position valuation is indicative and may be `null`. |
 

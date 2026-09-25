@@ -42,5 +42,7 @@ test("MCP bearer authentication and host/origin checks run before SDK dispatch",
   assert.equal(verified, 1);
   const raw = await response.text();
   assert.equal(raw.includes(secret), false);
-  assert.match(raw, /list_assets/);
+  assert.match(raw, /list_stocks/);
+  assert.match(raw, /list_pre_ipo/);
+  assert.doesNotMatch(raw, /list_assets|get_asset/);
 });

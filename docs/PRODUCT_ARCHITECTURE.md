@@ -84,7 +84,7 @@ Portfolio expansion is deferred until safe provider activation: group by market 
 | `/activity` | Attributed request/approval/execution history | Future |
 | `/settings` | Account and wallet preferences | Future |
 
-Future tools are investment-specific: `list_assets`, `get_asset`, `prepare_investment`, `get_request_status`. No `swap_token`, arbitrary mint purchase, arbitrary instruction execution or wallet signer is exposed to agents. Do not add dead navigation to unimplemented pages.
+Current read-only MCP market tools are separate: `list_stocks`/`get_stock` and `list_pre_ipo`/`get_pre_ipo`. No `swap_token`, arbitrary mint purchase, arbitrary instruction execution or wallet signer is exposed to agents. Do not add dead navigation to unimplemented pages.
 
 ## Delivery gate
 
