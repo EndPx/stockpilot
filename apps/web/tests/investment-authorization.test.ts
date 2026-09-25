@@ -23,6 +23,7 @@ import {
   fingerprintTransactionMessage,
   InvestmentSecurityError,
   readInvestmentAuthorization,
+  signedInvestmentSignature,
 } from "../lib/investments/authorization";
 
 // Ephemeral offline fixture, never a funded wallet or a broadcast transaction.
@@ -71,6 +72,8 @@ async function token(serialized = transaction(), overrides: Partial<{
     inputMint,
     outputMint,
     inputAmountRaw: "50000000",
+    requiredMinimumOutputRaw: null,
+    maximumWalletNativeDebitLamportsRaw: null,
     outputDecimals: 9,
     symbol: "SPACEX",
     lastValidBlockHeight: overrides.lastValidBlockHeight ?? "200",
@@ -93,8 +96,35 @@ test("round trips a short-lived authorization bound to every investment field", 
   assert.equal(decoded.inputMint, inputMint);
   assert.equal(decoded.outputMint, outputMint);
   assert.equal(decoded.inputAmountRaw, "50000000");
+  assert.equal(decoded.requiredMinimumOutputRaw, null);
+  assert.equal(decoded.maximumWalletNativeDebitLamportsRaw, null);
   assert.equal(decoded.symbol, "SPACEX");
+  assert.equal(decoded.provider, "prestocks");
   assert.equal(decoded.expiresAt, now + 120_000);
+});
+
+test("SELL authorization binds token input, USDC output and raw input decimals", async () => {
+  const encoded = await createInvestmentAuthorization({
+    side: "SELL", provider: "prestocks", walletAddress: wallet, requestId: "sell-one",
+    inputMint: outputMint, outputMint: inputMint, inputDecimals: 9, outputDecimals: 6,
+    inputAmountRaw: "100000000", requiredMinimumOutputRaw: "1000000",
+    maximumWalletNativeDebitLamportsRaw: "300000", symbol: "SPACEX",
+    lastValidBlockHeight: "200", orderExpireAt: null, transaction: transaction(),
+  }, secret, now);
+  const decoded = await readInvestmentAuthorization(encoded, secret, now + 1);
+  assert.equal(decoded.side, "SELL");
+  assert.equal(decoded.provider, "prestocks");
+  assert.equal(decoded.inputMint, outputMint);
+  assert.equal(decoded.outputMint, inputMint);
+  assert.equal(decoded.inputDecimals, 9);
+  await assert.rejects(createInvestmentAuthorization({
+    side: "SELL", provider: "prestocks", walletAddress: wallet, requestId: "invalid-sell",
+    inputMint: outputMint, outputMint, inputDecimals: 9, outputDecimals: 6,
+    inputAmountRaw: "100000000", requiredMinimumOutputRaw: "1000000",
+    maximumWalletNativeDebitLamportsRaw: "300000", symbol: "SPACEX",
+    lastValidBlockHeight: "200", orderExpireAt: null, transaction: transaction(),
+  }, secret, now), (error: unknown) =>
+    error instanceof InvestmentSecurityError && error.code === "INVESTMENT_TOKEN_INVALID");
 });
 
 test("rejects modified and expired investment tokens", async () => {
@@ -132,6 +162,11 @@ test("accepts the authenticated wallet signature without requiring extra signer 
   const signed = transaction({ walletSigned: true });
   const fingerprint = await fingerprintTransactionMessage(transaction());
   await assert.doesNotReject(assertSignedInvestmentTransaction(signed, wallet, fingerprint));
+  assert.match(signedInvestmentSignature(signed, wallet), /^[1-9A-HJ-NP-Za-km-z]{80,88}$/);
+  assert.throws(
+    () => signedInvestmentSignature(transaction(), wallet),
+    (error) => error instanceof InvestmentSecurityError && error.code === "TRANSACTION_MISMATCH",
+  );
 });
 
 test("rejects missing wallet signature and changed transaction messages", async () => {

@@ -10,6 +10,17 @@ export class InvestmentClientError extends Error {
   }
 }
 
+export function classifyInvestmentApprovalError(error: unknown, signed: boolean): "status-unknown" | "wallet-rejected" | "failure" {
+  // A wallet rejection can only be assumed before a signed transaction exists.
+  // After signing, even an AbortError may mean the provider received the bytes.
+  if (signed) return "status-unknown";
+  if (typeof error === "object" && error !== null && (
+    ("name" in error && error.name === "AbortError") ||
+    ("code" in error && error.code === 4001)
+  )) return "wallet-rejected";
+  return "failure";
+}
+
 export function decodeBase64Transaction(value: string): Uint8Array {
   try {
     const binary = atob(value);
@@ -63,10 +74,12 @@ export async function runInvestmentApproval(input: {
     encodeBase64Transaction(signed),
     input.prepared.investmentToken,
   );
-  try {
-    await input.refreshPortfolio();
-  } catch (error) {
-    input.onPortfolioRefreshError?.(error);
+  if (result.execution.status === "CONFIRMED") {
+    try {
+      await input.refreshPortfolio();
+    } catch (error) {
+      input.onPortfolioRefreshError?.(error);
+    }
   }
   return result;
 }

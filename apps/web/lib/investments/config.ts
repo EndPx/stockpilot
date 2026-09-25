@@ -5,8 +5,9 @@ import { InvestmentApiError } from "./errors";
 
 /** Operator-controlled kill switch, never a client parameter or agent credential. */
 export function investmentsEnabled(): boolean {
-  // Legacy wallet-signature execution cannot sign with a Privy embedded wallet.
-  return !isPrivyMode() && process.env.INVESTMENTS_ENABLED === "true" && isAuthEnabled();
+  // The legacy wallet-signature route has been removed; manual execution now
+  // requires a verified Privy owner session and the same wallet's signature.
+  return isPrivyMode() && process.env.INVESTMENTS_ENABLED === "true" && isAuthEnabled();
 }
 
 export function assertInvestmentsEnabled(): void {

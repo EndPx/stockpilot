@@ -75,6 +75,21 @@ test("the adapter sends only the four default Meta-Aggregator order parameters",
   assert.equal(seenHeaders!.get("x-api-key"), "server-secret");
 });
 
+test("keyless Jupiter requests omit the API-key header", async () => {
+  const seen: Headers[] = [];
+  const fetchMock: typeof fetch = async (_input, init) => {
+    seen.push(new Headers(init?.headers));
+    return init?.method === "POST"
+      ? Response.json({ status: "Failed", code: -1000 })
+      : Response.json(order());
+  };
+  const adapter = new JupiterV2Adapter(null, fetchMock, "https://example.test");
+  await adapter.createOrder(expected);
+  await adapter.execute({ signedTransaction: "signed", requestId: "request-one" });
+  assert.equal(seen.length, 2);
+  assert.equal(seen.every((headers) => !headers.has("x-api-key")), true);
+});
+
 test("execute posts only signed transaction, request id, and bound block height", async () => {
   let body: unknown;
   const fetchMock: typeof fetch = async (_input, init) => {

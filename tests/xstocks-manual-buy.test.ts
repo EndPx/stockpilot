@@ -30,7 +30,7 @@ const policy: XStocksBuyPolicy = {
 const order: JupiterOrder = {
   requestId: "fixture-order", inputMint: SOLANA_MAINNET_USDC_MINT, outputMint: mint,
   inAmount: "50000000", outAmount: "125000000", taker: wallet,
-  router: "fixture", mode: "ultra", feeBps: 10, feeMint: SOLANA_MAINNET_USDC_MINT,
+  router: "metis", mode: "ultra", feeBps: 10, feeMint: SOLANA_MAINNET_USDC_MINT,
   priceImpactPct: "0.01", transaction: "AQID", lastValidBlockHeight: "100", expireAt: new Date(now + 60_000).toISOString(),
 };
 const review: InvestorEligibilityReview = {
@@ -135,6 +135,22 @@ test("a reviewed fixture can prepare only a raw-unit order requiring later instr
   ]);
 });
 
+test("aggregator block height and RFQ timestamp produce bounded unsigned orders", async () => {
+  const aggregator = await setup({ product: approvedProduct(), order: {
+    ...order, expireAt: null,
+  } }).service.prepare(request);
+  assert.equal(aggregator.lastValidBlockHeight, order.lastValidBlockHeight);
+  assert.equal(aggregator.expiresAt, technical.expiresAt);
+
+  const rfq = await setup({ product: approvedProduct(), order: {
+    ...order, router: "jupiterz", lastValidBlockHeight: null,
+    expireAt: new Date(now + 20_000).toISOString(),
+  } }).service.prepare(request);
+  assert.equal(rfq.lastValidBlockHeight, null);
+  assert.equal(rfq.expiresAt, new Date(now + 20_000).toISOString());
+  assert.equal(rfq.transactionStatus, "REQUIRES_INSTRUCTION_VALIDATION");
+});
+
 test("trade arguments cannot override the server-bound principal or wallet", async () => {
   const fixture = setup({ product: approvedProduct() });
   const forged = { ...request, principalId: "did:privy:other", sessionWalletAddress: mint } as unknown as typeof request;
@@ -201,7 +217,10 @@ test("wallet balance must use canonical mainnet USDC and cover the exact raw spe
 test("order identity, fee, impact, transaction and expiry remain fail-closed", async () => {
   for (const change of [
     { outputMint: wallet }, { inAmount: "50000001" }, { taker: mint },
-    { transaction: "not-base64!" }, { expireAt: null }, { lastValidBlockHeight: null },
+    { transaction: "not-base64!" }, { router: "unknown" },
+    { expireAt: "invalid-time" }, { expireAt: new Date(now + policy.maxOrderLifetimeMs + 1).toISOString() },
+    { lastValidBlockHeight: null }, { lastValidBlockHeight: "0" },
+    { router: "jupiterz", expireAt: null, lastValidBlockHeight: null },
   ]) {
     const fixture = setup({ product: approvedProduct(), order: { ...order, ...change } });
     await assert.rejects(fixture.service.prepare(request), (error) => error instanceof XStocksBuyError && error.code === "ORDER_UNAVAILABLE");

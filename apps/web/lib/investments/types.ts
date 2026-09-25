@@ -10,6 +10,8 @@ export type InvestmentApiErrorCode =
   | "INSUFFICIENT_USDC"
   | "JUPITER_ORDER_FAILED"
   | "JUPITER_ORDER_NOT_EXECUTABLE"
+  | "INVESTMENT_ORDER_UNVERIFIED"
+  | "UNRESOLVED_TRADE"
   | "JUPITER_ORDER_EXPIRED"
   | "INVESTMENT_TOKEN_INVALID"
   | "INVESTMENT_TOKEN_EXPIRED"
@@ -28,12 +30,16 @@ export type InvestmentApiErrorBody = {
 export type PreparedInvestmentResponse = {
   investment: {
     walletAddress: string;
+    providerRequestId: string;
     asset: { symbol: string; name: string; mintAddress: string };
     fundingAsset: { symbol: "USDC"; mintAddress: string };
     inputAmountRaw: string;
     inputAmountUsd: string;
     outputAmountRaw: string;
     estimatedOutputAmount: string;
+    requiredMinimumOutputRaw: string;
+    minimumOutputAmount: string;
+    maximumWalletNativeDebitLamportsRaw: string;
     router: string;
     mode: string;
     feeBps: number | null;
@@ -47,13 +53,29 @@ export type PreparedInvestmentResponse = {
 
 export type InvestmentExecutionResponse = {
   execution: {
-    status: "success";
-    symbol: string;
-    signature: string;
-    inputAmountRaw: string;
-    inputAmountUsd: string;
-    outputAmountRaw: string;
-    outputAmount: string;
+    status: "PENDING" | "CONFIRMED" | "FAILED";
+    side: "BUY" | "SELL";
+    providerRequestId: string;
+    transactionSignature: string;
+    actualInputAmountRaw: string | null;
+    actualOutputAmountRaw: string | null;
     solscanUrl: string;
   };
+};
+
+export type ManualInvestmentStatusResponse = {
+  execution: {
+    status: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED" | "REVIEW_REQUIRED";
+    ledgerStatus: "CLAIMED" | "SUBMITTED" | "UNKNOWN" | "CONFIRMED" | "FAILED";
+    side?: "BUY" | "SELL";
+    providerRequestId: string;
+    transactionSignature: string;
+    actualInputAmountRaw: string | null;
+    actualOutputAmountRaw: string | null;
+    actualWalletNativeDebitLamportsRaw: string | null;
+  };
+};
+
+export type ActiveManualInvestmentStatusResponse = {
+  execution: ManualInvestmentStatusResponse["execution"] | null;
 };

@@ -41,7 +41,7 @@ const quote: ReverseSellQuote = { inputMint: mint, outputMint: SOLANA_MAINNET_US
   quotedAt: new Date(now).toISOString(), expiresAt: new Date(now + 25_000).toISOString() };
 const order: JupiterOrder = { requestId: "sell-order-1", inputMint: mint,
   outputMint: SOLANA_MAINNET_USDC_MINT, inAmount: "3000000", outAmount: "15000000",
-  taker: wallet, router: "jupiter", mode: "ultra", feeBps: 10,
+  taker: wallet, router: "metis", mode: "ultra", feeBps: 10,
   feeMint: SOLANA_MAINNET_USDC_MINT, priceImpactPct: "0.1", transaction: "AQID",
   lastValidBlockHeight: "123456", expireAt: new Date(now + 20_000).toISOString() };
 
@@ -105,6 +105,18 @@ test("reviewed Pre-IPO SELL prepares only a principal-bound unsigned, unvalidate
     `mint:${mint}`, `balances:${wallet}`, `quote:${mint}:${SOLANA_MAINNET_USDC_MINT}:3000000`,
     `order:${mint}:${SOLANA_MAINNET_USDC_MINT}:3000000:${wallet}`, "unsigned-envelope",
   ]);
+});
+
+test("SELL accepts bounded aggregator block-height and RFQ timestamp variants", async () => {
+  const aggregator = await setup({ order: { ...order, expireAt: null } }).service.prepare(request);
+  assert.equal(aggregator.lastValidBlockHeight, order.lastValidBlockHeight);
+  assert.equal(aggregator.expiresAt, quote.expiresAt);
+
+  const rfq = await setup({ order: { ...order, router: "jupiterz", lastValidBlockHeight: null,
+    expireAt: new Date(now + 20_000).toISOString() } }).service.prepare(request);
+  assert.equal(rfq.lastValidBlockHeight, null);
+  assert.equal(rfq.expiresAt, new Date(now + 20_000).toISOString());
+  assert.equal(rfq.transactionStatus, "REQUIRES_INSTRUCTION_VALIDATION");
 });
 
 test("invalid input, ticker substitution and stale catalog stop before wallet/quote reads", async () => {
@@ -188,7 +200,10 @@ test("read-only Jupiter reverse quote uses a fixed origin and rejects wrong iden
 
 test("Jupiter order identity, taker, fee, impact, expiry, minimum output and unsigned proof stay bounded", async () => {
   for (const change of [{ inputMint: wallet }, { outputMint: mint }, { inAmount: "3000001" },
-    { taker: mint }, { transaction: "bad!" }, { expireAt: null }, { lastValidBlockHeight: null }]) {
+    { taker: mint }, { transaction: "bad!" }, { router: "unknown" },
+    { expireAt: "invalid-time" }, { expireAt: new Date(now + policy.maxOrderLifetimeMs + 1).toISOString() },
+    { lastValidBlockHeight: null }, { lastValidBlockHeight: "0" },
+    { router: "jupiterz", expireAt: null, lastValidBlockHeight: null }]) {
     await rejects("ORDER_UNAVAILABLE", { order: { ...order, ...change } });
   }
   for (const change of [{ feeBps: 51 }, { feeMint: wallet }, { priceImpactPct: "2.01" },

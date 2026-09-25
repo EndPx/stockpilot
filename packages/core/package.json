@@ -10,6 +10,7 @@
     "./asset-registry": "./src/asset-registry.ts",
     "./assets": "./src/assets.ts",
     "./investments": "./src/investments.ts",
+    "./jupiter-order-validity": "./src/jupiter-order-validity.ts",
     "./manual-sell": "./src/manual-sell.ts",
     "./xstocks-manual-buy": "./src/xstocks-manual-buy.ts",
     "./portfolio": "./src/portfolio.ts",

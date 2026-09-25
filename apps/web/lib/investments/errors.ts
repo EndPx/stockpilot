@@ -9,8 +9,10 @@ import {
 } from "@stockpilot/integrations/jupiter-v2";
 import { AuthError } from "@/lib/auth/errors";
 import { jsonResponse } from "@/lib/auth/http";
+import { ManualBuyLedgerError } from "@/lib/control-plane/manual-executions";
 import { SolanaBalanceReadError, SolanaInvestmentReadError } from "@/lib/solana/read-adapter";
 import { InvestmentSecurityError } from "./authorization";
+import { TransactionValidationError } from "./transaction-validation";
 import type { InvestmentApiErrorBody, InvestmentApiErrorCode } from "./types";
 
 const MESSAGES: Record<InvestmentApiErrorCode, string> = {
@@ -20,11 +22,13 @@ const MESSAGES: Record<InvestmentApiErrorCode, string> = {
   WALLET_MISMATCH: "The connected wallet does not match your authenticated session.",
   ASSET_NOT_FOUND: "This PreStocks asset was not found.",
   ASSET_NOT_ALLOWED: "Only official PreStocks assets can be purchased.",
-  ASSET_CATALOG_STALE: "A fresh issuer catalog is required before preparing an investment.",
+  ASSET_CATALOG_STALE: "A fresh issuer catalog is required before preparing or submitting an investment.",
   INVALID_AMOUNT: "Enter a valid USDC amount with no more than six decimal places.",
   INSUFFICIENT_USDC: "Your wallet does not have enough USDC for this investment.",
   JUPITER_ORDER_FAILED: "We couldn't prepare this investment with Jupiter. Please try again.",
   JUPITER_ORDER_NOT_EXECUTABLE: "Jupiter could not create an executable investment for this wallet.",
+  INVESTMENT_ORDER_UNVERIFIED: "This investment order has not passed StockPilot's transaction safety checks. No wallet signature was requested.",
+  UNRESOLVED_TRADE: "An earlier trade is unresolved. Check its status before preparing or signing another.",
   JUPITER_ORDER_EXPIRED: "The investment quote expired. Prepare a new review.",
   INVESTMENT_TOKEN_INVALID: "This investment authorization is not valid.",
   INVESTMENT_TOKEN_EXPIRED: "This investment authorization expired. Prepare a new review.",
@@ -55,6 +59,16 @@ function normalize(error: unknown): InvestmentApiError {
     const status = error.code === "WALLET_MISMATCH" ? 403 :
       error.code === "INVESTMENT_TOKEN_INVALID" ? 401 : 409;
     return new InvestmentApiError(error.code, status, error.message);
+  }
+  if (error instanceof ManualBuyLedgerError) {
+    if (error.code === "WALLET_BINDING_MISMATCH") return new InvestmentApiError("WALLET_MISMATCH", 403);
+    if (error.code === "ORDER_EXPIRED") return new InvestmentApiError("JUPITER_ORDER_EXPIRED", 409);
+    if (error.code === "UNRESOLVED_TRADE") return new InvestmentApiError("UNRESOLVED_TRADE", 409);
+    if (error.code === "INVALID_INPUT") return new InvestmentApiError("INVALID_REQUEST", 400);
+    return new InvestmentApiError("TRANSACTION_MISMATCH", 409);
+  }
+  if (error instanceof TransactionValidationError) {
+    return new InvestmentApiError("INVESTMENT_ORDER_UNVERIFIED", 503);
   }
   if (error instanceof JupiterOrderNotExecutableError) {
     return new InvestmentApiError("JUPITER_ORDER_NOT_EXECUTABLE", 422);

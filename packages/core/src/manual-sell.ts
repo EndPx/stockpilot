@@ -4,6 +4,7 @@ import type { JupiterExecutionAdapter, JupiterOrder } from "@stockpilot/integrat
 import type { MintInspection } from "@stockpilot/integrations/market-validation";
 import { readProviderJson } from "@stockpilot/integrations/provider-json";
 import type { InvestmentAssetRegistry } from "@stockpilot/core/asset-registry";
+import { inspectJupiterOrderValidity } from "@stockpilot/core/jupiter-order-validity";
 import { formatRawTokenAmount, type SolanaReadAdapter } from "@stockpilot/core/portfolio";
 import { SOLANA_MAINNET_USDC_MINT, SPL_TOKEN_PROGRAM_ADDRESS, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
 import { effectiveMultiplier, parseRawU64 } from "@stockpilot/core/token-amounts";
@@ -102,7 +103,7 @@ export type PreparedManualSell = Readonly<{
   quotedUsdcOutRaw: string; requiredMinimumUsdcOutRaw: string;
   router: string; mode: string; feeBps: number; feeMint: string | null;
   priceImpactPct: string; transaction: string; requestId: string;
-  lastValidBlockHeight: string; expiresAt: string;
+  lastValidBlockHeight: string | null; expiresAt: string;
   /** This preparer never signs or submits. A separate instruction-effect verifier must still reject by default. */
   transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION";
 }>;
@@ -252,7 +253,8 @@ export class ManualSellService {
     try { order = await this.deps.jupiter.createOrder({ inputMint: asset.mintAddress,
       outputMint: SOLANA_MAINNET_USDC_MINT, amountRaw: amount.toString(), taker: this.deps.principal.walletAddress }); }
     catch { return fail("ORDER_UNAVAILABLE"); }
-    const orderOut = this.checkOrder(order, asset.mintAddress, amount.toString());
+    const checkedOrder = this.checkOrder(order, asset.mintAddress, amount.toString());
+    const orderOut = checkedOrder.outputRaw;
     const quoteFloor = quoteOut * BigInt(10_000 - this.deps.policy.maxSlippageBps) / 10_000n;
     const orderFloor = orderOut * BigInt(10_000 - this.deps.policy.maxSlippageBps) / 10_000n;
     const minimum = [userFloor, quoteFloor, orderFloor].reduce((high, value) => value > high ? value : high);
@@ -261,7 +263,7 @@ export class ManualSellService {
     try { unsigned = await this.deps.verifyUnsignedEnvelope(order.transaction, this.deps.principal.walletAddress); }
     catch { return fail("UNSIGNED_ENVELOPE_UNVERIFIED"); }
     if (!unsigned) fail("UNSIGNED_ENVELOPE_UNVERIFIED");
-    const orderExpiry = expiry(order.expireAt!, this.now(), this.deps.policy.maxOrderLifetimeMs, "ORDER_UNAVAILABLE");
+    const orderExpiry = checkedOrder.expiresAtMs;
     const expiresAt = Math.min(orderExpiry, quoteExpiry, ownerExpiry, investorExpiry, productExpiry,
       productTime + MAX_REVIEW_AGE_MS, catalogTime + MAX_CATALOG_AGE_MS, this.now() + this.deps.policy.maxOrderLifetimeMs);
     if (expiresAt <= this.now()) fail("ORDER_UNAVAILABLE");
@@ -273,7 +275,7 @@ export class ManualSellService {
       requiredMinimumUsdcOutRaw: minimum.toString(), router: order.router, mode: order.mode,
       feeBps: order.feeBps!, feeMint: order.feeMint, priceImpactPct: order.priceImpactPct!,
       transaction: order.transaction, requestId: order.requestId,
-      lastValidBlockHeight: order.lastValidBlockHeight!, expiresAt: new Date(expiresAt).toISOString(),
+      lastValidBlockHeight: order.lastValidBlockHeight, expiresAt: new Date(expiresAt).toISOString(),
       transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION",
     };
   }
@@ -306,13 +308,11 @@ export class ManualSellService {
     }
   }
 
-  private checkOrder(order: JupiterOrder, mint: string, inputRaw: string): bigint {
+  private checkOrder(order: JupiterOrder, mint: string, inputRaw: string): { outputRaw: bigint; expiresAtMs: number } {
     if (order.inputMint !== mint || order.outputMint !== SOLANA_MAINNET_USDC_MINT ||
         order.inAmount !== inputRaw || order.taker !== this.deps.principal.walletAddress ||
         !order.requestId || order.requestId.length > 200 || !order.router || order.router.length > 200 ||
-        !order.mode || order.mode.length > 100 || !canonicalBase64(order.transaction) ||
-        !order.lastValidBlockHeight || !/^[1-9]\d{0,19}$/.test(order.lastValidBlockHeight) ||
-        !order.expireAt) fail("ORDER_UNAVAILABLE");
+        !order.mode || order.mode.length > 100 || !canonicalBase64(order.transaction)) fail("ORDER_UNAVAILABLE");
     const outputRaw = u64(order.outAmount, "ORDER_UNAVAILABLE");
     if (!outputRaw) fail("ORDER_UNAVAILABLE");
     if (order.feeBps === null || !Number.isInteger(order.feeBps) || order.feeBps < 0 ||
@@ -320,7 +320,8 @@ export class ManualSellService {
         order.feeMint !== null && order.feeMint !== mint && order.feeMint !== SOLANA_MAINNET_USDC_MINT ||
         order.feeBps > 0 && order.feeMint === null || order.priceImpactPct === null ||
         percentBpsCeiling(order.priceImpactPct) > BigInt(this.deps.policy.maxPriceImpactBps)) fail("ORDER_OUT_OF_POLICY");
-    expiry(order.expireAt, this.now(), this.deps.policy.maxOrderLifetimeMs, "ORDER_UNAVAILABLE");
-    return outputRaw;
+    const validity = inspectJupiterOrderValidity(order, this.now(), this.deps.policy.maxOrderLifetimeMs);
+    if (!validity) fail("ORDER_UNAVAILABLE");
+    return { outputRaw, expiresAtMs: validity.expiresAtMs };
   }
 }

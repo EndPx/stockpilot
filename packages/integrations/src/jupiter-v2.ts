@@ -190,12 +190,10 @@ type Fetch = typeof fetch;
 
 export class JupiterV2Adapter implements JupiterExecutionAdapter {
   constructor(
-    private readonly apiKey: string,
+    private readonly apiKey: string | null,
     private readonly fetchImpl: Fetch = fetch,
     private readonly baseUrl = JUPITER_API_URL,
-  ) {
-    if (!apiKey) throw new Error("JUPITER_API_KEY is required.");
-  }
+  ) {}
 
   async createOrder(input: JupiterCreateOrderInput): Promise<JupiterOrder> {
     const url = new URL("/swap/v2/order", this.baseUrl);
@@ -206,7 +204,7 @@ export class JupiterV2Adapter implements JupiterExecutionAdapter {
 
     try {
       const response = await this.fetchImpl(url, {
-        headers: { Accept: "application/json", "x-api-key": this.apiKey },
+        headers: { Accept: "application/json", ...(this.apiKey ? { "x-api-key": this.apiKey } : {}) },
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -235,7 +233,7 @@ export class JupiterV2Adapter implements JupiterExecutionAdapter {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          "x-api-key": this.apiKey,
+          ...(this.apiKey ? { "x-api-key": this.apiKey } : {}),
         },
         body: JSON.stringify(body),
         cache: "no-store",

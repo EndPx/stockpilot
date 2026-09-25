@@ -4,6 +4,11 @@ Decision: Privy is the login and Solana wallet for StockPilot. Google is the
 primary sign-in method. Phantom/Wallet Standard sign-in was removed from the
 live app at the Privy cutover. Investment and agent execution remain disabled.
 
+The newer joint Pre-IPO + Stocks manual-BUY release decision, implemented
+foundation, and remaining blockers are tracked in
+[MANUAL_BUY_READINESS.md](MANUAL_BUY_READINESS.md). This historical migration
+checkpoint is not evidence that a production BUY has occurred.
+
 ## Current implementation checkpoint (2026-09-23)
 
 The repository has a guarded Privy mode (`NEXT_PUBLIC_AUTH_PROVIDER=privy`):

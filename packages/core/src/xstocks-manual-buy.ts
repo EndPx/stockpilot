@@ -3,6 +3,7 @@ import { assertAssetIdentity } from "@stockpilot/integrations/asset-domain";
 import type { JupiterExecutionAdapter, JupiterOrder } from "@stockpilot/integrations/jupiter-v2";
 import { InvestmentAssetRegistry } from "@stockpilot/core/asset-registry";
 import { ExecutionEligibilityService } from "@stockpilot/core/execution-eligibility";
+import { inspectJupiterOrderValidity } from "@stockpilot/core/jupiter-order-validity";
 import { parseUsdcAmount } from "@stockpilot/core/investments";
 import type { Portfolio } from "@stockpilot/core/portfolio";
 import { SOLANA_MAINNET_USDC_MINT, TOKEN_2022_PROGRAM_ADDRESS } from "@stockpilot/core/solana";
@@ -73,7 +74,7 @@ export type PreparedXStocksBuy = Readonly<{
   priceImpactPct: string;
   transaction: string;
   requestId: string;
-  lastValidBlockHeight: string;
+  lastValidBlockHeight: string | null;
   expiresAt: string;
   /** This is an unsigned, unvalidated order. It is never permission to sign or submit. */
   transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION";
@@ -118,10 +119,9 @@ function validateOrder(order: JupiterOrder, expected: { wallet: string; mint: st
       order.priceImpactPct === null || percentageBpsCeiling(order.priceImpactPct) > BigInt(policy.maxPriceImpactBps)) {
     fail("ORDER_OUT_OF_POLICY");
   }
-  const expireAt = order.expireAt ? Date.parse(order.expireAt) : Number.NaN;
-  if (!Number.isFinite(expireAt) || expireAt <= now || expireAt > now + policy.maxOrderLifetimeMs ||
-      !order.lastValidBlockHeight || !/^[1-9]\d{0,19}$/.test(order.lastValidBlockHeight)) fail("ORDER_UNAVAILABLE");
-  return { outputRaw, expireAt };
+  const validity = inspectJupiterOrderValidity(order, now, policy.maxOrderLifetimeMs);
+  if (!validity) fail("ORDER_UNAVAILABLE");
+  return { outputRaw, expireAt: validity.expiresAtMs };
 }
 
 /**
@@ -250,7 +250,7 @@ export class XStocksManualBuyService {
       priceImpactPct: order.priceImpactPct!,
       transaction: order.transaction,
       requestId: order.requestId,
-      lastValidBlockHeight: order.lastValidBlockHeight!,
+      lastValidBlockHeight: order.lastValidBlockHeight,
       expiresAt: new Date(expiresAt).toISOString(),
       transactionStatus: "REQUIRES_INSTRUCTION_VALIDATION",
     };

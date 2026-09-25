@@ -1,13 +1,15 @@
 import { findAssetBySymbol, type Asset, type AssetSnapshot } from "@stockpilot/core/assets";
+import { inspectJupiterOrderValidity } from "@stockpilot/core/jupiter-order-validity";
 import { assertAssetIdentity } from "@stockpilot/integrations/asset-domain";
 import type { Portfolio } from "@stockpilot/core/portfolio";
 import {
   SOLANA_MAINNET_USDC_DECIMALS,
   SOLANA_MAINNET_USDC_MINT,
 } from "@stockpilot/core/solana";
-import type { JupiterExecutionAdapter, JupiterOrder } from "@stockpilot/integrations/jupiter-v2";
+import { JupiterOrderError, type JupiterExecutionAdapter, type JupiterOrder } from "@stockpilot/integrations/jupiter-v2";
 
 const MAX_U64 = 18_446_744_073_709_551_615n;
+const MAX_ORDER_LIFETIME_MS = 120_000;
 
 export type InvestmentErrorCode =
   | "ASSET_CATALOG_STALE"
@@ -93,6 +95,18 @@ function validateOutputDecimals(value: number): number {
   return value;
 }
 
+function assertMatchingOrder(order: JupiterOrder, expected: { walletAddress: string; mintAddress: string; amountRaw: string }, now: number): void {
+  if (order.inputMint !== SOLANA_MAINNET_USDC_MINT || order.outputMint !== expected.mintAddress ||
+      order.inAmount !== expected.amountRaw || order.taker !== expected.walletAddress ||
+      typeof order.requestId !== "string" || !order.requestId || order.requestId.length > 200 ||
+      typeof order.transaction !== "string" || !order.transaction ||
+      typeof order.outAmount !== "string" || !/^[1-9]\d{0,19}$/.test(order.outAmount) ||
+      BigInt(order.outAmount) > MAX_U64 ||
+      !inspectJupiterOrderValidity(order, now, MAX_ORDER_LIFETIME_MS)) {
+    throw new JupiterOrderError("Jupiter returned an invalid investment order.");
+  }
+}
+
 export class InvestmentService {
   constructor(
     private readonly assets: AssetReader,
@@ -146,6 +160,8 @@ export class InvestmentService {
       amountRaw: amount.amountRaw,
       taker: input.walletAddress,
     });
+    assertMatchingOrder(order, { walletAddress: input.walletAddress, mintAddress: asset.mintAddress,
+      amountRaw: amount.amountRaw }, this.now());
     return {
       walletAddress: input.walletAddress,
       asset: { symbol: asset.symbol, name: asset.name, mintAddress: asset.mintAddress },

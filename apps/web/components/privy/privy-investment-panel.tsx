@@ -3,7 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useSignTransaction, useWallets } from "@privy-io/react-auth/solana";
 import { useEffect, useState } from "react";
-import { InvestmentForm } from "@/components/investment-panel";
+import { InvestmentEligibilityNotice, InvestmentForm } from "@/components/investment-panel";
 import { selectSessionWallet, signWithPrivyWallet } from "@/lib/investments/privy-wallet";
 import { exchangePrivySession } from "@/lib/privy/client-session";
 
@@ -42,6 +42,7 @@ export function PrivyInvestmentPanel({ asset }: { asset: { symbol: string; name:
       <p className="text-xs font-semibold uppercase tracking-widest text-accent">Invest</p>
       <h2 id="investment-heading" className="mt-2 text-xl font-semibold">Buy {asset.symbol}</h2>
       <p className="mt-2 text-sm leading-6 text-muted">Invest USDC into this official PreStocks asset through Jupiter.</p>
+      <InvestmentEligibilityNotice market="pre-ipo" />
       <div className="mt-6 border-t border-line pt-6">
         {privyReady && !authenticated ? (
           <p role="alert" className="investment-error mt-0">Sign in to invest with your Privy wallet.</p>

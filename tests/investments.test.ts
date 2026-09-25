@@ -5,6 +5,7 @@ import { InvestmentError, InvestmentService, parseUsdcAmount } from "@stockpilot
 import type { Portfolio } from "@stockpilot/core/portfolio";
 import { SOLANA_MAINNET_USDC_MINT } from "@stockpilot/core/solana";
 import type { JupiterExecutionAdapter, JupiterOrder } from "@stockpilot/integrations/jupiter-v2";
+import { JupiterOrderError } from "@stockpilot/integrations/jupiter-v2";
 
 const wallet = "11111111111111111111111111111111";
 const mint = "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh";
@@ -59,12 +60,13 @@ function order(overrides: Partial<JupiterOrder> = {}): JupiterOrder {
   };
 }
 
-function service(options: { asset?: Asset | null; assets?: Asset[]; usdc?: string; stale?: boolean; catalogAge?: number } = {}) {
+function service(options: { asset?: Asset | null; assets?: Asset[]; usdc?: string; stale?: boolean; catalogAge?: number;
+  order?: Partial<JupiterOrder> } = {}) {
   const orders: unknown[] = [];
   const jupiter: JupiterExecutionAdapter = {
     async createOrder(input) {
       orders.push(input);
-      return order({ inAmount: input.amountRaw });
+      return order({ inAmount: input.amountRaw, ...options.order });
     },
     async execute() { throw new Error("not used"); },
   };
@@ -105,6 +107,34 @@ test("prepares only canonical USDC to the official server-resolved mint and sess
   assert.equal(prepared.outputDecimals, 9);
   assert.equal(prepared.outputAmountRaw, "125000000");
   assert.equal(prepared.createdAt, "2023-11-14T22:13:20.000Z");
+});
+
+test("accepts bounded aggregator block-height and RFQ timestamp orders", async () => {
+  const aggregator = await service({ order: { router: "dflow", lastValidBlockHeight: "123", expireAt: null } })
+    .value.prepare({ walletAddress: wallet, symbol: "SPACEX", amountUsd: "50" });
+  assert.equal(aggregator.lastValidBlockHeight, "123");
+  assert.equal(aggregator.expireAt, null);
+
+  const rfqExpiry = new Date(1_700_000_000_000 + 30_000).toISOString();
+  const rfq = await service({ order: { router: "jupiterz", lastValidBlockHeight: null, expireAt: rfqExpiry } })
+    .value.prepare({ walletAddress: wallet, symbol: "SPACEX", amountUsd: "50" });
+  assert.equal(rfq.lastValidBlockHeight, null);
+  assert.equal(rfq.expireAt, rfqExpiry);
+});
+
+test("rejects tampered Jupiter identity and unsupported or expired order shapes", async () => {
+  const request = { walletAddress: wallet, symbol: "SPACEX", amountUsd: "50" };
+  for (const change of [
+    { inputMint: mint }, { outputMint: wallet }, { inAmount: "50000001" }, { taker: mint },
+    { requestId: "" }, { outAmount: "0" }, { router: "unknown" },
+    { lastValidBlockHeight: null }, { lastValidBlockHeight: "0" },
+    { router: "jupiterz", lastValidBlockHeight: null, expireAt: null },
+    { router: "jupiterz", lastValidBlockHeight: null, expireAt: "invalid-time" },
+    { router: "jupiterz", lastValidBlockHeight: null, expireAt: new Date(1_700_000_000_000 + 120_001).toISOString() },
+  ]) {
+    await assert.rejects(service({ order: change }).value.prepare(request),
+      (error) => error instanceof JupiterOrderError);
+  }
 });
 
 test("rejects missing assets before Jupiter is called", async () => {
