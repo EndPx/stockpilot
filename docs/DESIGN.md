@@ -146,6 +146,21 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 5. Components and states
 
+Manual trade feedback revision (2026-09-25): submitted trades show a quiet,
+announced "Confirming on Solana…" status, followed by "Trade complete" only
+after verified settlement. Receipt checks run automatically with bounded requests
+and backoff; there is no Check trade status button and no transaction resubmission.
+Unknown, failed, rejected, and needs-review states remain distinct. New trades stay
+blocked while an outcome is unresolved. The trade footer no longer repeats the
+old test-wallet balance warning; exact amounts, fees and wallet signing remain
+in the review. Sell balance uses the same authenticated portfolio source as Wallet,
+refreshing on Sell selection, return to the tab, and settlement. Loading and failed
+reads never become zero; Use holding copies exact base-token units without rounding.
+For scaled xStocks, wallet display quantity and sellable base-token units are labeled
+separately. Existing typography, buttons, focus and status primitives are reused.
+The BeUI action-swap mechanism informs state labels in place; no new motion/library
+is needed and feedback stays static under all motion preferences.
+
 Delegated agent execution revision (2026-09-25): the connected-agent detail
 keeps read/request policy separate from an explicit owner-only Wallet execution
 panel. BUY, SELL, transfer SOL, and transfer USDC are four independent opt-ins;

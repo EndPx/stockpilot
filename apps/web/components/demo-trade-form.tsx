@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { decodeBase64Transaction, encodeBase64Transaction, InvestmentClientError, readInvestmentApiResponse } from "@/lib/investments/client";
-import type { ActiveManualInvestmentStatusResponse, InvestmentExecutionResponse, ManualInvestmentStatusResponse } from "@/lib/investments/types";
+import type { InvestmentExecutionResponse } from "@/lib/investments/types";
+import { pollTradeStatus, readSellHolding, readTradeStatus, tradeStatusLabel, type SellHolding, type TradeExecution } from "@/lib/investments/trade-state";
 import { InvestmentEligibilityNotice } from "./investment-panel";
 
 type Review = {
@@ -15,14 +16,6 @@ type Review = {
 };
 type Prepared = { review: Review; transaction: string; investmentToken: string };
 
-function statusExecution(result: ManualInvestmentStatusResponse["execution"]): InvestmentExecutionResponse["execution"] {
-  return { status: result.status === "CONFIRMED" || result.status === "FAILED" || result.status === "REJECTED"
-    ? result.status : "PENDING", side: result.side ?? "BUY",
-    providerRequestId: result.providerRequestId, transactionSignature: result.transactionSignature,
-    actualInputAmountRaw: result.actualInputAmountRaw, actualOutputAmountRaw: result.actualOutputAmountRaw,
-    solscanUrl: `https://solscan.io/tx/${encodeURIComponent(result.transactionSignature)}` };
-}
-
 export function DemoTradeForm({ asset, walletAddress, sign }: {
   asset: { symbol: string; name: string; mintAddress: string; provider: "prestocks" | "xstocks" };
   walletAddress: string;
@@ -31,10 +24,11 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [amount, setAmount] = useState("0.1");
   const [attested, setAttested] = useState(false);
-  const [held, setHeld] = useState<string | null>(null);
+  const [held, setHeld] = useState<SellHolding | null>(null);
+  const [holdingState, setHoldingState] = useState<"loading" | "ready" | "error">("loading");
   const [prepared, setPrepared] = useState<Prepared | null>(null);
-  const [execution, setExecution] = useState<InvestmentExecutionResponse["execution"] | null>(null);
-  const [busy, setBusy] = useState<"preparing" | "signing" | "submitting" | "checking" | null>(null);
+  const [execution, setExecution] = useState<TradeExecution | null>(null);
+  const [busy, setBusy] = useState<"preparing" | "signing" | "submitting" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unknown, setUnknown] = useState(false);
   const [recovering, setRecovering] = useState(true);
@@ -42,16 +36,26 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const storageKey = `stockpilot:pending-trade:${walletAddress}`;
 
-  function rememberPending(requestId: string | null) {
+  const rememberPending = useCallback((requestId: string | null) => {
     setPendingRequestId(requestId);
     try {
       if (requestId) sessionStorage.setItem(storageKey, requestId);
       else sessionStorage.removeItem(storageKey);
     } catch { /* Recovery also queries the owner-bound server ledger. */ }
-  }
+  }, [storageKey]);
+
+  const receiveStatus = useCallback((updated: TradeExecution | null) => {
+    const unresolved = updated?.status === "PENDING" || updated?.status === "REVIEW_REQUIRED";
+    setExecution(updated);
+    setUnknown(unresolved);
+    rememberPending(unresolved ? updated.providerRequestId : null);
+    setError(null);
+  }, [rememberPending]);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 20_000);
     let storedId: string | null = null;
     try { storedId = sessionStorage.getItem(storageKey); } catch { /* optional storage */ }
     setPendingRequestId(storedId);
@@ -60,49 +64,65 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
     setExecution(null);
     setUnknown(Boolean(storedId));
     setError(null);
-    void fetch("/api/investments/manual/status", {
-      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-      body: JSON.stringify(storedId ? { providerRequestId: storedId } : { active: true }),
-    }).then((response) => readInvestmentApiResponse<ActiveManualInvestmentStatusResponse>(response))
-      .then((result) => {
+    void readTradeStatus(storedId, controller.signal).then((result) => {
         if (cancelled) return;
-        if (result.execution) {
-          const recovered = statusExecution(result.execution);
-          setExecution(recovered);
-          setUnknown(recovered.status === "PENDING");
-          rememberPending(recovered.status === "PENDING" ? recovered.providerRequestId : null);
-        } else setUnknown(false);
+        receiveStatus(result);
       }).catch(() => {
         if (!cancelled) {
           setUnknown(true);
-          setError("Could not verify your previous trade status. Check status before starting another trade.");
+          setError("Trade status is temporarily unavailable. Checking automatically…");
         }
-      }).finally(() => { if (!cancelled) setRecovering(false); });
-    return () => { cancelled = true; };
-  }, [storageKey]);
+      }).finally(() => { clearTimeout(deadline); if (!cancelled) setRecovering(false); });
+    return () => { cancelled = true; clearTimeout(deadline); controller.abort(); };
+  }, [storageKey, receiveStatus]);
 
-  const rawHolding = (raw: string, decimals: number) => {
-    const padded = raw.padStart(decimals + 1, "0");
-    const fraction = padded.slice(-decimals).replace(/0+$/, "");
-    return decimals === 0 || !fraction ? padded.slice(0, -decimals || undefined) :
-      `${padded.slice(0, -decimals)}.${fraction}`;
-  };
+  const unresolved = unknown || execution?.status === "PENDING" || execution?.status === "REVIEW_REQUIRED";
+  const shouldPoll = unresolved && execution?.status !== "REVIEW_REQUIRED";
+  useEffect(() => {
+    if (busy || recovering || !shouldPoll) return;
+    return pollTradeStatus({
+      requestId: pendingRequestId,
+      onResult: receiveStatus,
+      onError: () => setError("Confirmation is taking longer. Checking automatically; do not submit again."),
+    });
+  }, [busy, recovering, shouldPoll, pendingRequestId, receiveStatus]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/portfolio", { credentials: "same-origin", cache: "no-store" })
-      .then((response) => response.json())
-      .then((body: { portfolio?: { positions?: { mintAddress: string; rawTokenAmount?: string; decimals?: number }[] } }) => {
-        const position = body.portfolio?.positions?.find((item) => item.mintAddress === asset.mintAddress);
-        if (!cancelled) setHeld(position?.rawTokenAmount && Number.isInteger(position.decimals)
-          ? rawHolding(position.rawTokenAmount, position.decimals!) : "0");
-      })
-      .catch(() => { if (!cancelled) setHeld(null); });
-    return () => { cancelled = true; };
-  }, [asset.mintAddress, walletAddress, execution?.status, execution?.providerRequestId]);
+    let inFlight = false;
+    let controller: AbortController;
+    let deadline: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      controller = new AbortController();
+      deadline = setTimeout(() => controller.abort(), 20_000);
+      setHoldingState("loading");
+      try {
+        const response = await fetch("/api/portfolio", { credentials: "same-origin", cache: "no-store", signal: controller.signal });
+        const holding = await readSellHolding(response, walletAddress, asset.mintAddress);
+        if (!cancelled) { setHeld(holding); setHoldingState("ready"); }
+      } catch {
+        if (!cancelled) { setHeld(null); setHoldingState("error"); }
+      } finally { clearTimeout(deadline); inFlight = false; }
+    };
+    const refreshVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    void refresh();
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    const interval = side === "SELL" ? setInterval(refreshVisible, 30_000) : undefined;
+    return () => {
+      cancelled = true;
+      controller?.abort();
+      clearTimeout(deadline);
+      clearInterval(interval);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, [asset.mintAddress, walletAddress, side, execution?.status, execution?.providerRequestId]);
 
   function selectSide(next: "BUY" | "SELL") {
-    if (busy || recovering || unknown || execution?.status === "PENDING") return;
+    if (busy || recovering || unresolved) return;
     setSide(next);
     setAmount(next === "BUY" ? "0.1" : "");
     setError(null);
@@ -111,7 +131,7 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
   }
 
   async function prepare() {
-    if (!attested || !amount || busy || recovering || unknown || execution?.status === "PENDING") return;
+    if (!attested || !amount || busy || recovering || unresolved || (side === "SELL" && holdingState !== "ready")) return;
     setBusy("preparing");
     setError(null);
     setExecution(null);
@@ -169,35 +189,11 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
         dialogRef.current?.close();
       } else if (signed) {
         setUnknown(true);
-        setError("Submission status is unknown. Do not sign or submit again. Check the trade status below.");
+        setError("Confirming your submission automatically. Do not sign or submit again.");
         dialogRef.current?.close();
       } else {
         setError(cause instanceof Error ? cause.message : "Wallet signing was cancelled or failed.");
       }
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function checkStatus() {
-    if (busy || recovering) return;
-    setBusy("checking");
-    try {
-      const response = await fetch("/api/investments/manual/status", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        credentials: "same-origin", body: JSON.stringify(pendingRequestId || prepared?.review.requestId
-          ? { providerRequestId: pendingRequestId ?? prepared!.review.requestId } : { active: true }),
-      });
-      const result = await readInvestmentApiResponse<ActiveManualInvestmentStatusResponse>(response);
-      const updated = result.execution ? statusExecution(result.execution) : null;
-      setExecution(updated);
-      if (!updated || updated.status !== "PENDING") {
-        setUnknown(false);
-        rememberPending(null);
-        setError(null);
-      } else rememberPending(updated.providerRequestId);
-    } catch {
-      setError("Status is not verified yet. Do not resubmit; inspect your wallet and Solscan.");
     } finally {
       setBusy(null);
     }
@@ -210,34 +206,34 @@ export function DemoTradeForm({ asset, walletAddress, sign }: {
     <InvestmentEligibilityNotice market={asset.provider === "prestocks" ? "pre-ipo" : "stocks"} />
     <div className="mt-5 grid grid-cols-2 gap-2">
       <button type="button" className={side === "BUY" ? "button" : "secondary-button"}
-        onClick={() => selectSide("BUY")}>Buy</button>
+        disabled={Boolean(busy || recovering || unresolved)} aria-pressed={side === "BUY"} onClick={() => selectSide("BUY")}>Buy</button>
       <button type="button" className={side === "SELL" ? "button" : "secondary-button"}
-        onClick={() => selectSide("SELL")}>Sell</button>
+        disabled={Boolean(busy || recovering || unresolved)} aria-pressed={side === "SELL"} onClick={() => selectSide("SELL")}>Sell</button>
     </div>
     <label className="mt-5 block text-sm font-medium" htmlFor={`trade-amount-${asset.mintAddress}`}>
       {side === "BUY" ? "USDC to spend" : `${asset.symbol} to sell`}
     </label>
     <input id={`trade-amount-${asset.mintAddress}`} className="mt-2 w-full rounded-lg border border-line bg-transparent p-3"
       inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)}
-      disabled={Boolean(busy || recovering || unknown || execution?.status === "PENDING")} />
-    {side === "SELL" && <p className="mt-2 text-xs text-muted">Wallet holding: {held ?? "Checking…"} {asset.symbol}
-      {held && held !== "0" && <button type="button" className="ml-2 underline" onClick={() => setAmount(held)}>Use holding</button>}</p>}
+      disabled={Boolean(busy || recovering || unresolved)} />
+    {side === "SELL" && <div className="mt-2 text-xs text-muted">
+      <p role="status">{holdingState === "loading" ? "Checking wallet balance…" : holdingState === "error"
+        ? "Balance unavailable. Refreshing automatically…" : `Wallet holding: ${held?.displayAmount ?? "Display quantity unavailable"}${held?.displayAmount ? ` ${asset.symbol}` : ""}`}</p>
+      {holdingState === "ready" && held?.scaled && <p className="mt-2">Available to sell: {held.amount} base tokens. Wallet display uses the issuer multiplier.</p>}
+      {holdingState === "ready" && held && held.amount !== "0" && <button type="button" className="secondary-button mt-2"
+        disabled={Boolean(busy || recovering || unresolved)} onClick={() => setAmount(held.amount)}>Use holding</button>}
+    </div>}
     <label className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted">
       <input type="checkbox" checked={attested} onChange={(event) => setAttested(event.target.checked)} />
       <span>I confirm I am not a U.S. person, am not in a restricted jurisdiction, and have reviewed the issuer terms. This is my declaration, not StockPilot verification.</span>
     </label>
     {error && <p role="alert" className="investment-error">{error}</p>}
-    {execution && <p role="status" className="mt-4 text-sm">{execution.status === "CONFIRMED" ? "Confirmed" :
-      execution.status === "FAILED" ? "Failed on chain" : execution.status === "REJECTED"
-      ? "Rejected before broadcast. Check your SOL balance and prepare a fresh quote." : "Pending verification"}
+    {execution && <p role="status" className="mt-4 text-sm">{tradeStatusLabel(execution.status)}
       {execution.status !== "REJECTED" && <> · <a href={execution.solscanUrl}
       target="_blank" rel="noopener noreferrer" className="text-link">View transaction ↗</a></>}</p>}
-    {(unknown || execution?.status === "PENDING") && <button type="button" className="secondary-button mt-4"
-      disabled={Boolean(busy) || recovering} onClick={() => void checkStatus()}>Check trade status</button>}
-    <button type="button" className="button mt-5 w-full" disabled={!attested || !amount || Boolean(busy) || recovering || unknown || execution?.status === "PENDING"}
+    <button type="button" className="button mt-5 w-full" disabled={!attested || !amount || Boolean(busy) || recovering || unresolved || (side === "SELL" && (holdingState !== "ready" || held?.amount === "0"))}
       onClick={() => void prepare()}>{recovering ? "Checking trade status…" : busy === "preparing" ? "Preparing quote…" :
         busy === "signing" ? "Waiting for wallet approval…" : busy === "submitting" ? "Submitting trade…" : `Review ${side}`}</button>
-    <p className="mt-4 text-xs leading-5 text-muted">No order is sent until you review and sign in Privy. A first BUY may create a token account and require extra SOL rent; 0.003 SOL may not cover both products. An unknown result is never retried automatically.</p>
     <dialog ref={dialogRef} className="wallet-dialog" aria-label="Review trade" onCancel={(event) => { if (busy) event.preventDefault(); }}>
       {prepared && <div className="p-6">
         <p className="wallet-dialog-kicker">Review {prepared.review.side}</p>
