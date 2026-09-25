@@ -30,6 +30,13 @@ services:
       # owner wallet below; leaving either unset keeps trading unavailable.
       INVESTMENTS_ENABLED: ${INVESTMENTS_ENABLED:-false}
       STOCKPILOT_DEMO_TRADER_WALLET: ${STOCKPILOT_DEMO_TRADER_WALLET:-}
+      # Never grants wallet authority by itself. Owner must opt in through Privy
+      # and set a separate durable policy for each authenticated agent.
+      AGENT_EXECUTION_ENABLED: ${AGENT_EXECUTION_ENABLED:-false}
+      PRIVY_EXECUTION_SIGNER_ID: ${PRIVY_EXECUTION_SIGNER_ID:-}
+      PRIVY_EXECUTION_POLICY_ID: ${PRIVY_EXECUTION_POLICY_ID:-}
+      PRIVY_EXECUTION_EXPIRES_AT: ${PRIVY_EXECUTION_EXPIRES_AT:-}
+      PRIVY_EXECUTION_AUTHORIZATION_PRIVATE_KEY: ${PRIVY_EXECUTION_AUTHORIZATION_PRIVATE_KEY:-}
       JUPITER_API_KEY: ${JUPITER_API_KEY:-}
       # Safe only with loopback access and the supplied proxy's X-Real-IP overwrite.
       TRUST_PROXY: "true"

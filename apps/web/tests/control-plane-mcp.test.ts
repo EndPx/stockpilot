@@ -4,6 +4,7 @@ import type { InvestmentAsset } from "@stockpilot/integrations/asset-domain";
 import type { AgentPrincipal } from "../lib/control-plane/credentials";
 import { createStockPilotMcp, resolveMcpAsset } from "../lib/control-plane/mcp";
 import type { InvestmentRequestRecord } from "../lib/control-plane/requests";
+import { AgentOperationError } from "../lib/control-plane/agent-operations";
 
 const mint = "So11111111111111111111111111111111111111112";
 const asset: InvestmentAsset = {
@@ -94,8 +95,33 @@ test("official MCP handler exposes separate Stocks and Pre-IPO discovery tools",
   assert.ok(initialized.result);
   const listed = await rpc(handler, "tools/list");
   assert.deepEqual(listed.result?.tools?.map((tool) => tool.name).sort(),
-    ["get_balance", "get_portfolio", "get_pre_ipo", "get_request", "get_stock", "list_pre_ipo",
-      "list_requests", "list_stocks", "request_investment"]);
+    ["buy_pre_ipo", "buy_stock", "get_balance", "get_operation", "get_portfolio", "get_pre_ipo", "get_request", "get_stock",
+      "list_operations", "list_pre_ipo", "list_requests", "list_stocks", "request_investment",
+      "sell_pre_ipo", "sell_stock", "transfer_sol", "transfer_usdc"]);
+  await handler.close();
+});
+
+test("MCP execution passes only server principal and strict intent, not caller wallet or permission fields", async () => {
+  const calls: unknown[] = [];
+  const handler = createStockPilotMcp(principal, { execution: {
+    execute: async (caller, input) => {
+      assert.equal(caller, principal); calls.push(input); throw new AgentOperationError("POLICY_DISABLED");
+    }, get: async () => { throw new Error("unused"); }, list: async () => ({ operations: [] }),
+  } });
+  const valid = await rpc(handler, "tools/call", { name: "transfer_usdc", arguments: {
+    recipient: mint, amount: "1.25", clientRequestId,
+  } });
+  assert.equal(valid.result?.isError, true);
+  assert.match(valid.result?.content?.[0].text ?? "", /POLICY_DISABLED/);
+  assert.deepEqual(calls, [{ kind: "TRANSFER_USDC", recipient: mint, amount: "1.25", clientRequestId }]);
+  const bad = await rpc(handler, "tools/call", { name: "transfer_usdc", arguments: {
+    recipient: mint, amount: "1.25", clientRequestId, walletAddress: mint, autoApprove: true,
+  } });
+  assert.equal(bad.result?.isError, true); assert.equal(calls.length, 1);
+  const wrongMarket = await rpc(handler, "tools/call", { name: "buy_stock", arguments: {
+    assetId: asset.id, amount: "0.1", clientRequestId,
+  } });
+  assert.equal(wrongMarket.result?.isError, true); assert.equal(calls.length, 1);
   await handler.close();
 });
 

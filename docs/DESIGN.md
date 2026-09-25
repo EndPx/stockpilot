@@ -146,6 +146,33 @@ Labels are sentence case; uppercase is reserved for short system kickers.
 
 ## 5. Components and states
 
+Delegated agent execution revision (2026-09-25): the connected-agent detail
+keeps read/request policy separate from an explicit owner-only Wallet execution
+panel. BUY, SELL, transfer SOL, and transfer USDC are four independent opt-ins;
+new clients start with every execution permission off. The panel uses existing
+Surface, control-form, fieldset, button, and ConfirmDialog primitives, without
+changing the two-column layout or document scroll ownership. A saved policy
+alone does not connect wallet signing: the separate Wallet automation control
+requires its own user action and server-verified readiness. Never claim a
+policy save, OAuth reconnect, or legacy approval request executed a transaction.
+Before an enabled automation policy is saved, the themed confirmation names
+the agent and selected actions and states that those actions can run without
+per-transaction approval. Cancellation sends no mutation. Show exact human-unit
+limits for each operation and rolling 24 hours, with explicit Unlimited choices;
+BUY/USDC use USDC, SOL uses SOL, and SELL limits name their individual token.
+Eligible assets are the supported canonical Polymarket PreStocks and AAPLx
+products, not a generic all-market grant. Transfers require a visible recipient
+allowlist or an explicit Any recipient choice. Expiry and Indonesia/non-U.S.
+investor/issuer-risk acknowledgments are owner inputs, never inferred from login.
+Loading, unavailable, saved, conflict, invalid input, expired policy, inactive
+client, and wallet-not-connected states remain distinct. Revoked/expired clients
+cannot edit grants; disabling a grant affects future signing, not an already
+submitted transaction. Existing request-policy language must not imply either
+global trading disablement or wallet authority. This revision supersedes earlier
+unavailable-only automatic-execution copy only where the new enforced controls
+are present. Visual/browser accessibility verification is required separately;
+unit tests do not constitute a visual or performance certification.
+
 Privy sign-in extension: a dedicated `/sign-in` surface uses the existing
 BrandMark, charcoal/navy and cobalt system. The credential choice card has a
 Google primary action and email fallback using the Privy modal. The email field

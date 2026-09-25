@@ -19,7 +19,11 @@ check_health() {
   else
     printf '%s\n' "$health" | grep -Eq '"investmentsEnabled"[[:space:]]*:[[:space:]]*false' || fail 'trading unexpectedly enabled'
   fi
-  printf '%s\n' "$health" | grep -Eq '"agentExecutionEnabled"[[:space:]]*:[[:space:]]*false' || fail 'agent execution unexpectedly enabled'
+  if grep -qx 'AGENT_EXECUTION_ENABLED=true' "$runtime"; then
+    printf '%s\n' "$health" | grep -Eq '"agentExecutionEnabled"[[:space:]]*:[[:space:]]*true' || fail 'agent execution is not configured'
+  else
+    printf '%s\n' "$health" | grep -Eq '"agentExecutionEnabled"[[:space:]]*:[[:space:]]*false' || fail 'agent execution unexpectedly enabled'
+  fi
 }
 
 [ "$#" -eq 1 ] || fail 'usage: sh deploy/git-release.sh <40-character origin/main commit SHA>'

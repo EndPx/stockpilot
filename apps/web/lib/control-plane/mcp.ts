@@ -8,6 +8,11 @@ import { getPublicMarket, listMarkets, marketRegistry } from "@/lib/markets";
 import { getBalance, getPortfolio } from "@/lib/portfolio";
 import { createInvestmentRequest, getClientRequest, listClientRequests, RequestError } from "./requests";
 import type { AgentPrincipal } from "./credentials";
+import { AgentOperationError } from "./agent-operations";
+import { agentExecutionGateway, AgentExecutionError } from "@/lib/agent-execution/gateway";
+import { TransferError } from "@/lib/investments/transfer";
+import { InvestmentApiError } from "@/lib/investments/errors";
+import { DelegatedSignerError } from "@/lib/privy/delegated-signer";
 
 type Dependencies = {
   listAssets: typeof listMarkets;
@@ -19,6 +24,7 @@ type Dependencies = {
   getRequest: typeof getClientRequest;
   listRequests: typeof listClientRequests;
   appUrl: () => URL;
+  execution: typeof agentExecutionGateway;
 };
 
 type AssetReaders = {
@@ -55,6 +61,7 @@ const defaults: Dependencies = {
   getRequest: getClientRequest,
   listRequests: listClientRequests,
   appUrl: () => getAuthRuntimeConfig().appUrl,
+  execution: agentExecutionGateway,
 };
 
 function result(value: unknown) {
@@ -66,7 +73,10 @@ function denied() {
 }
 
 function failure(error: unknown) {
-  const message = error instanceof RequestError ? `${error.code}: ${error.message}` : "STOCKPILOT_UNAVAILABLE: Request could not be completed.";
+  const message = error instanceof RequestError ? `${error.code}: ${error.message}` :
+    error instanceof AgentOperationError || error instanceof AgentExecutionError || error instanceof TransferError ||
+    error instanceof InvestmentApiError || error instanceof DelegatedSignerError ? `${error.code}: Operation was not completed. Inspect your agent policy and get_operation before retrying.` :
+      "STOCKPILOT_UNAVAILABLE: Request could not be completed. For a write, reuse the same clientRequestId; never create a replacement before checking its status.";
   return { isError: true, content: [{ type: "text" as const, text: message }] };
 }
 
@@ -191,6 +201,46 @@ export function createStockPilotMcp(principal: AgentPrincipal, overrides: Partia
       catch (error) { return failure(error); }
     });
 
+    // Execution scopes live in a separate, owner-authored durable policy. A legacy
+    // read/request scope, OAuth login, or an approved request never grants spending.
+    const operationId = z.string().regex(/^[A-Za-z0-9_-]{16,128}$/);
+    const amount = z.string().min(1).max(40).regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/);
+    for (const market of marketTools) {
+      for (const side of ["BUY", "SELL"] as const) {
+        server.registerTool(`${side.toLowerCase()}_${market.provider === "xstocks" ? "stock" : "pre_ipo"}`, {
+          description: `${side} a supported ${market.label} with the owner's explicitly enabled automatic ${side} policy and wallet delegation. This moves real funds without another approval. amount is ${side === "BUY" ? "USDC (6 decimals)" : "token base units expressed as a decimal, NOT Scaled UI shares"}. Currently Polymarket and AAPLx only. Use a unique clientRequestId per intent; reuse it after errors. Never retry an unresolved operation with a new ID.`,
+          inputSchema: z.object({ assetId: z.string().regex(market.assetId), amount, clientRequestId: operationId }).strict(),
+          annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+        }, async (input) => {
+          try { return result(await deps.execution.execute(principal, { ...input, kind: side })); }
+          catch (error) { return failure(error); }
+        });
+      }
+    }
+    for (const currency of ["SOL", "USDC"] as const) {
+      server.registerTool(`transfer_${currency.toLowerCase()}`, {
+        description: `Transfer real ${currency} to another Solana wallet under a separate owner-enabled transfer permission, recipient allowlist, spending limits and wallet delegation. This is irreversible and does not ask again for approval. amount uses ${currency === "SOL" ? "9" : "6"} decimals. Network fee and possible USDC account rent are additional. A BUY/SELL grant does not allow transfers. Reuse clientRequestId on retries; never replace an unresolved transfer.`,
+        inputSchema: z.object({ recipient: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/), amount, clientRequestId: operationId }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      }, async (input) => {
+        try { return result(await deps.execution.execute(principal, { ...input, kind: currency === "SOL" ? "TRANSFER_SOL" : "TRANSFER_USDC" })); }
+        catch (error) { return failure(error); }
+      });
+    }
+    server.registerTool("get_operation", {
+      description: "Read this client's own trade/transfer and reconcile finalized Solana evidence. Never signs, sends or retries. UNKNOWN or SUBMITTED means unresolved, not failed.",
+      inputSchema: z.object({ operationId: z.uuid() }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    }, async ({ operationId }) => {
+      try { return result(await deps.execution.get(principal, operationId)); } catch (error) { return failure(error); }
+    });
+    server.registerTool("list_operations", {
+      description: "Read recent real trades and transfers made by this client, including clientRequestId for recovery. Does not submit anything.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(50).optional() }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    }, async ({ limit }) => {
+      try { return result(await deps.execution.list(principal, limit ?? 25)); } catch (error) { return failure(error); }
+    });
     return server;
   });
   return handler;

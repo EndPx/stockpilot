@@ -113,7 +113,7 @@ test("agent detail distinguishes read-only access from an investment request gra
   const html = renderToStaticMarkup(createElement(AccessSummary, { policy: detailPolicy }));
   assert.match(html, /Read Stocks and Pre-IPO market data/);
   assert.match(html, /Investment requests are off/);
-  assert.match(html, /no wallet-signing authority/);
+  assert.match(html, /do not grant wallet-signing authority/);
   assert.doesNotMatch(html, /No request cap|signing key|Full access|autonomous/i);
 });
 
