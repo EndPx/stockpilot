@@ -58,6 +58,7 @@ docker build --build-arg NEXT_PUBLIC_AUTH_PROVIDER=privy \
   export CONTROL_PLANE_DATABASE_URL
   docker run --rm --network stockpilot_egress --memory 384m --cpus 0.5 \
     --env CONTROL_PLANE_DATABASE_URL --env CONTROL_PLANE_MIGRATION_URL \
+    --mount "type=bind,src=$release/deploy/grant-runtime-agent-operations.sql,dst=/app/deploy/grant-runtime-agent-operations.sql,readonly" \
     "$migration_image" node apps/web/scripts/grant-agent-runtime.mjs
   # Positive u64 representability ceilings only. User's per-agent limits are
   # enforced atomically by StockPilot; no hidden $0.10 demo spending cap.

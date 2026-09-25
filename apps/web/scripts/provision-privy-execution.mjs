@@ -9,6 +9,26 @@ import { PrivyClient, generateP256KeyPair } from "@privy-io/node";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const MAX_U64 = 18_446_744_073_709_551_615n;
 
+export function quorumDisplayName(runId) {
+  return `StockPilot execution ${runId.slice(0, 8)}`;
+}
+
+// Never print an SDK Error, headers, config, or request body. Only a bounded
+// provider description is permitted, with credentials and URLs redacted.
+export function provisioningDiagnostic(stage, error, secrets = []) {
+  const status = Number.isInteger(error?.status) && error.status >= 100 && error.status <= 599 ? error.status : "none";
+  const body = error?.error && typeof error.error === "object" ? error.error : {};
+  const nested = body.error && typeof body.error === "object" ? body.error : body;
+  const code = typeof nested.code === "string" && /^[A-Za-z_][A-Za-z0-9_-]{0,47}$/.test(nested.code) ? nested.code : "unclassified";
+  let description = typeof nested.description === "string" ? nested.description : typeof nested.message === "string" ? nested.message : "";
+  for (const secret of secrets) if (typeof secret === "string" && secret.length > 0) description = description.replaceAll(secret, "[redacted]");
+  description = description.replace(/https?:\/\/[^\s"'<>]+/gi, "[url]")
+    .replace(/[A-Za-z0-9+/=_-]{24,}/g, "[redacted]")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/[\r\n\t\x00-\x1f\x7f]/g, " ").slice(0, 240);
+  return `stage=${stage} status=${status} code=${code}${description ? ` description=${description}` : ""}`;
+}
+
 function providerCeiling(value) {
   if (typeof value !== "string" || !/^[1-9]\d{0,19}$/.test(value) || BigInt(value) > MAX_U64) {
     throw new Error("Provider ceilings must be explicit positive raw-unit u64 amounts");
@@ -76,6 +96,7 @@ export async function provision(args) {
   const runId = randomUUID();
   let signerId = "";
   let policyId = "";
+  let stage = "generate_key";
   try {
     const key = await generateP256KeyPair();
     async function save() {
@@ -89,21 +110,27 @@ export async function provision(args) {
       await file.sync();
     }
     // Save the key before creating anything remotely, including on an ambiguous API response.
+    stage = "save_key";
     await save();
-    const privy = new PrivyClient({ appId, appSecret, maxRetries: 0, timeout: 15_000 });
+    stage = "initialize_client";
+    const privy = new PrivyClient({ appId, appSecret, maxRetries: 0, timeout: 15_000, logLevel: "off" });
+    stage = "create_signer";
     const quorum = await privy.keyQuorums().create({ authorization_threshold: 1,
-      display_name: `StockPilot execution ${runId}`, public_keys: [key.publicKey] });
+      display_name: quorumDisplayName(runId), public_keys: [key.publicKey] });
     signerId = quorum.id;
+    stage = "save_signer";
     await save();
+    stage = "create_policy";
     const policy = await privy.policies().create({ ...policyInput,
       idempotency_key: `stockpilot-policy-${runId}` });
     policyId = policy.id;
+    stage = "save_policy";
     await save();
     process.stdout.write(`Created StockPilot signer ${signerId} and policy ${policyId}. Protected configuration saved. No wallet was delegated.\n`);
-  } catch {
+  } catch (error) {
     // Keep the protected partial configuration to investigate an uncertain creation.
     // Do not print SDK errors: they may include request data.
-    throw new Error(`Provisioning did not complete. Inspect the protected output and Privy resources for run ${runId} before retrying.`);
+    throw new Error(`Provisioning did not complete (${provisioningDiagnostic(stage, error, [appSecret])}). Inspect the protected output and Privy resources for run ${runId} before retrying.`);
   } finally { await file.close(); }
 }
 
